@@ -7,7 +7,6 @@ module.exports = async (req, res) => {
 
   let fx = null, fxLive = false; // 업비트 USDC/KRW (크립토 환율, 김프 포함)
   let bankFx = null, bankFxLive = false; // 은행간 환율 (김프 미포함)
-  let mark = null, oracle = null, funding = null, oi = null, vol24h = null, skhxLive = false;
 
   // 1) 업비트 USDC/KRW 환율 (크립토 시장 환율 - 김치프리미엄 포함)
   try {
@@ -40,7 +39,8 @@ module.exports = async (req, res) => {
     // 실패하면 bankFx는 null로 남고, 프론트엔드에서 업비트 환율로 대체됩니다.
   }
 
-  // 2) Hyperliquid HIP-3 (xyz dex) SKHX
+  // 2) Hyperliquid HIP-3 (xyz dex) — SKHX(SK하이닉스), SMSN(삼성전자) 한 번에 조회
+  const symbols = { SKHX: null, SMSN: null };
   try {
     const r = await fetch("https://api.hyperliquid.xyz/info", {
       method: "POST",
@@ -49,25 +49,29 @@ module.exports = async (req, res) => {
     });
     if (r.ok) {
       const [meta, ctxs] = await r.json();
-      const idx = meta?.universe?.findIndex(
-        (a) => a.name === "SKHX" || a.name === "xyz:SKHX"
-      );
-      if (idx != null && idx >= 0 && ctxs?.[idx]) {
-        const m = ctxs[idx];
-        mark = Number(m.markPx);
-        oracle = Number(m.oraclePx);
-        funding = Number(m.funding);
-        oi = Number(m.openInterest);
-        vol24h = Number(m.dayNtlVlm);
-        skhxLive = true;
+      for (const key of Object.keys(symbols)) {
+        const idx = meta?.universe?.findIndex(
+          (a) => a.name === key || a.name === "xyz:" + key
+        );
+        if (idx != null && idx >= 0 && ctxs?.[idx]) {
+          const m = ctxs[idx];
+          symbols[key] = {
+            mark: Number(m.markPx),
+            oracle: Number(m.oraclePx),
+            funding: Number(m.funding),
+            oi: Number(m.openInterest),
+            vol24h: Number(m.dayNtlVlm),
+            live: true,
+          };
+        }
       }
     }
   } catch (e) {
-    // 실패하면 mark 등은 null로 남고, 프론트엔드에서 데모값으로 대체됩니다.
+    // 실패하면 해당 심볼은 null로 남고, 프론트엔드에서 데모값으로 대체됩니다.
   }
 
   res.status(200).json({
-    fx, fxLive, bankFx, bankFxLive, mark, oracle, funding, oi, vol24h, skhxLive,
+    fx, fxLive, bankFx, bankFxLive, symbols,
     timestamp: Date.now(),
   });
 };

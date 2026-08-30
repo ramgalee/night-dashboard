@@ -39,6 +39,8 @@
   .dot { display:inline-flex; align-items:center; gap:6px; font-size:10px; font-family:var(--mono); }
   .dotcircle { width:6px; height:6px; border-radius:999px; display:inline-block; }
   .macro-cell { background: var(--surface2); border-radius:10px; padding:10px 12px; }
+  .stock-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(280px,1fr)); gap:16px; margin-bottom:16px; }
+  .stock-name { font-size:13px; color:var(--textSec); margin-bottom:6px; }
   .disclaimer { border:1px dashed var(--hair); border-radius:12px; padding:12px 16px; font-size:11.5px; color:var(--textTer); line-height:1.6; background: var(--surface); }
 </style>
 </head>
@@ -55,51 +57,14 @@
   <div class="layout">
     <div>
       <div class="card row">
-        <span style="font-size:12px;color:var(--textSec);">SK하이닉스 한국 종가 (수동 입력)</span>
-        <input id="koreanClose" type="number" value="1653000" />
+        <label class="row" style="gap:6px;font-size:12px;color:var(--textSec);cursor:pointer;">
+          <input type="checkbox" id="kimchiToggle" checked style="accent-color:var(--signature);" />
+          김프 제거 (은행간 환율로 계산)
+        </label>
         <span id="updatedAt" style="font-size:11px;color:var(--textTer);margin-left:auto;">로딩 중...</span>
       </div>
 
-      <div class="card">
-        <div class="between" style="align-items:flex-start;flex-wrap:wrap;gap:16px;">
-          <div>
-            <div style="font-size:13px;color:var(--textSec);margin-bottom:6px;">SK하이닉스 · 야간 참고가</div>
-            <div class="price" id="impliedPrice">-</div>
-            <div class="pct" id="changePct">-</div>
-            <div class="meta">
-              <span id="markVal">SKHX Mark -</span>
-              <span id="oracleVal">Oracle -</span>
-              <span id="fxVal">USD/KRW(업비트) -</span>
-              <span id="bankFxVal">USD/KRW(은행간) -</span>
-            </div>
-            <label class="row" style="gap:6px;margin-top:10px;font-size:11.5px;color:var(--textSec);cursor:pointer;">
-              <input type="checkbox" id="kimchiToggle" checked style="accent-color:var(--signature);" />
-              김프 제거 (은행간 환율로 계산)
-            </label>
-          </div>
-          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
-            <div id="gauge"></div>
-            <div class="row" style="gap:10px;">
-              <span class="dot"><span class="dotcircle" id="skhxDotC"></span><span id="skhxDot">DEMO</span></span>
-              <span style="color:var(--textTer);">·</span>
-              <span class="dot"><span class="dotcircle" id="fxDotC"></span><span id="fxDot">DEMO</span></span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="between" style="margin-bottom:12px;">
-          <span style="font-size:13px;color:var(--textSec);">가격 신뢰도</span>
-          <span id="confBadge" style="font-size:13px;font-weight:600;"></span>
-        </div>
-        <div class="grid">
-          <div><div class="stat-label">Mark-Oracle</div><div class="stat-value" id="spreadVal">-</div></div>
-          <div><div class="stat-label">Funding</div><div class="stat-value" id="fundingVal">-</div></div>
-          <div><div class="stat-label">24H 거래대금</div><div class="stat-value" id="volVal">-</div></div>
-          <div><div class="stat-label">미결제(OI)</div><div class="stat-value" id="oiVal">-</div></div>
-        </div>
-      </div>
+      <div class="stock-grid" id="stockGrid"></div>
 
       <div class="card">
         <div style="font-size:13px;color:var(--textSec);margin-bottom:12px;">참고 지표 <span style="color:var(--textTer);font-size:11px;">(데모 고정값 · 실제 연동 필요)</span></div>
@@ -123,7 +88,39 @@
 
 <script>
 const T = { up:"#E5484D", down:"#2F6FED", amber:"#B8790A", teal:"#0E9C86", hair:"#E1E5F0", textPri:"#131A2C", textTer:"#8B94B0" };
-let walk = { fx: 1380.5, bankFx: 1380.5, mark: 1211.6, oracle: 1207.3 };
+const STOCKS = [
+  { key: "SKHX", name: "SK하이닉스", defaultClose: 1653000, demoMark: 1211.6, demoOracle: 1207.3 },
+  { key: "SMSN", name: "삼성전자", defaultClose: 257000, demoMark: 188.9, demoOracle: 188.6 },
+];
+let walk = { fx: 1380.5, bankFx: 1380.5 };
+STOCKS.forEach(s => { walk[s.key] = { mark: s.demoMark, oracle: s.demoOracle }; });
+
+document.getElementById("stockGrid").innerHTML = STOCKS.map(s => `
+  <div class="card">
+    <div class="stock-name">${s.name} <span style="color:var(--textTer);font-family:var(--mono);font-size:11px;">${s.key}</span></div>
+    <div class="price" id="price_${s.key}">-</div>
+    <div class="pct" id="pct_${s.key}">-</div>
+    <div class="meta">
+      <span id="mark_${s.key}">Mark -</span>
+      <span id="oracle_${s.key}">Oracle -</span>
+    </div>
+    <div class="row" style="margin-top:12px;gap:8px;">
+      <span style="font-size:11px;color:var(--textSec);">한국 종가</span>
+      <input id="close_${s.key}" type="number" value="${s.defaultClose}" style="width:110px;" />
+    </div>
+    <div class="row" style="margin-top:12px;justify-content:space-between;">
+      <div id="gauge_${s.key}" style="max-width:150px;"></div>
+      <div style="text-align:right;">
+        <div class="row" style="gap:6px;justify-content:flex-end;">
+          <span class="dot"><span class="dotcircle" id="liveDot_${s.key}"></span><span id="liveLabel_${s.key}">DEMO</span></span>
+        </div>
+        <div style="font-size:10.5px;color:var(--textTer);margin-top:6px;">
+          신뢰도 <span id="conf_${s.key}" style="font-weight:600;"></span><br/>
+          Mark-Oracle <span id="spread_${s.key}"></span> · 거래대금 <span id="vol_${s.key}"></span>
+        </div>
+      </div>
+    </div>
+  </div>`).join("");
 
 const macro = [
   { name:"NASDAQ", val:0.82 }, { name:"SOX", val:2.21 }, { name:"Micron", val:3.29 },
@@ -148,8 +145,7 @@ function gaugeSvg(pct){
   const zone = Math.abs(clamped)<0.8 ? T.teal : Math.abs(clamped)<1.8 ? T.amber : T.up;
   const dash = (Math.abs(angle)/180)*232.5;
   const offset = angle<0 ? 0 : -(90/180)*232.5;
-  return `<svg viewBox="0 0 200 110" style="width:100%;max-width:220px;">
-    <path d="M 26 92 A 74 74 0 0 1 174 92" stroke="${T.hair}" stroke-width="10" fill="none" stroke-linecap="round"/>
+  return `<svg viewBox="0 0 200 110" style="width:100%;max-width:150px;">    <path d="M 26 92 A 74 74 0 0 1 174 92" stroke="${T.hair}" stroke-width="10" fill="none" stroke-linecap="round"/>
     <path d="M 26 92 A 74 74 0 0 1 174 92" stroke="${zone}" stroke-width="10" fill="none" stroke-linecap="round"
       stroke-dasharray="${dash} 500" stroke-dashoffset="${offset}" opacity="0.9"/>
     <line x1="${cx}" y1="${cy}" x2="${nx}" y2="${ny}" stroke="${T.textPri}" stroke-width="2.5" stroke-linecap="round"/>
@@ -161,62 +157,72 @@ function gaugeSvg(pct){
 }
 
 async function fetchAndRender(){
-  const koreanClose = Number(document.getElementById("koreanClose").value) || 0;
   let data = {};
   try {
     const r = await fetch("/api/market", { cache: "no-store" });
     data = await r.json();
   } catch(e) { data = {}; }
 
-  let { fx, fxLive, bankFx, bankFxLive, mark, oracle, funding, oi, vol24h, skhxLive } = data;
+  let { fx, fxLive, bankFx, bankFxLive, symbols } = data;
+  symbols = symbols || {};
 
   if (!fxLive) { walk.fx *= (1 + (Math.random()-0.5)*0.0008); fx = walk.fx; } else { walk.fx = fx; }
   if (!bankFxLive) { walk.bankFx *= (1 + (Math.random()-0.5)*0.0004); bankFx = walk.bankFx; } else { walk.bankFx = bankFx; }
-  if (!skhxLive) {
-    walk.mark *= (1 + (Math.random()-0.5)*0.003);
-    walk.oracle *= (1 + (Math.random()-0.5)*0.0015);
-    mark = walk.mark; oracle = walk.oracle;
-    funding = 0.0018 + (Math.random()-0.5)*0.001;
-    oi = 12000000 + Math.random()*1000000;
-    vol24h = 18000000 + Math.random()*3000000;
-  } else { walk.mark = mark; walk.oracle = oracle; }
 
   const removeKimchi = document.getElementById("kimchiToggle").checked;
   const effectiveFx = (removeKimchi && bankFxLive) ? bankFx : fx;
 
-  const impliedKrw = mark * effectiveFx;
-  const changePct = (impliedKrw/koreanClose - 1) * 100;
-  const spreadPct = ((mark - oracle)/oracle) * 100;
+  STOCKS.forEach(s => {
+    const koreanClose = Number(document.getElementById(`close_${s.key}`).value) || 0;
+    const live = symbols[s.key];
+    let mark, oracle, funding, oi, vol24h, isLive;
 
-  document.getElementById("impliedPrice").textContent = fmtWon(impliedKrw);
-  document.getElementById("impliedPrice").style.color = changePct>=0 ? T.up : T.down;
-  const pctEl = document.getElementById("changePct");
-  pctEl.textContent = fmtPct(changePct) + " vs 한국 종가";
-  pctEl.style.color = changePct>=0 ? T.up : T.down;
-  document.getElementById("markVal").textContent = "SKHX Mark " + fmtUsd(mark);
-  document.getElementById("oracleVal").textContent = "Oracle " + fmtUsd(oracle);
-  document.getElementById("fxVal").textContent = "USD/KRW(업비트) " + fx.toFixed(2);
-  document.getElementById("bankFxVal").textContent = "USD/KRW(은행간) " + (bankFxLive ? bankFx.toFixed(2) : "데모 " + bankFx.toFixed(2));
-  document.getElementById("gauge").innerHTML = gaugeSvg(changePct);
+    if (live) {
+      mark = live.mark; oracle = live.oracle; funding = live.funding; oi = live.oi; vol24h = live.vol24h;
+      isLive = true;
+      walk[s.key].mark = mark; walk[s.key].oracle = oracle;
+    } else {
+      walk[s.key].mark *= (1 + (Math.random()-0.5)*0.003);
+      walk[s.key].oracle *= (1 + (Math.random()-0.5)*0.0015);
+      mark = walk[s.key].mark; oracle = walk[s.key].oracle;
+      funding = 0.0018 + (Math.random()-0.5)*0.001;
+      oi = 5000000 + Math.random()*1000000;
+      vol24h = 8000000 + Math.random()*2000000;
+      isLive = false;
+    }
 
-  document.getElementById("skhxDot").textContent = skhxLive ? "LIVE" : "DEMO";
-  document.getElementById("skhxDotC").style.background = skhxLive ? T.teal : "#5B6483";
-  document.getElementById("fxDot").textContent = fxLive ? "LIVE" : "DEMO";
-  document.getElementById("fxDotC").style.background = fxLive ? T.teal : "#5B6483";
+    const impliedKrw = mark * effectiveFx;
+    const changePct = (impliedKrw/koreanClose - 1) * 100;
+    const spreadPct = ((mark - oracle)/oracle) * 100;
 
-  let confLabel="높음", confColor=T.teal;
-  if (Math.abs(spreadPct)>1.5 || vol24h<8000000){ confLabel="낮음"; confColor=T.up; }
-  else if (Math.abs(spreadPct)>0.6 || vol24h<15000000){ confLabel="보통"; confColor=T.amber; }
-  const badge = document.getElementById("confBadge");
-  badge.textContent = confLabel; badge.style.color = confColor;
+    const priceEl = document.getElementById(`price_${s.key}`);
+    priceEl.textContent = fmtWon(impliedKrw);
+    priceEl.style.color = changePct>=0 ? T.up : T.down;
+    const pctEl = document.getElementById(`pct_${s.key}`);
+    pctEl.textContent = fmtPct(changePct) + " vs 한국 종가";
+    pctEl.style.color = changePct>=0 ? T.up : T.down;
+    document.getElementById(`mark_${s.key}`).textContent = "Mark " + fmtUsd(mark);
+    document.getElementById(`oracle_${s.key}`).textContent = "Oracle " + fmtUsd(oracle);
+    document.getElementById(`gauge_${s.key}`).innerHTML = gaugeSvg(changePct);
 
-  document.getElementById("spreadVal").textContent = fmtPct(spreadPct);
-  document.getElementById("fundingVal").textContent = (funding*100).toFixed(4) + "%";
-  document.getElementById("volVal").textContent = "$" + (vol24h/1e6).toFixed(1) + "m";
-  document.getElementById("oiVal").textContent = "$" + (oi/1e6).toFixed(1) + "m";
+    document.getElementById(`liveLabel_${s.key}`).textContent = isLive ? "LIVE" : "DEMO";
+    document.getElementById(`liveDot_${s.key}`).style.background = isLive ? T.teal : "#8B94B0";
 
-  document.getElementById("updatedAt").textContent = "업데이트 " + new Date().toLocaleTimeString("ko-KR");
-  localStorage.setItem("koreanClose", koreanClose);
+    let confLabel="높음", confColor=T.teal;
+    if (Math.abs(spreadPct)>1.5 || vol24h<8000000){ confLabel="낮음"; confColor=T.up; }
+    else if (Math.abs(spreadPct)>0.6 || vol24h<15000000){ confLabel="보통"; confColor=T.amber; }
+    const confEl = document.getElementById(`conf_${s.key}`);
+    confEl.textContent = confLabel; confEl.style.color = confColor;
+    document.getElementById(`spread_${s.key}`).textContent = fmtPct(spreadPct);
+    document.getElementById(`vol_${s.key}`).textContent = "$" + (vol24h/1e6).toFixed(1) + "m";
+
+    localStorage.setItem(`close_${s.key}`, koreanClose);
+  });
+
+  document.getElementById("updatedAt").textContent =
+    "업데이트 " + new Date().toLocaleTimeString("ko-KR") +
+    " · USD/KRW(업비트) " + fx.toFixed(2) +
+    " · USD/KRW(은행간) " + bankFx.toFixed(2);
 }
 
 function timeAgo(pubDate){
@@ -246,9 +252,12 @@ async function fetchNews(){
   }
 }
 
-document.getElementById("koreanClose").value = localStorage.getItem("koreanClose") || 1653000;
+STOCKS.forEach(s => {
+  const saved = localStorage.getItem(`close_${s.key}`);
+  if (saved) document.getElementById(`close_${s.key}`).value = saved;
+  document.getElementById(`close_${s.key}`).addEventListener("change", fetchAndRender);
+});
 document.getElementById("refreshBtn").addEventListener("click", fetchAndRender);
-document.getElementById("koreanClose").addEventListener("change", fetchAndRender);
 document.getElementById("kimchiToggle").addEventListener("change", fetchAndRender);
 fetchAndRender();
 fetchNews();
