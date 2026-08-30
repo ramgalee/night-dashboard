@@ -33,16 +33,25 @@ module.exports = async (req, res) => {
         .replace(/\s+/g, " ")
         .trim();
 
-    // 각 글의 본문 텍스트 추출 (메시지 텍스트에는 보통 <div>가 중첩되지 않으므로,
-    // 여는 태그 다음 첫 번째 </div>를 닫는 태그로 간주합니다)
+    // 각 글의 본문 텍스트 + 실제 기사 링크 추출
+    // (메시지 텍스트에는 보통 <div>가 중첩되지 않으므로, 여는 태그 다음 첫 번째 </div>를 닫는 태그로 간주합니다)
+    const decodeUrl = (u) => u.replace(/&amp;/g, "&");
     const texts = [];
     const textRe = /class="tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>/g;
     let m;
     while ((m = textRe.exec(html)) !== null) {
-      texts.push(clean(m[1]));
+      const raw = m[1];
+      const aMatch = raw.match(/<a\s+href="([^"]+)"/);
+      const articleUrl = aMatch ? decodeUrl(aMatch[1]) : null;
+      let title = clean(raw);
+      if (articleUrl) {
+        // 제목 끝에 URL 텍스트가 그대로 남아있으면 제거 (링크로 대체할 것이므로 중복)
+        title = title.replace(articleUrl, "").trim();
+      }
+      texts.push({ title, articleUrl });
     }
 
-    // 각 글의 원문 링크(permalink) + 작성 시각 추출
+    // 각 글의 텔레그램 permalink(실제 기사 링크가 없을 때 대비용) + 작성 시각 추출
     const links = [];
     const linkRe =
       /class="tgme_widget_message_date"\s+href="([^"]+)"[\s\S]*?datetime="([^"]+)"/g;
@@ -53,10 +62,10 @@ module.exports = async (req, res) => {
     const count = Math.min(texts.length, links.length);
     const items = [];
     for (let i = 0; i < count; i++) {
-      if (!texts[i]) continue;
+      if (!texts[i] || !texts[i].title) continue;
       items.push({
-        title: texts[i].length > 140 ? texts[i].slice(0, 140) + "…" : texts[i],
-        link: links[i].link,
+        title: texts[i].title.length > 140 ? texts[i].title.slice(0, 140) + "…" : texts[i].title,
+        link: texts[i].articleUrl || links[i].link, // 실제 기사 링크 우선, 없으면 텔레그램 글로 대체
         pubDate: links[i].date,
       });
     }
