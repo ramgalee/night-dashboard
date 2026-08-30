@@ -6,9 +6,9 @@
 <title>야간 증시 모니터</title>
 <style>
   :root {
-    --void:#0A0E1A; --surface:#111729; --surface2:#182036; --hair:#232C48;
-    --textPri:#EEF1F8; --textSec:#8B94B0; --textTer:#5B6483;
-    --up:#FF4D4D; --down:#4D8DFF; --amber:#F2A93B; --teal:#37D6B0; --signature:#8B7CF6;
+    --void:#F2F4F9; --surface:#FFFFFF; --surface2:#F0F2F8; --hair:#E1E5F0;
+    --textPri:#131A2C; --textSec:#5B6483; --textTer:#8B94B0;
+    --up:#E5484D; --down:#2F6FED; --amber:#B8790A; --teal:#0E9C86; --signature:#6D4FE0;
     --mono: ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, Consolas, monospace;
     --sans: -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
   }
@@ -25,7 +25,7 @@
   .news-empty { font-size:12px; color:var(--textTer); line-height:1.6; }
   .row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
   .between { display:flex; align-items:center; justify-content:space-between; }
-  .card { background: var(--surface); border:1px solid var(--hair); border-radius:16px; padding:18px; margin-bottom:16px; }
+  .card { background: var(--surface); border:1px solid var(--hair); border-radius:16px; padding:18px; margin-bottom:16px; box-shadow: 0 1px 3px rgba(19,26,44,0.06); }
   .eyebrow { font-size:11px; letter-spacing:2px; color:var(--textTer); font-family:var(--mono); }
   h1 { font-size:22px; margin:2px 0 0; }
   button { background: var(--surface2); border:1px solid var(--hair); color:var(--textSec); padding:8px 14px; border-radius:10px; font-size:12px; cursor:pointer; font-family:var(--sans); }
@@ -39,7 +39,7 @@
   .dot { display:inline-flex; align-items:center; gap:6px; font-size:10px; font-family:var(--mono); }
   .dotcircle { width:6px; height:6px; border-radius:999px; display:inline-block; }
   .macro-cell { background: var(--surface2); border-radius:10px; padding:10px 12px; }
-  .disclaimer { border:1px dashed var(--hair); border-radius:12px; padding:12px 16px; font-size:11.5px; color:var(--textTer); line-height:1.6; }
+  .disclaimer { border:1px dashed var(--hair); border-radius:12px; padding:12px 16px; font-size:11.5px; color:var(--textTer); line-height:1.6; background: var(--surface); }
 </style>
 </head>
 <body>
@@ -122,7 +122,7 @@
 </div>
 
 <script>
-const T = { up:"#FF4D4D", down:"#4D8DFF", amber:"#F2A93B", teal:"#37D6B0", hair:"#232C48", textPri:"#EEF1F8", textTer:"#5B6483" };
+const T = { up:"#E5484D", down:"#2F6FED", amber:"#B8790A", teal:"#0E9C86", hair:"#E1E5F0", textPri:"#131A2C", textTer:"#8B94B0" };
 let walk = { fx: 1380.5, bankFx: 1380.5, mark: 1211.6, oracle: 1207.3 };
 
 const macro = [
