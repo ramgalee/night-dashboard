@@ -67,7 +67,7 @@
       <div class="stock-grid" id="stockGrid"></div>
 
       <div class="card">
-        <div style="font-size:13px;color:var(--textSec);margin-bottom:12px;">참고 지표 <span style="color:var(--textTer);font-size:11px;">(데모 고정값 · 실제 연동 필요)</span></div>
+        <div style="font-size:13px;color:var(--textSec);margin-bottom:12px;">참고 지표</div>
         <div class="grid" id="macroGrid"></div>
       </div>
 
@@ -122,15 +122,38 @@ document.getElementById("stockGrid").innerHTML = STOCKS.map(s => `
     </div>
   </div>`).join("");
 
-const macro = [
-  { name:"NASDAQ", val:0.82 }, { name:"SOX", val:2.21 }, { name:"Micron", val:3.29 },
-  { name:"NVIDIA", val:5.07 }, { name:"TSMC", val:1.43 }, { name:"미10년물", val:-0.4, unit:"%p" },
-];
-document.getElementById("macroGrid").innerHTML = macro.map(m => `
-  <div class="macro-cell">
-    <div class="stat-label">${m.name}</div>
-    <div class="stat-value" style="font-size:15px;color:${m.val>=0?T.up:T.down}">${m.val>=0?"+":""}${m.val.toFixed(2)}${m.unit||"%"}</div>
-  </div>`).join("");
+function fmtMacroPrimary(item){
+  if (!item.live) return "-";
+  if (item.type === "yield") return item.primary.toFixed(2) + "%";
+  if (item.type === "commodity") return "$" + item.primary.toFixed(2);
+  if (item.type === "stock") return "$" + item.primary.toFixed(2);
+  return item.primary.toLocaleString("en-US", { maximumFractionDigits: 2 });
+}
+function fmtMacroChange(item){
+  if (!item.live) return "";
+  if (item.type === "yield") return fmtPct(item.changePts).replace("%","") + "%p";
+  return fmtPct(item.changePct);
+}
+function macroChangeVal(item){
+  return item.type === "yield" ? item.changePts : item.changePct;
+}
+
+async function fetchMacro(){
+  const el = document.getElementById("macroGrid");
+  try {
+    const r = await fetch("/api/macro", { cache: "no-store" });
+    const data = await r.json();
+    const items = data.items || [];
+    el.innerHTML = items.map(it => `
+      <div class="macro-cell">
+        <div class="stat-label">${it.name}</div>
+        <div style="font-size:13px;font-weight:600;font-family:var(--mono);">${fmtMacroPrimary(it)}</div>
+        <div class="stat-value" style="font-size:13px;color:${it.live ? (macroChangeVal(it)>=0?T.up:T.down) : T.textTer}">${it.live ? fmtMacroChange(it) : "DEMO"}</div>
+      </div>`).join("");
+  } catch (e) {
+    el.innerHTML = `<div class="news-empty">참고 지표를 불러오지 못했습니다.</div>`;
+  }
+}
 
 function fmtWon(n){ return "₩" + Math.round(n).toLocaleString("ko-KR"); }
 function fmtUsd(n){ return "$" + n.toFixed(2); }
@@ -261,8 +284,10 @@ document.getElementById("refreshBtn").addEventListener("click", fetchAndRender);
 document.getElementById("kimchiToggle").addEventListener("change", fetchAndRender);
 fetchAndRender();
 fetchNews();
+fetchMacro();
 setInterval(fetchAndRender, 6000);
 setInterval(fetchNews, 60000);
+setInterval(fetchMacro, 15000);
 </script>
 </body>
 </html>
