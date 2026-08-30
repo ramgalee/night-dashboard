@@ -1,0 +1,55 @@
+// 이 파일은 브라우저가 아니라 Vercel 서버에서 실행됩니다.
+// 그래서 업비트/Hyperliquid가 브라우저 요청을 막아도(CORS) 여기서는 문제없이 데이터를 가져올 수 있습니다.
+
+module.exports = async (req, res) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Cache-Control", "no-store");
+
+  let fx = null, fxLive = false;
+  let mark = null, oracle = null, funding = null, oi = null, vol24h = null, skhxLive = false;
+
+  // 1) 업비트 USDC/KRW 환율
+  try {
+    const r = await fetch("https://api.upbit.com/v1/ticker?markets=KRW-USDC");
+    if (r.ok) {
+      const j = await r.json();
+      if (j?.[0]?.trade_price) {
+        fx = j[0].trade_price;
+        fxLive = true;
+      }
+    }
+  } catch (e) {
+    // 실패하면 fx는 null로 남고, 프론트엔드에서 데모값으로 대체됩니다.
+  }
+
+  // 2) Hyperliquid HIP-3 (xyz dex) SKHX
+  try {
+    const r = await fetch("https://api.hyperliquid.xyz/info", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "metaAndAssetCtxs", dex: "xyz" }),
+    });
+    if (r.ok) {
+      const [meta, ctxs] = await r.json();
+      const idx = meta?.universe?.findIndex(
+        (a) => a.name === "SKHX" || a.name === "xyz:SKHX"
+      );
+      if (idx != null && idx >= 0 && ctxs?.[idx]) {
+        const m = ctxs[idx];
+        mark = Number(m.markPx);
+        oracle = Number(m.oraclePx);
+        funding = Number(m.funding);
+        oi = Number(m.openInterest);
+        vol24h = Number(m.dayNtlVlm);
+        skhxLive = true;
+      }
+    }
+  } catch (e) {
+    // 실패하면 mark 등은 null로 남고, 프론트엔드에서 데모값으로 대체됩니다.
+  }
+
+  res.status(200).json({
+    fx, fxLive, mark, oracle, funding, oi, vol24h, skhxLive,
+    timestamp: Date.now(),
+  });
+};
