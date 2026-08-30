@@ -33,10 +33,10 @@ module.exports = async (req, res) => {
         .replace(/\s+/g, " ")
         .trim();
 
-    // 각 글의 본문 텍스트 추출
+    // 각 글의 본문 텍스트 추출 (메시지 텍스트에는 보통 <div>가 중첩되지 않으므로,
+    // 여는 태그 다음 첫 번째 </div>를 닫는 태그로 간주합니다)
     const texts = [];
-    const textRe =
-      /class="tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>\s*(?=<div class="tgme_widget_message_(?:meta|media)|<a class="tgme_widget_message_date)/g;
+    const textRe = /class="tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>/g;
     let m;
     while ((m = textRe.exec(html)) !== null) {
       texts.push(clean(m[1]));
