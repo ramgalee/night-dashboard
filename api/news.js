@@ -1,15 +1,17 @@
-// 네이버 뉴스 검색 API를 대신 호출해주는 서버 함수입니다.
-// Client ID/Secret은 코드에 직접 적지 않고, Vercel 프로젝트의 "환경변수"에 저장합니다.
+// 네이버 뉴스 검색 API(NAVER API HUB)를 대신 호출해주는 서버 함수입니다.
+// 2026년 7월, 네이버가 뉴스 검색 API를 예전 개발자센터에서 NAVER Cloud Platform의
+// API HUB로 이전했습니다. 그래서 자격증명 이름과 호출 주소가 예전과 다릅니다.
+// Key ID/Key는 코드에 직접 적지 않고, Vercel 프로젝트의 "환경변수"에 저장합니다.
 // (배포방법.md의 "뉴스 API 연결하기" 항목 참고)
 
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Cache-Control", "no-store");
 
-  const CLIENT_ID = process.env.NAVER_CLIENT_ID;
-  const CLIENT_SECRET = process.env.NAVER_CLIENT_SECRET;
+  const KEY_ID = process.env.NAVER_CLIENT_ID;
+  const KEY = process.env.NAVER_CLIENT_SECRET;
 
-  if (!CLIENT_ID || !CLIENT_SECRET) {
+  if (!KEY_ID || !KEY) {
     res.status(200).json({ items: [], configured: false });
     return;
   }
@@ -18,14 +20,14 @@ module.exports = async (req, res) => {
 
   try {
     const url =
-      "https://openapi.naver.com/v1/search/news.json?query=" +
+      "https://naverapihub.apigw.ntruss.com/search/v1/news?query=" +
       encodeURIComponent(query) +
       "&display=10&sort=date";
 
     const r = await fetch(url, {
       headers: {
-        "X-Naver-Client-Id": CLIENT_ID,
-        "X-Naver-Client-Secret": CLIENT_SECRET,
+        "X-NCP-APIGW-API-KEY-ID": KEY_ID,
+        "X-NCP-APIGW-API-KEY": KEY,
       },
     });
 

@@ -110,7 +110,10 @@
     <div class="card" style="margin-bottom:0;">
       <div class="between" style="margin-bottom:8px;">
         <span style="font-size:13px;color:var(--textSec);">뉴스</span>
-        <span style="font-size:10px;color:var(--textTer);font-family:var(--mono);">via 네이버 뉴스</span>
+        <span class="row" style="gap:6px;">
+          <button id="tabTg" style="padding:4px 10px;font-size:11px;">뉴스</button>
+          <button id="tabNaver" style="padding:4px 10px;font-size:11px;">네이버</button>
+        </span>
       </div>
       <div id="newsList" class="news-empty">불러오는 중...</div>
     </div>
@@ -218,17 +221,20 @@ function timeAgo(pubDate){
   return Math.round(h/24) + "일 전";
 }
 
+let newsSource = "tg";
+
 async function fetchNews(){
   const el = document.getElementById("newsList");
+  const url = newsSource === "tg" ? "/api/telegram-news" : ("/api/news?q=" + encodeURIComponent("미국증시"));
   try {
-    const r = await fetch("/api/news?q=" + encodeURIComponent("미국증시"), { cache: "no-store" });
+    const r = await fetch(url, { cache: "no-store" });
     const data = await r.json();
-    if (!data.configured) {
+    if (newsSource === "naver" && data.configured === false) {
       el.innerHTML = `<div class="news-empty">뉴스 API 키가 아직 연결되지 않았습니다.<br>배포방법.md의 "뉴스 API 연결하기" 항목을 참고해 Vercel 환경변수를 설정해주세요.</div>`;
       return;
     }
     if (!data.items || data.items.length === 0) {
-      el.innerHTML = `<div class="news-empty">표시할 뉴스가 없습니다.</div>`;
+      el.innerHTML = `<div class="news-empty">표시할 뉴스가 없습니다.${data.error ? " (불러오는 중 오류 발생)" : ""}</div>`;
       return;
     }
     el.innerHTML = data.items.map(it => `
@@ -241,11 +247,22 @@ async function fetchNews(){
   }
 }
 
+function setNewsTab(src){
+  newsSource = src;
+  document.getElementById("tabTg").style.background = src === "tg" ? "var(--signature)" : "var(--surface2)";
+  document.getElementById("tabTg").style.color = src === "tg" ? "#fff" : "var(--textSec)";
+  document.getElementById("tabNaver").style.background = src === "naver" ? "var(--signature)" : "var(--surface2)";
+  document.getElementById("tabNaver").style.color = src === "naver" ? "#fff" : "var(--textSec)";
+  fetchNews();
+}
+document.getElementById("tabTg").addEventListener("click", () => setNewsTab("tg"));
+document.getElementById("tabNaver").addEventListener("click", () => setNewsTab("naver"));
+
 document.getElementById("koreanClose").value = localStorage.getItem("koreanClose") || 1653000;
 document.getElementById("refreshBtn").addEventListener("click", fetchAndRender);
 document.getElementById("koreanClose").addEventListener("change", fetchAndRender);
 fetchAndRender();
-fetchNews();
+setNewsTab("tg");
 setInterval(fetchAndRender, 6000);
 setInterval(fetchNews, 60000);
 </script>
