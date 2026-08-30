@@ -69,8 +69,13 @@
             <div class="meta">
               <span id="markVal">SKHX Mark -</span>
               <span id="oracleVal">Oracle -</span>
-              <span id="fxVal">USD/KRW -</span>
+              <span id="fxVal">USD/KRW(업비트) -</span>
+              <span id="bankFxVal">USD/KRW(은행간) -</span>
             </div>
+            <label class="row" style="gap:6px;margin-top:10px;font-size:11.5px;color:var(--textSec);cursor:pointer;">
+              <input type="checkbox" id="kimchiToggle" checked style="accent-color:var(--signature);" />
+              김프 제거 (은행간 환율로 계산)
+            </label>
           </div>
           <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
             <div id="gauge"></div>
@@ -118,7 +123,7 @@
 
 <script>
 const T = { up:"#FF4D4D", down:"#4D8DFF", amber:"#F2A93B", teal:"#37D6B0", hair:"#232C48", textPri:"#EEF1F8", textTer:"#5B6483" };
-let walk = { fx: 1380.5, mark: 1211.6, oracle: 1207.3 };
+let walk = { fx: 1380.5, bankFx: 1380.5, mark: 1211.6, oracle: 1207.3 };
 
 const macro = [
   { name:"NASDAQ", val:0.82 }, { name:"SOX", val:2.21 }, { name:"Micron", val:3.29 },
@@ -163,9 +168,10 @@ async function fetchAndRender(){
     data = await r.json();
   } catch(e) { data = {}; }
 
-  let { fx, fxLive, mark, oracle, funding, oi, vol24h, skhxLive } = data;
+  let { fx, fxLive, bankFx, bankFxLive, mark, oracle, funding, oi, vol24h, skhxLive } = data;
 
   if (!fxLive) { walk.fx *= (1 + (Math.random()-0.5)*0.0008); fx = walk.fx; } else { walk.fx = fx; }
+  if (!bankFxLive) { walk.bankFx *= (1 + (Math.random()-0.5)*0.0004); bankFx = walk.bankFx; } else { walk.bankFx = bankFx; }
   if (!skhxLive) {
     walk.mark *= (1 + (Math.random()-0.5)*0.003);
     walk.oracle *= (1 + (Math.random()-0.5)*0.0015);
@@ -175,7 +181,10 @@ async function fetchAndRender(){
     vol24h = 18000000 + Math.random()*3000000;
   } else { walk.mark = mark; walk.oracle = oracle; }
 
-  const impliedKrw = mark * fx;
+  const removeKimchi = document.getElementById("kimchiToggle").checked;
+  const effectiveFx = (removeKimchi && bankFxLive) ? bankFx : fx;
+
+  const impliedKrw = mark * effectiveFx;
   const changePct = (impliedKrw/koreanClose - 1) * 100;
   const spreadPct = ((mark - oracle)/oracle) * 100;
 
@@ -186,7 +195,8 @@ async function fetchAndRender(){
   pctEl.style.color = changePct>=0 ? T.up : T.down;
   document.getElementById("markVal").textContent = "SKHX Mark " + fmtUsd(mark);
   document.getElementById("oracleVal").textContent = "Oracle " + fmtUsd(oracle);
-  document.getElementById("fxVal").textContent = "USD/KRW " + fx.toFixed(2);
+  document.getElementById("fxVal").textContent = "USD/KRW(업비트) " + fx.toFixed(2);
+  document.getElementById("bankFxVal").textContent = "USD/KRW(은행간) " + (bankFxLive ? bankFx.toFixed(2) : "데모 " + bankFx.toFixed(2));
   document.getElementById("gauge").innerHTML = gaugeSvg(changePct);
 
   document.getElementById("skhxDot").textContent = skhxLive ? "LIVE" : "DEMO";
@@ -239,6 +249,7 @@ async function fetchNews(){
 document.getElementById("koreanClose").value = localStorage.getItem("koreanClose") || 1653000;
 document.getElementById("refreshBtn").addEventListener("click", fetchAndRender);
 document.getElementById("koreanClose").addEventListener("change", fetchAndRender);
+document.getElementById("kimchiToggle").addEventListener("change", fetchAndRender);
 fetchAndRender();
 fetchNews();
 setInterval(fetchAndRender, 6000);
