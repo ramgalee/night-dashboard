@@ -28,10 +28,8 @@ async function fetchOne(inst) {
     if (price == null || prevClose == null) return { ...inst, live: false };
 
     if (inst.type === "yield") {
-      // ^TNX는 실제 수익률의 10배로 표시되는 값입니다.
-      const yieldNow = price / 10;
-      const yieldPrev = prevClose / 10;
-      return { ...inst, live: true, primary: yieldNow, changePts: yieldNow - yieldPrev };
+      // ^TNX는 이미 실제 수익률(%) 값 그대로 제공됩니다 (예: 4.73 = 4.73%).
+      return { ...inst, live: true, primary: price, changePts: price - prevClose };
     }
 
     const changePct = (price / prevClose - 1) * 100;
