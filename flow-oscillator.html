@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>수급오실레이터</title>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+  :root {
+    --void:#F2F4F9; --surface:#FFFFFF; --surface2:#F0F2F8; --hair:#E1E5F0;
+    --textPri:#131A2C; --textSec:#5B6483; --textTer:#8B94B0;
+    --up:#E5484D; --down:#2F6FED; --signature:#6D4FE0;
+    --mono: ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, Consolas, monospace;
+    --sans: -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--void); color: var(--textPri); font-family: var(--sans); margin:0; padding:24px 16px; }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  .row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .between { display:flex; align-items:center; justify-content:space-between; }
+  .card { background: var(--surface); border:1px solid var(--hair); border-radius:16px; padding:18px; margin-bottom:16px; box-shadow: 0 1px 3px rgba(19,26,44,0.06); }
+  .eyebrow { font-size:11px; letter-spacing:2px; color:var(--textTer); font-family:var(--mono); }
+  h1 { font-size:22px; margin:2px 0 0; }
+  input[type=text] { background: var(--surface2); border:1px solid var(--hair); color:var(--textPri); border-radius:8px; padding:8px 12px; font-family:var(--mono); font-size:14px; width:140px; }
+  button { background: var(--signature); border:none; color:#fff; padding:9px 16px; border-radius:8px; font-size:13px; cursor:pointer; font-family:var(--sans); font-weight:600; }
+  .status { font-size:12px; color:var(--textTer); }
+  .warning { border:1px dashed var(--up); border-radius:12px; padding:10px 14px; font-size:12px; color:var(--up); margin-bottom:16px; }
+  .notice { border:1px dashed var(--hair); border-radius:12px; padding:10px 14px; font-size:12px; color:var(--textTer); margin-bottom:16px; }
+  #chart { width:100%; height:420px; }
+  #oscChart { width:100%; height:140px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="between" style="margin-bottom:16px;">
+    <div>
+      <div class="eyebrow">수급오실레이터</div>
+      <h1>기관+외국인 수급 MACD 오실레이터</h1>
+    </div>
+  </div>
+
+  <div class="card row">
+    <span style="font-size:12px;color:var(--textSec);">종목코드</span>
+    <input type="text" id="codeInput" value="000660" placeholder="예: 000660" />
+    <button id="loadBtn">조회</button>
+    <span id="statusText" class="status" style="margin-left:auto;">SK하이닉스(000660) 조회 중...</span>
+  </div>
+
+  <div id="warningBox"></div>
+
+  <div class="card">
+    <div style="font-size:13px;color:var(--textSec);margin-bottom:8px;">캔들 차트</div>
+    <div id="chart"></div>
+  </div>
+
+  <div class="card">
+    <div style="font-size:13px;color:var(--textSec);margin-bottom:8px;">수급오실레이터 (기관+외국인 순매수 ÷ 시가총액 기준 MACD)</div>
+    <div id="oscChart"></div>
+  </div>
+
+  <div class="notice">
+    ⚠ 시가총액은 상장주식수(추정) × 종가로 계산한 근사값입니다. 실제 원본 산식(FnGuide 유료 데이터 기준)과 소폭 차이가 있을 수 있습니다.
+    수급오실레이터는 매수/매도를 보장하지 않는 참고 지표입니다.
+  </div>
+</div>
+
+<script>
+const chart = LightweightCharts.createChart(document.getElementById('chart'), {
+  layout: { background: { color: '#FFFFFF' }, textColor: '#5B6483' },
+  grid: { vertLines: { color: '#E1E5F0' }, horzLines: { color: '#E1E5F0' } },
+  timeScale: { borderColor: '#E1E5F0' },
+  rightPriceScale: { borderColor: '#E1E5F0' },
+});
+const candleSeries = chart.addCandlestickSeries({
+  upColor: '#E5484D', downColor: '#2F6FED',
+  borderUpColor: '#E5484D', borderDownColor: '#2F6FED',
+  wickUpColor: '#E5484D', wickDownColor: '#2F6FED',
+});
+
+const oscChart = LightweightCharts.createChart(document.getElementById('oscChart'), {
+  layout: { background: { color: '#FFFFFF' }, textColor: '#5B6483' },
+  grid: { vertLines: { color: '#E1E5F0' }, horzLines: { color: '#E1E5F0' } },
+  timeScale: { borderColor: '#E1E5F0' },
+  rightPriceScale: { borderColor: '#E1E5F0' },
+});
+const oscSeries = oscChart.addHistogramSeries({ color: '#6D4FE0' });
+
+// 두 차트의 좌우 스크롤(시간축)을 동기화
+chart.timeScale().subscribeVisibleLogicalRangeChange(range => {
+  if (range) oscChart.timeScale().setVisibleLogicalRange(range);
+});
+oscChart.timeScale().subscribeVisibleLogicalRangeChange(range => {
+  if (range) chart.timeScale().setVisibleLogicalRange(range);
+});
+
+function fmtDate(d){
+  // YYYYMMDD -> YYYY-MM-DD
+  return d.slice(0,4) + "-" + d.slice(4,6) + "-" + d.slice(6,8);
+}
+
+async function loadData(code){
+  const statusEl = document.getElementById('statusText');
+  const warnEl = document.getElementById('warningBox');
+  statusEl.textContent = code + " 조회 중...";
+  warnEl.innerHTML = "";
+  try {
+    const r = await fetch("/api/flow-oscillator?code=" + encodeURIComponent(code), { cache: "no-store" });
+    const data = await r.json();
+    if (data.error) {
+      statusEl.textContent = "오류: " + data.message;
+      return;
+    }
+    const series = data.series || [];
+    if (series.length === 0) {
+      statusEl.textContent = "데이터가 없습니다.";
+      return;
+    }
+    candleSeries.setData(series.map(s => ({
+      time: fmtDate(s.date), open: s.open, high: s.high, low: s.low, close: s.close,
+    })));
+    oscSeries.setData(series.map(s => ({
+      time: fmtDate(s.date), value: s.oscillator,
+      color: s.oscillator >= 0 ? '#E5484D' : '#2F6FED',
+    })));
+    chart.timeScale().fitContent();
+    oscChart.timeScale().fitContent();
+
+    statusEl.textContent = code + " · " + series.length + "거래일 · 최근 업데이트 " + new Date().toLocaleTimeString("ko-KR");
+
+    if (data.unitWarning) {
+      warnEl.innerHTML = `<div class="warning">⚠ ${data.unitWarning}</div>`;
+    } else if (data.warmupNotice) {
+      warnEl.innerHTML = `<div class="notice">${data.warmupNotice}</div>`;
+    }
+  } catch (e) {
+    statusEl.textContent = "불러오지 못했습니다: " + e;
+  }
+}
+
+document.getElementById('loadBtn').addEventListener('click', () => {
+  const code = document.getElementById('codeInput').value.trim();
+  if (code) loadData(code);
+});
+document.getElementById('codeInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('loadBtn').click();
+});
+
+loadData(document.getElementById('codeInput').value.trim());
+</script>
+</body>
+</html>
