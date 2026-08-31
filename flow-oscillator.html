@@ -35,7 +35,7 @@
   <div class="between" style="margin-bottom:16px;">
     <div>
       <div class="eyebrow">수급오실레이터</div>
-      <h1>기관+외국인 수급 MACD 오실레이터</h1>
+      <h1>수급오실레이터</h1>
     </div>
     <a href="/index.html" style="text-decoration:none;">
       <button style="background:var(--surface2);color:var(--textSec);border:1px solid var(--hair);">← 야간증시 모니터</button>
@@ -80,6 +80,17 @@ const candleSeries = chart.addCandlestickSeries({
   wickUpColor: '#E5484D', wickDownColor: '#2F6FED',
 });
 
+// 캔들 차트 위에 오실레이터를 겹쳐 그리기 위한 별도 축(값 크기가 달라도 화면 안에 맞춰 표시됨)
+const oscOverlay = chart.addLineSeries({
+  color: '#E5484D',
+  lineWidth: 2,
+  priceScaleId: 'osc-overlay',
+});
+chart.priceScale('osc-overlay').applyOptions({
+  scaleMargins: { top: 0.1, bottom: 0.1 },
+  visible: false,
+});
+
 const oscChart = LightweightCharts.createChart(document.getElementById('oscChart'), {
   layout: { background: { color: '#FFFFFF' }, textColor: '#5B6483' },
   grid: { vertLines: { color: '#E1E5F0' }, horzLines: { color: '#E1E5F0' } },
@@ -121,6 +132,9 @@ async function loadData(code){
     }
     candleSeries.setData(series.map(s => ({
       time: fmtDate(s.date), open: s.open, high: s.high, low: s.low, close: s.close,
+    })));
+    oscOverlay.setData(series.map(s => ({
+      time: fmtDate(s.date), value: s.oscillator,
     })));
     oscSeries.setData(series.map(s => ({
       time: fmtDate(s.date), value: s.oscillator,
