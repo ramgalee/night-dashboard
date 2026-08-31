@@ -138,10 +138,13 @@ function fmtMacroPrimary(item){
 function fmtMacroChange(item){
   if (!item.live) return "";
   if (item.type === "yield") return fmtPct(item.changePts).replace("%","") + "%p";
+  if (item.type === "fx") return (item.changeWon>=0?"+":"") + item.changeWon.toFixed(2) + "원";
   return fmtPct(item.changePct);
 }
 function macroChangeVal(item){
-  return item.type === "yield" ? item.changePts : item.changePct;
+  if (item.type === "yield") return item.changePts;
+  if (item.type === "fx") return item.changeWon;
+  return item.changePct;
 }
 function renderMacroCells(items){
   return items.map(it => `
