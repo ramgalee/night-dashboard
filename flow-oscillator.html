@@ -57,7 +57,7 @@
   </div>
 
   <div class="card">
-    <div style="font-size:13px;color:var(--textSec);margin-bottom:8px;">수급오실레이터 (기관+외국인 순매수 ÷ 시가총액 기준 MACD)</div>
+    <div style="font-size:13px;color:var(--textSec);margin-bottom:8px;">수급오실레이터</div>
     <div id="oscChart"></div>
   </div>
 
@@ -87,6 +87,7 @@ const oscChart = LightweightCharts.createChart(document.getElementById('oscChart
   rightPriceScale: { borderColor: '#E1E5F0' },
 });
 const oscSeries = oscChart.addHistogramSeries({ color: '#6D4FE0' });
+const oscLine = oscChart.addLineSeries({ color: '#000000', lineWidth: 1 });
 
 // 두 차트의 좌우 스크롤(시간축)을 동기화
 chart.timeScale().subscribeVisibleLogicalRangeChange(range => {
@@ -124,6 +125,9 @@ async function loadData(code){
     oscSeries.setData(series.map(s => ({
       time: fmtDate(s.date), value: s.oscillator,
       color: s.oscillator >= 0 ? '#E5484D' : '#2F6FED',
+    })));
+    oscLine.setData(series.map(s => ({
+      time: fmtDate(s.date), value: s.oscillator,
     })));
     chart.timeScale().fitContent();
     oscChart.timeScale().fitContent();
