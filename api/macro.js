@@ -3,15 +3,22 @@
 // 공식 API가 아니므로, Yahoo가 정책을 바꾸면 예고 없이 안 뜰 수 있습니다.
 
 const INSTRUMENTS = [
-  { symbol: "^DJI", name: "다우존스", type: "index" },
-  { symbol: "^IXIC", name: "나스닥", type: "index" },
-  { symbol: "^GSPC", name: "S&P500", type: "index" },
-  { symbol: "^RUT", name: "러셀2000", type: "index" },
-  { symbol: "^SOX", name: "반도체지수", type: "index" },
-  { symbol: "DRAM", name: "DRAM ETF", type: "stock" }, // Roundhill Memory ETF
-  { symbol: "^TNX", name: "미10년물", type: "yield" },
-  { symbol: "CL=F", name: "WTI유", type: "commodity" },
-  { symbol: "GC=F", name: "금선물", type: "commodity" },
+  // 아시아 증시
+  { symbol: "^N225", name: "니케이225", type: "index", region: "asia" },
+  { symbol: "^HSI", name: "홍콩항셍", type: "index", region: "asia" },
+  { symbol: "000001.SS", name: "상해종합", type: "index", region: "asia" },
+  { symbol: "^TWII", name: "대만가권", type: "index", region: "asia" },
+  { symbol: "KRW=X", name: "달러/원", type: "fx", region: "asia" },
+  // 미국/원자재
+  { symbol: "^DJI", name: "다우존스", type: "index", region: "us" },
+  { symbol: "^IXIC", name: "나스닥", type: "index", region: "us" },
+  { symbol: "^GSPC", name: "S&P500", type: "index", region: "us" },
+  { symbol: "^RUT", name: "러셀2000", type: "index", region: "us" },
+  { symbol: "^SOX", name: "반도체지수", type: "index", region: "us" },
+  { symbol: "DRAM", name: "DRAM ETF", type: "stock", region: "us" }, // Roundhill Memory ETF
+  { symbol: "^TNX", name: "미10년물", type: "yield", region: "us" },
+  { symbol: "CL=F", name: "WTI유", type: "commodity", region: "us" },
+  { symbol: "GC=F", name: "금선물", type: "commodity", region: "us" },
 ];
 
 async function fetchOne(inst) {
@@ -30,6 +37,11 @@ async function fetchOne(inst) {
     if (inst.type === "yield") {
       // ^TNX는 이미 실제 수익률(%) 값 그대로 제공됩니다 (예: 4.73 = 4.73%).
       return { ...inst, live: true, primary: price, changePts: price - prevClose };
+    }
+
+    if (inst.type === "fx") {
+      const changePct = (price / prevClose - 1) * 100;
+      return { ...inst, live: true, primary: price, changePct };
     }
 
     const changePct = (price / prevClose - 1) * 100;
