@@ -41,7 +41,8 @@ async function fetchOne(inst) {
 
     if (inst.type === "fx") {
       const changePct = (price / prevClose - 1) * 100;
-      return { ...inst, live: true, primary: price, changePct };
+      const changeWon = price - prevClose;
+      return { ...inst, live: true, primary: price, changePct, changeWon };
     }
 
     const changePct = (price / prevClose - 1) * 100;
