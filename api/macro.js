@@ -9,12 +9,12 @@ const INSTRUMENTS = [
   { symbol: "000001.SS", name: "상해종합", type: "index", region: "asia" },
   { symbol: "^TWII", name: "대만가권", type: "index", region: "asia" },
   { symbol: "KRW=X", name: "달러/원", type: "fx", region: "asia" },
-  // 미국/원자재
-  { symbol: "^DJI", name: "다우존스", type: "index", region: "us" },
-  { symbol: "^IXIC", name: "나스닥", type: "index", region: "us" },
-  { symbol: "^GSPC", name: "S&P500", type: "index", region: "us" },
-  { symbol: "^RUT", name: "러셀2000", type: "index", region: "us" },
-  { symbol: "^SOX", name: "반도체지수", type: "index", region: "us" },
+  // 미국/원자재 (다우·나스닥·S&P500·러셀2000은 선물 티커 사용 — 정규장 마감 후에도 움직임)
+  { symbol: "YM=F", name: "다우선물", type: "index", region: "us" },
+  { symbol: "NQ=F", name: "나스닥선물", type: "index", region: "us" },
+  { symbol: "ES=F", name: "S&P500선물", type: "index", region: "us" },
+  { symbol: "RTY=F", name: "러셀2000선물", type: "index", region: "us" },
+  { symbol: "^SOX", name: "반도체지수", type: "index", region: "us" }, // 유동성 있는 선물 티커가 없어 정규장 지수 유지
   { symbol: "DRAM", name: "DRAM ETF", type: "stock", region: "us" }, // Roundhill Memory ETF
   { symbol: "^TNX", name: "미10년물", type: "yield", region: "us" },
   { symbol: "CL=F", name: "WTI유", type: "commodity", region: "us" },
