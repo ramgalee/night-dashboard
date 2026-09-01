@@ -50,6 +50,12 @@
   .rank-name { font-size:12.5px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .rank-code { font-family:var(--mono); font-size:10px; color:var(--textTer); margin-left:5px; }
   .rank-amt { font-family:var(--mono); font-size:12.5px; font-weight:600; flex:none; }
+  .idx-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(320px,1fr)); gap:20px; }
+  .idx-name { font-size:13px; color:var(--textSec); margin-bottom:8px; }
+  .idx-value { font-size:34px; font-weight:700; font-family:var(--mono); letter-spacing:-1px; line-height:1.1; }
+  .idx-chg { font-size:14px; font-family:var(--mono); margin-top:4px; }
+  .idx-spark { margin-top:12px; width:100%; height:88px; display:block; }
+  .idx-foot { margin-top:6px; font-size:10.5px; color:var(--textTer); font-family:var(--mono); display:flex; justify-content:space-between; }
 </style>
 </head>
 <body>
@@ -64,6 +70,16 @@
         <button style="background:var(--signature);color:#fff;border:none;">수급오실레이터 →</button>
       </a>
       <button id="refreshBtn">↻ 새로고침</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="between" style="margin-bottom:14px;">
+      <div style="font-size:13px;color:var(--textSec);">국내 지수</div>
+      <span id="idxMeta" style="font-size:10.5px;color:var(--textTer);font-family:var(--mono);"></span>
+    </div>
+    <div class="idx-grid" id="idxGrid">
+      <div class="news-empty">불러오는 중...</div>
     </div>
   </div>
 
@@ -354,21 +370,86 @@ async function fetchInvestorRank(){
   }
 }
 
+function sparkPath(points, w, h, pad) {
+  const vals = points.map(p => p.v);
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  if (hi === lo) { hi += 1; lo -= 1; }
+  const span = hi - lo;
+  const x = i => pad + (i / Math.max(1, points.length - 1)) * (w - pad * 2);
+  const y = v => pad + (1 - (v - lo) / span) * (h - pad * 2);
+  return {
+    d: points.map((p, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + y(p.v).toFixed(1)).join(" "),
+    y, lo, hi
+  };
+}
+
+function renderIndexCard(label, o) {
+  if (!o || o.value == null) {
+    return `<div><div class="idx-name">${label}</div><div class="news-empty">데이터 없음</div></div>`;
+  }
+  const up = (o.changePts ?? 0) >= 0;
+  const color = up ? T.up : T.down;
+  const pts = o.changePts == null ? "—" : (up ? "+" : "−") + Math.abs(o.changePts).toFixed(2);
+  const pct = o.changePct == null ? "" : ` (${up ? "+" : "−"}${Math.abs(o.changePct).toFixed(2)}%)`;
+
+  const W = 560, H = 88, PAD = 6;
+  let svg = "";
+  if (o.points && o.points.length > 1) {
+    const s = sparkPath(o.points, W, H, PAD);
+    const base = (o.prevClose != null && o.prevClose >= s.lo && o.prevClose <= s.hi)
+      ? `<line x1="${PAD}" y1="${s.y(o.prevClose).toFixed(1)}" x2="${W - PAD}" y2="${s.y(o.prevClose).toFixed(1)}" stroke="${T.textTer}" stroke-width="1" stroke-dasharray="3 3" opacity="0.55" />`
+      : "";
+    svg = `<svg class="idx-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      ${base}
+      <path d="${s.d}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+    </svg>`;
+  }
+
+  const first = o.points && o.points.length ? o.points[0].t : "";
+  const last = o.points && o.points.length ? o.points[o.points.length - 1].t : "";
+  const hhmm = t => (t && t.length === 4) ? t.slice(0, 2) + ":" + t.slice(2) : "";
+
+  return `<div>
+    <div class="idx-name">${label}</div>
+    <div class="idx-value" style="color:${color}">${o.value.toLocaleString("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+    <div class="idx-chg" style="color:${color}">${pts}${pct}</div>
+    ${svg}
+    <div class="idx-foot"><span>${hhmm(first)}</span><span>${hhmm(last)}</span></div>
+  </div>`;
+}
+
+async function fetchIndexIntraday() {
+  const grid = document.getElementById("idxGrid");
+  try {
+    const r = await fetch("/api/index-intraday", { cache: "no-store" });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    grid.innerHTML = renderIndexCard("코스피", d.kospi) + renderIndexCard("코스닥", d.kosdaq);
+    const day = (d.kospi && d.kospi.date) || "";
+    document.getElementById("idxMeta").textContent =
+      (day.length === 8 ? `${day.slice(0, 4)}.${day.slice(4, 6)}.${day.slice(6, 8)} · ` : "") + "당일 1분봉";
+  } catch (e) {
+    grid.innerHTML = `<div class="news-empty">지수를 불러오지 못했습니다.</div>`;
+  }
+}
+
 STOCKS.forEach(s => {
   const saved = localStorage.getItem(`close_${s.key}`);
   if (saved) document.getElementById(`close_${s.key}`).value = saved;
   document.getElementById(`close_${s.key}`).addEventListener("change", fetchAndRender);
 });
-document.getElementById("refreshBtn").addEventListener("click", () => { fetchAndRender(); fetchInvestorRank(); });
+document.getElementById("refreshBtn").addEventListener("click", () => { fetchAndRender(); fetchInvestorRank(); fetchIndexIntraday(); });
 document.getElementById("kimchiToggle").addEventListener("change", fetchAndRender);
 fetchAndRender();
 fetchNews();
 fetchMacro();
 fetchInvestorRank();
+fetchIndexIntraday();
 setInterval(fetchAndRender, 6000);
 setInterval(fetchNews, 60000);
 setInterval(fetchMacro, 15000);
 setInterval(fetchInvestorRank, 600000);
+setInterval(fetchIndexIntraday, 30000);
 </script>
 </body>
 </html>
