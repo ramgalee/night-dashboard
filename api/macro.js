@@ -76,8 +76,10 @@ async function fetchOne(inst) {
   }
 
   try {
+    // range=1d 를 명시해야 전일 종가가 제대로 옵니다.
+    // 기간을 안 주면 야후가 종목에 따라 엉뚱한 전일 종가를 돌려주는 경우가 있습니다.
     const r = await fetch(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(inst.symbol)}`,
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(inst.symbol)}?interval=5m&range=1d`,
       { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" } }
     );
     if (!r.ok) return { ...inst, live: false };
