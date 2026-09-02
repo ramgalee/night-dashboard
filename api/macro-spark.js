@@ -1,7 +1,7 @@
 const SYMBOLS = [
   "^N225", "^HSI", "000001.SS", "^TWII", "KRW=X",
   "YM=F", "NQ=F", "ES=F", "RTY=F", "^SOX",
-  "DRAM", "CL=F", "GC=F"
+  "DRAM", "^TNX", "CL=F", "GC=F"
 ];
 
 async function one(sym) {
