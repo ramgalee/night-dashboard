@@ -89,19 +89,13 @@ async function fetchOne(inst) {
     const meta = result?.meta;
     const price = meta?.regularMarketPrice;
 
-    // 일봉 종가 목록에서 오늘을 뺀 마지막 값 = 어제 종가
-    let prevClose = null;
-    const stamps = result?.timestamp || [];
+    // 일봉 목록의 마지막 값은 항상 '현재 진행 중이거나 가장 최근에 끝난 장'입니다.
+    // 따라서 그 바로 앞 값이 전일 종가입니다. 시간대 계산이 필요 없어 24시간 거래되는
+    // 선물·환율이나 장이 닫힌 시장에서도 똑같이 동작합니다.
     const closes = result?.indicators?.quote?.[0]?.close || [];
-    const todayStart = meta?.currentTradingPeriod?.regular?.start;
-    const days = [];
-    for (let i = 0; i < closes.length; i++) {
-      const c = closes[i];
-      if (typeof c !== "number" || !isFinite(c)) continue;
-      if (todayStart && stamps[i] >= todayStart - 3600) continue; // 오늘 봉 제외
-      days.push(c);
-    }
-    if (days.length) prevClose = days[days.length - 1];
+    const days = closes.filter(c => typeof c === "number" && isFinite(c));
+
+    let prevClose = days.length >= 2 ? days[days.length - 2] : null;
 
     // 일봉으로 못 구하면 기존 방식으로 물러섭니다.
     if (prevClose == null) prevClose = meta?.chartPreviousClose ?? meta?.previousClose;
