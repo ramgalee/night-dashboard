@@ -196,22 +196,34 @@ function macroChangeVal(item){
 let SPARK = {};
 let MACRO_ITEMS = [];
 
-function miniSpark(sym, color) {
-  const s = SPARK[sym];
+// 그래프 기준선은 화면에 표시된 숫자에서 역산합니다.
+// 야후가 주는 전일종가 항목이 두 가지라 서로 어긋나는 경우가 있어,
+// 등락률과 기준선이 항상 같은 값을 쓰도록 맞춥니다.
+function macroPrevClose(it) {
+  if (!it.live || it.primary == null) return null;
+  if (it.type === "yield") return it.changePts == null ? null : it.primary - it.changePts;
+  if (it.type === "fx") return it.changeWon == null ? null : it.primary - it.changeWon;
+  if (it.changePct == null) return null;
+  return it.primary / (1 + it.changePct / 100);
+}
+
+function miniSpark(it, color) {
+  const s = SPARK[it.symbol];
   const W = 120, H = 28, PAD = 3;
   if (!s || !s.points || s.points.length < 2) {
     return `<svg class="macro-spark" viewBox="0 0 ${W} ${H}"></svg>`;
   }
   const vals = s.points;
+  const prev = macroPrevClose(it);
   let lo = Math.min(...vals), hi = Math.max(...vals);
-  if (s.prevClose != null) { lo = Math.min(lo, s.prevClose); hi = Math.max(hi, s.prevClose); }
+  if (prev != null) { lo = Math.min(lo, prev); hi = Math.max(hi, prev); }
   if (hi === lo) { hi += 1; lo -= 1; }
   const x = i => PAD + (i / (vals.length - 1)) * (W - PAD * 2);
   const y = v => PAD + (1 - (v - lo) / (hi - lo)) * (H - PAD * 2);
 
   const d = vals.map((v, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1)).join(" ");
-  const base = s.prevClose == null ? "" :
-    `<line x1="${PAD}" y1="${y(s.prevClose).toFixed(1)}" x2="${W - PAD}" y2="${y(s.prevClose).toFixed(1)}" stroke="${T.textTer}" stroke-width="1" stroke-dasharray="2 2" opacity="0.5" />`;
+  const base = prev == null ? "" :
+    `<line x1="${PAD}" y1="${y(prev).toFixed(1)}" x2="${W - PAD}" y2="${y(prev).toFixed(1)}" stroke="${T.textTer}" stroke-width="1" stroke-dasharray="2 2" opacity="0.5" />`;
   const lastX = x(vals.length - 1).toFixed(1), lastY = y(vals[vals.length - 1]).toFixed(1);
 
   return `<svg class="macro-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
@@ -229,7 +241,7 @@ function renderMacroCells(items){
         <div class="stat-label">${it.name}</div>
         <div style="font-size:13px;font-weight:600;font-family:var(--mono);">${fmtMacroPrimary(it)}</div>
         <div class="stat-value" style="font-size:13px;color:${color}">${it.live ? fmtMacroChange(it) : "DEMO"}</div>
-        ${miniSpark(it.symbol, color)}
+        ${miniSpark(it, color)}
       </div>`;
   }).join("");
 }
