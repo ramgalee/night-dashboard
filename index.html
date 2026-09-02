@@ -57,6 +57,9 @@
   .idx-chg { font-size:14px; font-family:var(--mono); margin-top:4px; }
   .idx-spark { margin-top:12px; width:100%; height:88px; display:block; }
   .idx-foot { margin-top:6px; font-size:10.5px; color:var(--textTer); font-family:var(--mono); display:flex; justify-content:space-between; }
+  .idx-breadth { margin-top:10px; padding-top:10px; border-top:1px solid var(--hair); display:flex; gap:16px; flex-wrap:wrap; }
+  .idx-bd { display:flex; align-items:baseline; gap:5px; font-size:11.5px; }
+  .idx-bd b { font-family:var(--mono); font-size:13px; font-weight:600; }
 </style>
 </head>
 <body>
@@ -452,12 +455,15 @@ function renderIndexCard(label, o) {
   const pts = o.changePts == null ? "—" : (up ? "+" : "−") + Math.abs(o.changePts).toFixed(2);
   const pct = o.changePct == null ? "" : ` (${up ? "+" : "−"}${Math.abs(o.changePct).toFixed(2)}%)`;
 
+  // 기준선은 화면에 보이는 등락폭에서 역산해, 숫자와 그래프가 어긋나지 않게 합니다.
+  const prevLine = (o.changePts != null && o.value != null) ? o.value - o.changePts : o.prevClose;
+
   const W = 560, H = 88, PAD = 6;
   let svg = "";
   if (o.points && o.points.length > 1) {
     const s = sparkPath(o.points, W, H, PAD);
-    const base = (o.prevClose != null && o.prevClose >= s.lo && o.prevClose <= s.hi)
-      ? `<line x1="${PAD}" y1="${s.y(o.prevClose).toFixed(1)}" x2="${W - PAD}" y2="${s.y(o.prevClose).toFixed(1)}" stroke="${T.textTer}" stroke-width="1" stroke-dasharray="3 3" opacity="0.55" />`
+    const base = (prevLine != null && prevLine >= s.lo && prevLine <= s.hi)
+      ? `<line x1="${PAD}" y1="${s.y(prevLine).toFixed(1)}" x2="${W - PAD}" y2="${s.y(prevLine).toFixed(1)}" stroke="${T.textTer}" stroke-width="1" stroke-dasharray="3 3" opacity="0.55" />`
       : "";
     svg = `<svg class="idx-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
       ${base}
@@ -469,12 +475,27 @@ function renderIndexCard(label, o) {
   const last = o.points && o.points.length ? o.points[o.points.length - 1].t : "";
   const hhmm = t => (t && t.length === 4) ? t.slice(0, 2) + ":" + t.slice(2) : "";
 
+  let breadth = "";
+  if (o.rising != null || o.falling != null) {
+    const n = v => v == null ? "—" : v.toLocaleString("ko-KR");
+    const lim = (v, label) => (v ? `<span style="color:var(--textTer);font-size:10.5px;">${label} ${v}</span>` : "");
+    const tv = o.tradeValue == null ? "" :
+      `<div class="idx-bd" style="margin-left:auto;color:var(--textTer)">거래대금 <b style="color:var(--textSec)">${Math.round(o.tradeValue / 100).toLocaleString("ko-KR")}</b>억</div>`;
+    breadth = `<div class="idx-breadth">
+      <div class="idx-bd" style="color:var(--textTer)">상승 <b style="color:${T.up}">${n(o.rising)}</b> ${lim(o.upperLimit, "상한")}</div>
+      <div class="idx-bd" style="color:var(--textTer)">보합 <b style="color:var(--textSec)">${n(o.flat)}</b></div>
+      <div class="idx-bd" style="color:var(--textTer)">하락 <b style="color:${T.down}">${n(o.falling)}</b> ${lim(o.lowerLimit, "하한")}</div>
+      ${tv}
+    </div>`;
+  }
+
   return `<div>
     <div class="idx-name">${label}</div>
     <div class="idx-value" style="color:${color}">${o.value.toLocaleString("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
     <div class="idx-chg" style="color:${color}">${pts}${pct}</div>
     ${svg}
     <div class="idx-foot"><span>${hhmm(first)}</span><span>${hhmm(last)}</span></div>
+    ${breadth}
   </div>`;
 }
 
