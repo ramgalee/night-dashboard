@@ -84,7 +84,7 @@ async function fetchOne(inst) {
     const j = await r.json();
     const meta = j?.chart?.result?.[0]?.meta;
     const price = meta?.regularMarketPrice;
-    const prevClose = meta?.previousClose ?? meta?.chartPreviousClose;
+    const prevClose = meta?.chartPreviousClose ?? meta?.previousClose;
     if (price == null || prevClose == null) return { ...inst, live: false };
     if (inst.type === "yield") {
       // ^TNX는 이미 실제 수익률(%) 값 그대로 제공됩니다 (예: 4.73 = 4.73%).
