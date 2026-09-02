@@ -76,17 +76,35 @@ async function fetchOne(inst) {
   }
 
   try {
-    // range=1d 를 명시해야 전일 종가가 제대로 옵니다.
-    // 기간을 안 주면 야후가 종목에 따라 엉뚱한 전일 종가를 돌려주는 경우가 있습니다.
+    // 일봉 5일치를 받아 전일 종가를 직접 계산합니다.
+    // 야후가 요약으로 주는 previousClose / chartPreviousClose 는
+    // 종목에 따라 장중에 엉뚱한 값으로 바뀌는 경우가 있어(예: ^TWII) 쓰지 않습니다.
     const r = await fetch(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(inst.symbol)}?interval=5m&range=1d`,
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(inst.symbol)}?interval=1d&range=5d`,
       { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" } }
     );
     if (!r.ok) return { ...inst, live: false };
     const j = await r.json();
-    const meta = j?.chart?.result?.[0]?.meta;
+    const result = j?.chart?.result?.[0];
+    const meta = result?.meta;
     const price = meta?.regularMarketPrice;
-    const prevClose = meta?.chartPreviousClose ?? meta?.previousClose;
+
+    // 일봉 종가 목록에서 오늘을 뺀 마지막 값 = 어제 종가
+    let prevClose = null;
+    const stamps = result?.timestamp || [];
+    const closes = result?.indicators?.quote?.[0]?.close || [];
+    const todayStart = meta?.currentTradingPeriod?.regular?.start;
+    const days = [];
+    for (let i = 0; i < closes.length; i++) {
+      const c = closes[i];
+      if (typeof c !== "number" || !isFinite(c)) continue;
+      if (todayStart && stamps[i] >= todayStart - 3600) continue; // 오늘 봉 제외
+      days.push(c);
+    }
+    if (days.length) prevClose = days[days.length - 1];
+
+    // 일봉으로 못 구하면 기존 방식으로 물러섭니다.
+    if (prevClose == null) prevClose = meta?.chartPreviousClose ?? meta?.previousClose;
     if (price == null || prevClose == null) return { ...inst, live: false };
     if (inst.type === "yield") {
       // ^TNX는 이미 실제 수익률(%) 값 그대로 제공됩니다 (예: 4.73 = 4.73%).
