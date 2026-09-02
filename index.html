@@ -39,6 +39,7 @@
   .dot { display:inline-flex; align-items:center; gap:6px; font-size:10px; font-family:var(--mono); }
   .dotcircle { width:6px; height:6px; border-radius:999px; display:inline-block; }
   .macro-cell { background: var(--surface2); border-radius:10px; padding:10px 12px; }
+  .macro-spark { width:100%; height:28px; display:block; margin-top:7px; }
   .stock-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(280px,1fr)); gap:16px; margin-bottom:16px; }
   .stock-name { font-size:13px; color:var(--textSec); margin-bottom:6px; }
   .disclaimer { border:1px dashed var(--hair); border-radius:12px; padding:12px 16px; font-size:11.5px; color:var(--textTer); line-height:1.6; background: var(--surface); }
@@ -192,13 +193,61 @@ function macroChangeVal(item){
   if (item.type === "fx") return item.changeWon;
   return item.changePct;
 }
+let SPARK = {};
+let MACRO_ITEMS = [];
+
+function miniSpark(sym, color) {
+  const s = SPARK[sym];
+  const W = 120, H = 28, PAD = 3;
+  if (!s || !s.points || s.points.length < 2) {
+    return `<svg class="macro-spark" viewBox="0 0 ${W} ${H}"></svg>`;
+  }
+  const vals = s.points;
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  if (s.prevClose != null) { lo = Math.min(lo, s.prevClose); hi = Math.max(hi, s.prevClose); }
+  if (hi === lo) { hi += 1; lo -= 1; }
+  const x = i => PAD + (i / (vals.length - 1)) * (W - PAD * 2);
+  const y = v => PAD + (1 - (v - lo) / (hi - lo)) * (H - PAD * 2);
+
+  const d = vals.map((v, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1)).join(" ");
+  const base = s.prevClose == null ? "" :
+    `<line x1="${PAD}" y1="${y(s.prevClose).toFixed(1)}" x2="${W - PAD}" y2="${y(s.prevClose).toFixed(1)}" stroke="${T.textTer}" stroke-width="1" stroke-dasharray="2 2" opacity="0.5" />`;
+  const lastX = x(vals.length - 1).toFixed(1), lastY = y(vals[vals.length - 1]).toFixed(1);
+
+  return `<svg class="macro-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    ${base}
+    <path d="${d}" fill="none" stroke="${color}" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+    <circle cx="${lastX}" cy="${lastY}" r="1.8" fill="${color}" />
+  </svg>`;
+}
+
 function renderMacroCells(items){
-  return items.map(it => `
+  return items.map(it => {
+    const color = it.live ? (macroChangeVal(it) >= 0 ? T.up : T.down) : T.textTer;
+    return `
       <div class="macro-cell">
         <div class="stat-label">${it.name}</div>
         <div style="font-size:13px;font-weight:600;font-family:var(--mono);">${fmtMacroPrimary(it)}</div>
-        <div class="stat-value" style="font-size:13px;color:${it.live ? (macroChangeVal(it)>=0?T.up:T.down) : T.textTer}">${it.live ? fmtMacroChange(it) : "DEMO"}</div>
-      </div>`).join("");
+        <div class="stat-value" style="font-size:13px;color:${color}">${it.live ? fmtMacroChange(it) : "DEMO"}</div>
+        ${miniSpark(it.symbol, color)}
+      </div>`;
+  }).join("");
+}
+
+function paintMacro(){
+  if (!MACRO_ITEMS.length) return;
+  document.getElementById("asiaGrid").innerHTML = renderMacroCells(MACRO_ITEMS.filter(it => it.region === "asia"));
+  document.getElementById("macroGrid").innerHTML = renderMacroCells(MACRO_ITEMS.filter(it => it.region !== "asia"));
+}
+
+async function fetchMacroSpark(){
+  try {
+    const r = await fetch("/api/macro-spark", { cache: "no-store" });
+    const d = await r.json();
+    if (d.series) { SPARK = d.series; paintMacro(); }
+  } catch (e) {
+    // 그래프만 실패한 것이므로 숫자는 그대로 둡니다.
+  }
 }
 
 async function fetchMacro(){
@@ -207,9 +256,8 @@ async function fetchMacro(){
   try {
     const r = await fetch("/api/macro", { cache: "no-store" });
     const data = await r.json();
-    const items = data.items || [];
-    asiaEl.innerHTML = renderMacroCells(items.filter(it => it.region === "asia"));
-    usEl.innerHTML = renderMacroCells(items.filter(it => it.region !== "asia"));
+    MACRO_ITEMS = data.items || [];
+    paintMacro();
   } catch (e) {
     asiaEl.innerHTML = `<div class="news-empty">아시아 증시를 불러오지 못했습니다.</div>`;
     usEl.innerHTML = `<div class="news-empty">참고 지표를 불러오지 못했습니다.</div>`;
@@ -438,16 +486,18 @@ STOCKS.forEach(s => {
   if (saved) document.getElementById(`close_${s.key}`).value = saved;
   document.getElementById(`close_${s.key}`).addEventListener("change", fetchAndRender);
 });
-document.getElementById("refreshBtn").addEventListener("click", () => { fetchAndRender(); fetchInvestorRank(); fetchIndexIntraday(); });
+document.getElementById("refreshBtn").addEventListener("click", () => { fetchAndRender(); fetchInvestorRank(); fetchIndexIntraday(); fetchMacroSpark(); });
 document.getElementById("kimchiToggle").addEventListener("change", fetchAndRender);
 fetchAndRender();
 fetchNews();
 fetchMacro();
+fetchMacroSpark();
 fetchInvestorRank();
 fetchIndexIntraday();
 setInterval(fetchAndRender, 6000);
 setInterval(fetchNews, 60000);
 setInterval(fetchMacro, 15000);
+setInterval(fetchMacroSpark, 60000);
 setInterval(fetchInvestorRank, 600000);
 setInterval(fetchIndexIntraday, 30000);
 </script>
