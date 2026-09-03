@@ -64,6 +64,12 @@
   .idx-fl { flex:1; text-align:center; background:var(--surface2); border-radius:8px; padding:7px 4px; }
   .idx-fl-l { font-size:10.5px; color:var(--textTer); margin-bottom:3px; }
   .idx-fl-v { font-family:var(--mono); font-size:14px; font-weight:600; }
+  .kr2-top { display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap; }
+  .kr2-value { font-size:38px; font-weight:700; font-family:var(--mono); letter-spacing:-1px; line-height:1; }
+  .kr2-chg { font-size:15px; font-family:var(--mono); padding-bottom:3px; }
+  .kr2-spark { width:100%; height:110px; display:block; margin-top:14px; }
+  .kr2-meta { margin-top:8px; display:flex; gap:14px; flex-wrap:wrap; font-size:10.5px; color:var(--textTer); font-family:var(--mono); }
+  .kr2-note { margin-top:12px; padding-top:10px; border-top:1px solid var(--hair); font-size:11px; color:var(--textTer); line-height:1.6; }
 </style>
 </head>
 <body>
@@ -99,6 +105,14 @@
           김프 제거 (은행간 환율로 계산)
         </label>
         <span id="updatedAt" style="font-size:11px;color:var(--textTer);margin-left:auto;">로딩 중...</span>
+      </div>
+
+      <div class="card" id="kr200Card">
+        <div class="between" style="margin-bottom:14px;">
+          <div style="font-size:13px;color:var(--textSec);">코스피200 야간 <span style="font-size:11px;color:var(--textTer);">KR200</span></div>
+          <span id="kr200Meta" style="font-size:10.5px;color:var(--textTer);font-family:var(--mono);"></span>
+        </div>
+        <div id="kr200Body"><div class="news-empty">불러오는 중...</div></div>
       </div>
 
       <div class="stock-grid" id="stockGrid"></div>
@@ -474,6 +488,78 @@ async function fetchInvestorRank(){
   }
 }
 
+function renderKr200(d) {
+  const up = (d.changePts ?? 0) >= 0;
+  const color = up ? T.up : T.down;
+  const sign = up ? "+" : "−";
+  const pts = d.changePts == null ? "—" : sign + Math.abs(d.changePts).toFixed(2);
+  const pct = d.changePct == null ? "" : ` (${sign}${Math.abs(d.changePct).toFixed(2)}%)`;
+
+  const W = 700, H = 110, PAD = 8;
+  let svg = "";
+  if (d.points && d.points.length > 1) {
+    const vals = d.points.slice();
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    if (d.prevDay != null) { lo = Math.min(lo, d.prevDay); hi = Math.max(hi, d.prevDay); }
+    if (hi === lo) { hi += 1; lo -= 1; }
+    const x = i => PAD + (i / (vals.length - 1)) * (W - PAD * 2);
+    const y = v => PAD + (1 - (v - lo) / (hi - lo)) * (H - PAD * 2);
+    const path = vals.map((v, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1)).join(" ");
+    const base = d.prevDay == null ? "" :
+      `<line x1="${PAD}" y1="${y(d.prevDay).toFixed(1)}" x2="${W - PAD}" y2="${y(d.prevDay).toFixed(1)}" stroke="${T.textTer}" stroke-width="1" stroke-dasharray="3 3" opacity="0.55" />`;
+    svg = `<svg class="kr2-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      ${base}
+      <path d="${path}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+      <circle cx="${x(vals.length - 1).toFixed(1)}" cy="${y(vals[vals.length - 1]).toFixed(1)}" r="3" fill="${color}" />
+    </svg>`;
+  }
+
+  const hhmm = ms => {
+    const dt = new Date(ms);
+    return dt.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Seoul" });
+  };
+  const startTxt = d.sessionStart ? hhmm(d.sessionStart) : "";
+  const endTxt = d.sessionStart && d.points && d.points.length
+    ? hhmm(Math.min(Date.now(), d.sessionStart + (d.points.length - 1) * 300000)) : "";
+
+  return `
+    <div class="kr2-top">
+      <div class="kr2-value" style="color:${color}">${d.mark.toLocaleString("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+      <div class="kr2-chg" style="color:${color}">${pts}${pct}</div>
+      <div class="dot" style="margin-left:auto;padding-bottom:4px;color:var(--textTer);"><span class="dotcircle" style="background:${T.teal}"></span>LIVE</div>
+    </div>
+    ${svg}
+    <div class="kr2-meta">
+      <span>${startTxt}</span>
+      <span style="margin-left:auto;">${endTxt}</span>
+    </div>
+    <div class="kr2-meta">
+      <span>Mark ${d.mark}</span>
+      <span>Oracle ${d.oracle}</span>
+      <span>전일 ${d.prevDay}</span>
+      <span>미결제 ${Math.round(d.openInterest).toLocaleString("ko-KR")}</span>
+    </div>
+    <div class="kr2-note">
+      ⚠ KRX가 공식 산출·배포하는 야간선물 시세가 아닙니다. 해외 파생상품 거래소(Hyperliquid)에서
+      형성된 코스피200 24시간 계약의 체결가로, 야간 흐름을 가늠하는 참고값입니다.
+      거래량이 얕어 실제 시장 대비 가격이 크게 튈 수 있습니다.
+    </div>`;
+}
+
+async function fetchKr200() {
+  const el = document.getElementById("kr200Body");
+  try {
+    const r = await fetch("/api/kr200", { cache: "no-store" });
+    const d = await r.json();
+    if (!d.live || d.mark == null) throw new Error(d.error || "no data");
+    el.innerHTML = renderKr200(d);
+    document.getElementById("kr200Meta").textContent = "야간 18:00~06:00 · 5분봉";
+  } catch (e) {
+    el.innerHTML = `<div class="news-empty">야간 지표를 불러오지 못했습니다.</div>`;
+    document.getElementById("kr200Meta").textContent = "";
+  }
+}
+
 function sparkPath(points, w, h, pad) {
   const vals = points.map(p => p.v);
   let lo = Math.min(...vals), hi = Math.max(...vals);
@@ -578,13 +664,14 @@ STOCKS.forEach(s => {
   if (saved) document.getElementById(`close_${s.key}`).value = saved;
   document.getElementById(`close_${s.key}`).addEventListener("change", fetchAndRender);
 });
-document.getElementById("refreshBtn").addEventListener("click", () => { fetchAndRender(); fetchInvestorRank(); fetchIndexIntraday(); fetchMacroSpark(); fetchTwse(); });
+document.getElementById("refreshBtn").addEventListener("click", () => { fetchAndRender(); fetchInvestorRank(); fetchIndexIntraday(); fetchMacroSpark(); fetchTwse(); fetchKr200(); });
 document.getElementById("kimchiToggle").addEventListener("change", fetchAndRender);
 fetchAndRender();
 fetchNews();
 fetchMacro();
 fetchMacroSpark();
 fetchTwse();
+fetchKr200();
 fetchInvestorRank();
 fetchIndexIntraday();
 setInterval(fetchAndRender, 6000);
@@ -592,6 +679,7 @@ setInterval(fetchNews, 60000);
 setInterval(fetchMacro, 15000);
 setInterval(fetchMacroSpark, 60000);
 setInterval(fetchTwse, 30000);
+setInterval(fetchKr200, 15000);
 setInterval(fetchInvestorRank, 600000);
 setInterval(fetchIndexIntraday, 30000);
 </script>
