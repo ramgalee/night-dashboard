@@ -488,6 +488,14 @@ async function fetchInvestorRank(){
   }
 }
 
+let KOSPI200_CLOSE = null;
+let LAST_KR200 = null;
+
+function fetchKr200Repaint() {
+  if (!LAST_KR200) return;
+  document.getElementById("kr200Body").innerHTML = renderKr200(LAST_KR200);
+}
+
 function renderKr200(d) {
   const up = (d.changePts ?? 0) >= 0;
   const color = up ? T.up : T.down;
@@ -514,6 +522,30 @@ function renderKr200(d) {
     </svg>`;
   }
 
+  // 정규장 종가 대비 갭 — 다음 날 시초가 방향을 가늠하는 지표
+  let gapBlock = "";
+  if (KOSPI200_CLOSE) {
+    const gapPts = d.mark - KOSPI200_CLOSE;
+    const gapPct = (gapPts / KOSPI200_CLOSE) * 100;
+    const gUp = gapPts >= 0;
+    const gc = gUp ? T.up : T.down;
+    const gs = gUp ? "+" : "−";
+    gapBlock = `<div class="idx-flow" style="margin-top:12px;">
+      <div class="idx-fl">
+        <div class="idx-fl-l">정규장 종가</div>
+        <div class="idx-fl-v" style="color:var(--textPri)">${KOSPI200_CLOSE.toFixed(2)}</div>
+      </div>
+      <div class="idx-fl">
+        <div class="idx-fl-l">종가 대비 갭</div>
+        <div class="idx-fl-v" style="color:${gc}">${gs}${Math.abs(gapPct).toFixed(2)}%</div>
+      </div>
+      <div class="idx-fl">
+        <div class="idx-fl-l">포인트 차</div>
+        <div class="idx-fl-v" style="color:${gc}">${gs}${Math.abs(gapPts).toFixed(2)}</div>
+      </div>
+    </div>`;
+  }
+
   const hhmm = ms => {
     const dt = new Date(ms);
     return dt.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Seoul" });
@@ -533,6 +565,7 @@ function renderKr200(d) {
       <span>${startTxt}</span>
       <span style="margin-left:auto;">${endTxt}</span>
     </div>
+    ${gapBlock}
     <div class="kr2-meta">
       <span>Mark ${d.mark}</span>
       <span>Oracle ${d.oracle}</span>
@@ -552,6 +585,7 @@ async function fetchKr200() {
     const r = await fetch("/api/kr200", { cache: "no-store" });
     const d = await r.json();
     if (!d.live || d.mark == null) throw new Error(d.error || "no data");
+    LAST_KR200 = d;
     el.innerHTML = renderKr200(d);
     document.getElementById("kr200Meta").textContent = "야간 18:00~06:00 · 5분봉";
   } catch (e) {
@@ -651,6 +685,10 @@ async function fetchIndexIntraday() {
     const d = await r.json();
     if (d.error) throw new Error(d.error);
     grid.innerHTML = renderIndexCard("코스피", d.kospi) + renderIndexCard("코스닥", d.kosdaq);
+    if (d.kospi200 && d.kospi200.value != null) {
+      KOSPI200_CLOSE = d.kospi200.value;
+      if (LAST_KR200) fetchKr200Repaint();
+    }
     const day = (d.kospi && d.kospi.date) || "";
     document.getElementById("idxMeta").textContent =
       (day.length === 8 ? `${day.slice(0, 4)}.${day.slice(4, 6)}.${day.slice(6, 8)} · ` : "") + "당일 1분봉 · 순매수 억원";
