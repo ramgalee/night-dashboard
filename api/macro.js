@@ -89,13 +89,25 @@ async function fetchOne(inst) {
     const meta = result?.meta;
     const price = meta?.regularMarketPrice;
 
-    // 일봉 목록의 마지막 값은 항상 '현재 진행 중이거나 가장 최근에 끝난 장'입니다.
-    // 따라서 그 바로 앞 값이 전일 종가입니다. 시간대 계산이 필요 없어 24시간 거래되는
-    // 선물·환율이나 장이 닫힌 시장에서도 똑같이 동작합니다.
+    // 일봉 종가 목록에서 전일 종가를 직접 찾습니다.
+    // 야후 요약값(previousClose / chartPreviousClose)은 종목에 따라
+    // 장중에 엉뚱한 값으로 바뀌는 경우가 있어 쓰지 않습니다.
+    //
+    // 목록의 마지막 봉은 보통 '오늘'이지만, 개장 직후에는 오늘 봉이
+    // 아직 안 만들어져 있기도 합니다. 그래서 마지막 봉의 종가가 현재가와
+    // 같은지로 판단합니다. 같으면 그 봉이 오늘이므로 한 칸 앞이 전일 종가이고,
+    // 다르면 마지막 봉 자체가 전일 종가입니다.
     const closes = result?.indicators?.quote?.[0]?.close || [];
     const days = closes.filter(c => typeof c === "number" && isFinite(c));
 
-    let prevClose = days.length >= 2 ? days[days.length - 2] : null;
+    let prevClose = null;
+    if (days.length) {
+      const lastDay = days[days.length - 1];
+      const isTodayBar = price != null && Math.abs(lastDay - price) < Math.abs(price) * 1e-6;
+      prevClose = isTodayBar
+        ? (days.length >= 2 ? days[days.length - 2] : null)
+        : lastDay;
+    }
 
     // 일봉으로 못 구하면 기존 방식으로 물러섭니다.
     if (prevClose == null) prevClose = meta?.chartPreviousClose ?? meta?.previousClose;
