@@ -253,17 +253,54 @@ function renderMacroCells(items){
   }).join("");
 }
 
+let TWSE = null;
+
+// 대만 가권지수는 Yahoo가 20분 지연이라 대만거래소 값으로 덮어씁니다.
+async function fetchTwse(){
+  try {
+    const r = await fetch("/api/twse", { cache: "no-store" });
+    const d = await r.json();
+    if (d && d.live && d.primary != null) {
+      TWSE = d;
+      if (d.points && d.points.length) SPARK["^TWII"] = { points: d.points, prevClose: d.prevClose };
+      paintMacro();
+    }
+  } catch (e) {
+    // 실패하면 Yahoo 값이 그대로 쓰입니다.
+  }
+}
+
+function applyTwse(items){
+  if (!TWSE) return items;
+  return items.map(it => it.symbol !== "^TWII" ? it : {
+    ...it,
+    live: true,
+    primary: TWSE.primary,
+    changePct: TWSE.changePct,
+    source: "twse",
+    quoteTime: TWSE.quoteTime || ""
+  });
+}
+
 function paintMacro(){
   if (!MACRO_ITEMS.length) return;
-  document.getElementById("asiaGrid").innerHTML = renderMacroCells(MACRO_ITEMS.filter(it => it.region === "asia"));
-  document.getElementById("macroGrid").innerHTML = renderMacroCells(MACRO_ITEMS.filter(it => it.region !== "asia"));
+  const items = applyTwse(MACRO_ITEMS);
+  document.getElementById("asiaGrid").innerHTML = renderMacroCells(items.filter(it => it.region === "asia"));
+  document.getElementById("macroGrid").innerHTML = renderMacroCells(items.filter(it => it.region !== "asia"));
 }
 
 async function fetchMacroSpark(){
   try {
     const r = await fetch("/api/macro-spark", { cache: "no-store" });
     const d = await r.json();
-    if (d.series) { SPARK = d.series; paintMacro(); }
+    if (d.series) {
+      SPARK = d.series;
+      // 대만가권 그래프는 거래소 값을 우선합니다.
+      if (TWSE && TWSE.points && TWSE.points.length) {
+        SPARK["^TWII"] = { points: TWSE.points, prevClose: TWSE.prevClose };
+      }
+      paintMacro();
+    }
   } catch (e) {
     // 그래프만 실패한 것이므로 숫자는 그대로 둡니다.
   }
@@ -541,18 +578,20 @@ STOCKS.forEach(s => {
   if (saved) document.getElementById(`close_${s.key}`).value = saved;
   document.getElementById(`close_${s.key}`).addEventListener("change", fetchAndRender);
 });
-document.getElementById("refreshBtn").addEventListener("click", () => { fetchAndRender(); fetchInvestorRank(); fetchIndexIntraday(); fetchMacroSpark(); });
+document.getElementById("refreshBtn").addEventListener("click", () => { fetchAndRender(); fetchInvestorRank(); fetchIndexIntraday(); fetchMacroSpark(); fetchTwse(); });
 document.getElementById("kimchiToggle").addEventListener("change", fetchAndRender);
 fetchAndRender();
 fetchNews();
 fetchMacro();
 fetchMacroSpark();
+fetchTwse();
 fetchInvestorRank();
 fetchIndexIntraday();
 setInterval(fetchAndRender, 6000);
 setInterval(fetchNews, 60000);
 setInterval(fetchMacro, 15000);
 setInterval(fetchMacroSpark, 60000);
+setInterval(fetchTwse, 30000);
 setInterval(fetchInvestorRank, 600000);
 setInterval(fetchIndexIntraday, 30000);
 </script>
