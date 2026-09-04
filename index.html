@@ -70,6 +70,19 @@
   .kr2-spark { width:100%; height:110px; display:block; margin-top:14px; }
   .kr2-meta { margin-top:8px; display:flex; gap:14px; flex-wrap:wrap; font-size:10.5px; color:var(--textTer); font-family:var(--mono); }
   .kr2-note { margin-top:12px; padding-top:10px; border-top:1px solid var(--hair); font-size:11px; color:var(--textTer); line-height:1.6; }
+  .sup-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; }
+  .sup-tab { border:1px solid var(--hair); background:var(--surface); color:var(--textSec); border-radius:999px; padding:6px 14px; font-size:12px; font-family:inherit; cursor:pointer; }
+  .sup-tab.on { background:var(--textPri); border-color:var(--textPri); color:#fff; }
+  .sup-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(280px,1fr)); gap:18px; }
+  .sup-head { font-size:12px; padding-bottom:8px; border-bottom:1px solid var(--hair); margin-bottom:2px; }
+  .sup-scroll { max-height:420px; overflow-y:auto; }
+  .sup-row { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--hair); }
+  .sup-row:last-child { border-bottom:none; }
+  .sup-no { font-family:var(--mono); font-size:10.5px; color:var(--textTer); width:20px; flex:none; text-align:right; }
+  .sup-name { font-size:12.5px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sup-mkt { font-family:var(--mono); font-size:9.5px; color:var(--textTer); margin-left:5px; }
+  .sup-net { font-family:var(--mono); font-size:11px; color:var(--textTer); flex:none; width:62px; text-align:right; }
+  .sup-ratio { font-family:var(--mono); font-size:12.5px; font-weight:600; flex:none; width:62px; text-align:right; }
 </style>
 </head>
 <body>
@@ -125,6 +138,15 @@
       <div class="card">
         <div style="font-size:13px;color:var(--textSec);margin-bottom:12px;">참고 지표</div>
         <div class="grid" id="macroGrid"></div>
+      </div>
+
+      <div class="card">
+        <div class="between" style="margin-bottom:12px;">
+          <div style="font-size:13px;color:var(--textSec);">시총대비 수급 <span style="font-size:11px;color:var(--textTer);">장중 잠정</span></div>
+          <span id="supMeta" style="font-size:10.5px;color:var(--textTer);font-family:var(--mono);"></span>
+        </div>
+        <div class="sup-tabs" id="supTabs"></div>
+        <div id="supBody"><div class="news-empty">불러오는 중...</div></div>
       </div>
 
       <div class="card">
@@ -499,6 +521,68 @@ async function fetchInvestorRank(){
   }
 }
 
+let SUPPLY = null;
+let SUPPLY_TAB = null;
+
+function supRows(list, sign) {
+  if (!list || !list.length) return `<div class="news-empty" style="padding-top:10px;">데이터가 없습니다.</div>`;
+  const color = sign > 0 ? T.up : T.down;
+  return list.map((it, i) => `
+    <div class="sup-row">
+      <span class="sup-no">${i + 1}</span>
+      <span class="sup-name">${it.name}<span class="sup-mkt">${it.market === "KOSPI" ? "KP" : "KQ"}</span></span>
+      <span class="sup-net">${Math.round(it.net / 100).toLocaleString("ko-KR")}억</span>
+      <span class="sup-ratio" style="color:${color}">${it.ratio >= 0 ? "+" : "−"}${Math.abs(it.ratio).toFixed(2)}%</span>
+    </div>`).join("");
+}
+
+function paintSupply() {
+  if (!SUPPLY) return;
+  const tabs = document.getElementById("supTabs");
+  const body = document.getElementById("supBody");
+  const list = SUPPLY.investors || [];
+  if (!SUPPLY_TAB || list.indexOf(SUPPLY_TAB) < 0) SUPPLY_TAB = list[0];
+
+  tabs.innerHTML = list.map(n =>
+    `<button class="sup-tab${n === SUPPLY_TAB ? " on" : ""}" data-inv="${n}">${n}</button>`).join("");
+  tabs.querySelectorAll(".sup-tab").forEach(b => {
+    b.addEventListener("click", () => { SUPPLY_TAB = b.dataset.inv; paintSupply(); });
+  });
+
+  const d = (SUPPLY.data || {})[SUPPLY_TAB] || { buy: [], sell: [] };
+  body.innerHTML = `<div class="sup-grid">
+    <div>
+      <div class="sup-head" style="color:${T.up}">순매수 상위</div>
+      <div class="sup-scroll">${supRows(d.buy, 1)}</div>
+    </div>
+    <div>
+      <div class="sup-head" style="color:${T.down}">순매도 상위</div>
+      <div class="sup-scroll">${supRows(d.sell, -1)}</div>
+    </div>
+  </div>`;
+
+  const cd = SUPPLY.capDate || "";
+  const stale = SUPPLY.stale ? " · 갱신 지연" : "";
+  document.getElementById("supMeta").textContent =
+    (cd.length === 8 ? `시총 ${cd.slice(4, 6)}.${cd.slice(6, 8)} 기준 · ` : "") +
+    `${Math.round((SUPPLY.minCap || 0) / 1e8).toLocaleString("ko-KR")}억 이상${stale}`;
+}
+
+async function fetchSupplyRatio() {
+  try {
+    const r = await fetch("/api/supply-ratio", { cache: "no-store" });
+    const d = await r.json();
+    if (d.error || !d.data) throw new Error(d.error || "no data");
+    SUPPLY = d;
+    paintSupply();
+  } catch (e) {
+    if (!SUPPLY) {
+      document.getElementById("supBody").innerHTML =
+        `<div class="news-empty">수급 데이터를 불러오지 못했습니다. 장중에만 집계됩니다.</div>`;
+    }
+  }
+}
+
 let KOSPI200_CLOSE = null;
 let LAST_KR200 = null;
 
@@ -713,7 +797,7 @@ STOCKS.forEach(s => {
   if (saved) document.getElementById(`close_${s.key}`).value = saved;
   document.getElementById(`close_${s.key}`).addEventListener("change", fetchAndRender);
 });
-document.getElementById("refreshBtn").addEventListener("click", () => { fetchAndRender(); fetchInvestorRank(); fetchIndexIntraday(); fetchMacroSpark(); fetchTwse(); fetchKr200(); });
+document.getElementById("refreshBtn").addEventListener("click", () => { fetchAndRender(); fetchInvestorRank(); fetchIndexIntraday(); fetchMacroSpark(); fetchTwse(); fetchKr200(); fetchSupplyRatio(); });
 document.getElementById("kimchiToggle").addEventListener("change", fetchAndRender);
 fetchAndRender();
 fetchNews();
@@ -721,6 +805,7 @@ fetchMacro();
 fetchMacroSpark();
 fetchTwse();
 fetchKr200();
+fetchSupplyRatio();
 fetchInvestorRank();
 fetchIndexIntraday();
 setInterval(fetchAndRender, 6000);
@@ -729,6 +814,7 @@ setInterval(fetchMacro, 15000);
 setInterval(fetchMacroSpark, 60000);
 setInterval(fetchTwse, 30000);
 setInterval(fetchKr200, 15000);
+setInterval(fetchSupplyRatio, 60000);
 setInterval(fetchInvestorRank, 600000);
 setInterval(fetchIndexIntraday, 30000);
 </script>
