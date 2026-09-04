@@ -562,8 +562,10 @@ function paintSupply() {
   </div>`;
 
   const cd = SUPPLY.capDate || "";
-  const stale = SUPPLY.stale ? " · 갱신 지연" : "";
+   const stale = SUPPLY.stale ? " · 갱신 지연" : "";
+  const snap = SUPPLY.snapshotAt ? `${SUPPLY.snapshotAt} 집계 · ` : "";
   document.getElementById("supMeta").textContent =
+    snap +
     (cd.length === 8 ? `시총 ${cd.slice(4, 6)}.${cd.slice(6, 8)} 기준 · ` : "") +
     `${Math.round((SUPPLY.minCap || 0) / 1e8).toLocaleString("ko-KR")}억 이상${stale}`;
 }
@@ -814,7 +816,7 @@ setInterval(fetchMacro, 15000);
 setInterval(fetchMacroSpark, 60000);
 setInterval(fetchTwse, 30000);
 setInterval(fetchKr200, 15000);
-setInterval(fetchSupplyRatio, 60000);
+setInterval(fetchSupplyRatio, 300000);
 setInterval(fetchInvestorRank, 600000);
 setInterval(fetchIndexIntraday, 30000);
 </script>
