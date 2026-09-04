@@ -24,25 +24,33 @@ async function live() {
   return {
     price, prevClose: prev,
     high: num(q.h), low: num(q.l),
-    quoteTime: q.t || "", date: q.d || ""
+    quoteTime: q.t || "", date: String(q.d || "")
   };
 }
 
 // 당일 5분 단위 지수 (그래프용)
-async function series() {
+// 개장 직후에는 오늘 자료가 아직 없어 전날 것이 그대로 오는 경우가 있습니다.
+// 응답의 날짜가 실시간 시세의 날짜와 다르면 그래프를 그리지 않습니다.
+async function series(today) {
   try {
     const r = await fetch(
       "https://www.twse.com.tw/rwd/zh/TAIEX/MI_5MINS_INDEX?response=json",
       { headers: { "User-Agent": UA, "Referer": "https://www.twse.com.tw/" } }
     );
-    if (!r.ok) return [];
+    if (!r.ok) return { points: [], seriesDate: null };
+
     const j = await r.json();
+    const seriesDate = String((j && j.date) || "");
+    if (!seriesDate || (today && seriesDate !== today)) {
+      return { points: [], seriesDate };
+    }
+
     const rows = (j && j.data) || [];
     const pts = rows.map(row => num(row[1])).filter(v => v != null);
     const step = Math.max(1, Math.ceil(pts.length / 60));
-    return pts.filter((_, i) => i % step === 0 || i === pts.length - 1);
+    return { points: pts.filter((_, i) => i % step === 0 || i === pts.length - 1), seriesDate };
   } catch (e) {
-    return [];
+    return { points: [], seriesDate: null };
   }
 }
 
@@ -51,7 +59,7 @@ module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "s-maxage=30, stale-while-revalidate=60");
   try {
     const q = await live();
-    const points = await series();
+    const s = await series(q.date);
     const changePts = q.price - q.prevClose;
     res.status(200).json({
       symbol: "^TWII",
@@ -62,7 +70,8 @@ module.exports = async (req, res) => {
       changePct: Number(((changePts / q.prevClose) * 100).toFixed(2)),
       quoteTime: q.quoteTime,
       date: q.date,
-      points
+      seriesDate: s.seriesDate,
+      points: s.points
     });
   } catch (e) {
     res.status(500).json({ error: String(e.message || e), live: false });
