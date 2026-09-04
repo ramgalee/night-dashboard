@@ -276,7 +276,14 @@ async function fetchTwse(){
     const d = await r.json();
     if (d && d.live && d.primary != null) {
       TWSE = d;
-      if (d.points && d.points.length) SPARK["^TWII"] = { points: d.points, prevClose: d.prevClose };
+      // 거래소를 쓰기로 한 이상 그래프도 거래소 것만 씁니다.
+      // 오늘 자료가 아직 없으면(개장 직후) 그래프를 비워둡니다.
+      // 야후로 되돌아가면 지연·전일 데이터가 섞여 숫자와 어긋납니다.
+      if (d.points && d.points.length) {
+        SPARK["^TWII"] = { points: d.points, prevClose: d.prevClose };
+      } else {
+        delete SPARK["^TWII"];
+      }
       paintMacro();
     }
   } catch (e) {
@@ -309,9 +316,13 @@ async function fetchMacroSpark(){
     const d = await r.json();
     if (d.series) {
       SPARK = d.series;
-      // 대만가권 그래프는 거래소 값을 우선합니다.
-      if (TWSE && TWSE.points && TWSE.points.length) {
-        SPARK["^TWII"] = { points: TWSE.points, prevClose: TWSE.prevClose };
+      // 대만가권 그래프는 거래소 값만 씁니다(야후 것은 버립니다).
+      if (TWSE) {
+        if (TWSE.points && TWSE.points.length) {
+          SPARK["^TWII"] = { points: TWSE.points, prevClose: TWSE.prevClose };
+        } else {
+          delete SPARK["^TWII"];
+        }
       }
       paintMacro();
     }
