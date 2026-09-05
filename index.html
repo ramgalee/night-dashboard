@@ -154,6 +154,15 @@
 
       <div class="card">
         <div class="between" style="margin-bottom:12px;">
+          <div style="font-size:13px;color:var(--textSec);">시총대비 수급 <span style="font-size:11px;color:var(--textTer);">마감 확정</span></div>
+          <span id="finMeta" style="font-size:10.5px;color:var(--textTer);font-family:var(--mono);"></span>
+        </div>
+        <div class="sup-tabs" id="finTabs"></div>
+        <div id="finBody"><div class="news-empty">불러오는 중...</div></div>
+      </div>
+
+      <div class="card">
+        <div class="between" style="margin-bottom:12px;">
           <div style="font-size:13px;color:var(--textSec);">순매수·순매도 상위 10</div>
           <span id="rankMeta" style="font-size:10.5px;color:var(--textTer);font-family:var(--mono);"></span>
         </div>
@@ -602,6 +611,58 @@ async function fetchSupplyRatio() {
   }
 }
 
+// 마감 확정 수급 — KRX 노트북이 만든 supply_final.json을 그대로 읽습니다.
+// 서버를 거치지 않아 Vercel 함수를 쓰지 않습니다.
+let FINAL = null;
+let FINAL_TAB = null;
+
+function paintFinal() {
+  if (!FINAL) return;
+  const tabs = document.getElementById("finTabs");
+  const body = document.getElementById("finBody");
+  const list = FINAL.investors || [];
+  if (!FINAL_TAB || list.indexOf(FINAL_TAB) < 0) FINAL_TAB = list[0];
+
+  tabs.innerHTML = list.map(n =>
+    `<button class="sup-tab${n === FINAL_TAB ? " on" : ""}" data-inv="${n}">${n}</button>`).join("");
+  tabs.querySelectorAll(".sup-tab").forEach(b => {
+    b.addEventListener("click", () => { FINAL_TAB = b.dataset.inv; paintFinal(); });
+  });
+
+  const d = (FINAL.data || {})[FINAL_TAB] || { buy: [], sell: [] };
+  body.innerHTML = `<div class="sup-grid">
+    <div>
+      <div class="sup-head" style="color:${T.up}">순매수 상위</div>
+      <div class="sup-scroll">${supRows(d.buy, 1)}</div>
+    </div>
+    <div>
+      <div class="sup-head" style="color:${T.down}">순매도 상위</div>
+      <div class="sup-scroll">${supRows(d.sell, -1)}</div>
+    </div>
+  </div>`;
+
+  const cd = FINAL.date || "";
+  const cap = FINAL.minCap ? ` · ${Math.round(FINAL.minCap / 1e8).toLocaleString("ko-KR")}억 이상` : "";
+  document.getElementById("finMeta").textContent =
+    (cd.length === 8 ? `${cd.slice(4, 6)}.${cd.slice(6, 8)} 종가 확정` : "") + cap;
+}
+
+async function fetchFinalSupply() {
+  try {
+    const r = await fetch("/supply_final.json", { cache: "no-store" });
+    if (!r.ok) throw new Error("no file");
+    const d = await r.json();
+    if (!d.data || !d.investors) throw new Error("bad data");
+    FINAL = d;
+    paintFinal();
+  } catch (e) {
+    if (!FINAL) {
+      document.getElementById("finBody").innerHTML =
+        `<div class="news-empty">확정 수급 파일이 아직 없습니다. 장 마감 후 노트북에서 만들어 올려주세요.</div>`;
+    }
+  }
+}
+
 let KOSPI200_CLOSE = null;
 let LAST_KR200 = null;
 
@@ -865,7 +926,7 @@ STOCKS.forEach(s => {
     }
   });
 });
-document.getElementById("refreshBtn").addEventListener("click", () => { fetchAndRender(); fetchInvestorRank(); fetchIndexIntraday(); fetchMacroSpark(); fetchTwse(); fetchKr200(); fetchSupplyRatio(); });
+document.getElementById("refreshBtn").addEventListener("click", () => { fetchAndRender(); fetchInvestorRank(); fetchIndexIntraday(); fetchMacroSpark(); fetchTwse(); fetchKr200(); fetchSupplyRatio(); fetchFinalSupply(); });
 document.getElementById("kimchiToggle").addEventListener("change", fetchAndRender);
 fetchAndRender();
 fetchNews();
@@ -874,6 +935,7 @@ fetchMacroSpark();
 fetchTwse();
 fetchKr200();
 fetchSupplyRatio();
+fetchFinalSupply();
 fetchInvestorRank();
 fetchIndexIntraday();
 setInterval(fetchAndRender, 6000);
@@ -883,6 +945,7 @@ setInterval(fetchMacroSpark, 60000);
 setInterval(fetchTwse, 30000);
 setInterval(fetchKr200, 15000);
 setInterval(fetchSupplyRatio, 300000);
+setInterval(fetchFinalSupply, 600000);
 setInterval(fetchInvestorRank, 600000);
 setInterval(fetchIndexIntraday, 30000);
 </script>
