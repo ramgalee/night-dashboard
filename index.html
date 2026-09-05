@@ -191,7 +191,8 @@ const STOCKS = [
 let walk = { fx: 1380.5, bankFx: 1380.5 };
 STOCKS.forEach(s => { walk[s.key] = { mark: s.demoMark, oracle: s.demoOracle }; });
 
-document.getElementById("stockGrid").innerHTML = STOCKS.map(s => `
+const stockGridEl = document.getElementById("stockGrid");
+if (stockGridEl) stockGridEl.innerHTML = STOCKS.map(s => `
   <div class="card">
     <div class="stock-name">${s.name} <span style="color:var(--textTer);font-family:var(--mono);font-size:11px;">${s.key}</span></div>
     <div class="price" id="price_${s.key}">-</div>
