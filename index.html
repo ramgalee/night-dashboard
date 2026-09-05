@@ -205,6 +205,10 @@ document.getElementById("stockGrid").innerHTML = STOCKS.map(s => `
     <div class="row" style="margin-top:12px;gap:8px;">
       <span style="font-size:11px;color:var(--textSec);">한국 종가</span>
       <input id="close_${s.key}" type="number" value="${s.defaultClose}" style="width:110px;" />
+      <label style="font-size:11px;color:var(--textTer);display:inline-flex;align-items:center;gap:4px;cursor:pointer;">
+        <input type="checkbox" id="auto_${s.key}" checked /> 자동
+      </label>
+      <span id="autoNote_${s.key}" style="font-size:10px;color:var(--textTer);font-family:var(--mono);"></span>
     </div>
     <div class="row" style="margin-top:12px;justify-content:space-between;">
       <div id="gauge_${s.key}" style="max-width:150px;"></div>
@@ -778,6 +782,33 @@ function renderIndexCard(label, o) {
   </div>`;
 }
 
+// 키움에서 받은 국내 시세로 '한국 종가' 칸을 자동으로 채웁니다.
+// '자동' 체크를 끄거나 직접 값을 고치면 그때부터 손입력 값을 유지합니다.
+function applyKrStocks(stocks) {
+  if (!stocks) return;
+  let changed = false;
+  STOCKS.forEach(s => {
+    const q = stocks[s.key];
+    const auto = document.getElementById(`auto_${s.key}`);
+    const input = document.getElementById(`close_${s.key}`);
+    const note = document.getElementById(`autoNote_${s.key}`);
+    if (!q || !input || !auto) return;
+
+    if (auto.checked) {
+      if (Number(input.value) !== q.price) {
+        input.value = q.price;
+        localStorage.setItem(`close_${s.key}`, q.price);
+        changed = true;
+      }
+      if (note) note.textContent = q.changePct == null ? "키움"
+        : `키움 ${q.changePct >= 0 ? "+" : "−"}${Math.abs(q.changePct).toFixed(2)}%`;
+    } else if (note) {
+      note.textContent = "수동";
+    }
+  });
+  if (changed) fetchAndRender();
+}
+
 async function fetchIndexIntraday() {
   const grid = document.getElementById("idxGrid");
   try {
@@ -785,6 +816,7 @@ async function fetchIndexIntraday() {
     const d = await r.json();
     if (d.error) throw new Error(d.error);
     grid.innerHTML = renderIndexCard("코스피", d.kospi) + renderIndexCard("코스닥", d.kosdaq);
+    applyKrStocks(d.stocks);
     if (d.kospi200 && d.kospi200.value != null) {
       KOSPI200_CLOSE = d.kospi200.value;
       if (LAST_KR200) fetchKr200Repaint();
@@ -800,7 +832,28 @@ async function fetchIndexIntraday() {
 STOCKS.forEach(s => {
   const saved = localStorage.getItem(`close_${s.key}`);
   if (saved) document.getElementById(`close_${s.key}`).value = saved;
-  document.getElementById(`close_${s.key}`).addEventListener("change", fetchAndRender);
+
+  const autoEl = document.getElementById(`auto_${s.key}`);
+  const savedAuto = localStorage.getItem(`auto_${s.key}`);
+  if (savedAuto !== null) autoEl.checked = savedAuto === "1";
+
+  // 사용자가 직접 값을 고치면 자동을 끕니다.
+  document.getElementById(`close_${s.key}`).addEventListener("change", () => {
+    autoEl.checked = false;
+    localStorage.setItem(`auto_${s.key}`, "0");
+    const note = document.getElementById(`autoNote_${s.key}`);
+    if (note) note.textContent = "수동";
+    fetchAndRender();
+  });
+
+  autoEl.addEventListener("change", () => {
+    localStorage.setItem(`auto_${s.key}`, autoEl.checked ? "1" : "0");
+    if (autoEl.checked) fetchIndexIntraday();
+    else {
+      const note = document.getElementById(`autoNote_${s.key}`);
+      if (note) note.textContent = "수동";
+    }
+  });
 });
 document.getElementById("refreshBtn").addEventListener("click", () => { fetchAndRender(); fetchInvestorRank(); fetchIndexIntraday(); fetchMacroSpark(); fetchTwse(); fetchKr200(); fetchSupplyRatio(); });
 document.getElementById("kimchiToggle").addEventListener("change", fetchAndRender);
