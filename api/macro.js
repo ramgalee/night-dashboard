@@ -20,7 +20,9 @@ const INSTRUMENTS = [
   { symbol: "RTY=F", name: "러셀2000선물", type: "index", region: "us" },
   { symbol: "^SOX", name: "반도체지수", type: "index", region: "us" }, // 유동성 있는 선물 티커가 없어 정규장 지수 유지
   { symbol: "DRAM", name: "DRAM ETF", type: "stock", region: "us" }, // Roundhill Memory ETF
+  { symbol: "2YY=F", cnbc: "US2Y", name: "미2년물", type: "yield", region: "us" },
   { symbol: "^TNX", cnbc: "US10Y", name: "미10년물", type: "yield", region: "us" },
+  { symbol: "^TYX", cnbc: "US30Y", name: "미30년물", type: "yield", region: "us" },
   { symbol: "CL=F", name: "WTI유", type: "commodity", region: "us" },
   { symbol: "GC=F", name: "금선물", type: "commodity", region: "us" },
 ];
