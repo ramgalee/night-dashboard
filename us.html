@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>미국 증시 정리</title>
+<style>
+  :root {
+    --void:#F2F4F9; --surface:#FFFFFF; --surface2:#F0F2F8; --hair:#E1E5F0;
+    --textPri:#131A2C; --textSec:#5B6483; --textTer:#8B94B0;
+    --up:#E5484D; --down:#2F6FED; --signature:#6D4FE0;
+    --mono: ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, Consolas, monospace;
+    --sans: -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--void); color: var(--textPri); font-family: var(--sans); margin:0; padding:24px 16px; }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  .between { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .card { background: var(--surface); border:1px solid var(--hair); border-radius:16px; padding:18px; margin-bottom:16px; box-shadow: 0 1px 3px rgba(19,26,44,0.06); }
+  .eyebrow { font-size:11px; letter-spacing:2px; color:var(--textTer); font-family:var(--mono); }
+  h1 { font-size:22px; margin:2px 0 0; }
+  button { background: var(--surface2); border:1px solid var(--hair); color:var(--textSec); padding:8px 14px; border-radius:10px; font-size:12px; cursor:pointer; font-family:var(--sans); }
+  button.primary { background: var(--signature); border-color: var(--signature); color:#fff; font-weight:600; }
+  .empty { font-size:12px; color:var(--textTer); line-height:1.6; }
+
+  /* 히트맵 */
+  .hm-group { margin-bottom:18px; }
+  .hm-head { display:flex; align-items:baseline; gap:8px; margin-bottom:7px; }
+  .hm-title { font-size:13px; font-weight:600; }
+  .hm-sub { font-size:11.5px; color:var(--textTer); }
+  .hm-avg { margin-left:auto; font-family:var(--mono); font-size:12px; font-weight:600; }
+  .hm-tiles { display:grid; grid-template-columns: repeat(auto-fill, minmax(104px,1fr)); gap:5px; }
+  .tile { border-radius:8px; padding:9px 8px; min-height:58px; display:flex; flex-direction:column; justify-content:space-between; }
+  .tile-name { font-size:11px; line-height:1.25; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .tile-pct { font-family:var(--mono); font-size:13.5px; font-weight:700; color:#fff; }
+  .tile.dead { background: var(--surface2); }
+  .tile.dead .tile-name, .tile.dead .tile-pct { color: var(--textTer); }
+
+  /* 목록 */
+  .ls-group { border-bottom:1px solid var(--hair); padding:10px 0; }
+  .ls-group:last-child { border-bottom:none; }
+  .ls-head { display:flex; align-items:baseline; gap:8px; margin-bottom:6px; }
+  .ls-title { font-size:12.5px; font-weight:600; }
+  .ls-sub { font-size:11px; color:var(--textTer); }
+  .ls-avg { margin-left:auto; font-family:var(--mono); font-size:11.5px; font-weight:600; }
+  .ls-items { display:flex; flex-wrap:wrap; gap:5px 14px; }
+  .ls-item { font-size:12px; }
+  .ls-item b { font-family:var(--mono); font-weight:600; margin-left:4px; }
+  .ls-tk { font-family:var(--mono); font-size:9.5px; color:var(--textTer); margin-left:3px; }
+
+  #copyBox { width:100%; height:260px; margin-top:12px; border:1px solid var(--hair); border-radius:10px;
+             padding:12px; font-family:var(--mono); font-size:11.5px; line-height:1.6; resize:vertical;
+             background:var(--surface2); color:var(--textPri); display:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="between" style="margin-bottom:16px;">
+    <div>
+      <div class="eyebrow">US MARKET SUMMARY</div>
+      <h1>미국 증시 정리</h1>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button id="copyBtn" class="primary">텍스트 복사</button>
+      <button id="refreshBtn">↻ 새로고침</button>
+      <a href="/index.html" style="text-decoration:none;"><button>← 야간 모니터</button></a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="between" style="margin-bottom:14px;">
+      <div style="font-size:13px;color:var(--textSec);">섹터 히트맵</div>
+      <span id="meta" style="font-size:10.5px;color:var(--textTer);font-family:var(--mono);"></span>
+    </div>
+    <div id="heat"><div class="empty">불러오는 중...</div></div>
+  </div>
+
+  <div class="card">
+    <div class="between" style="margin-bottom:6px;">
+      <div style="font-size:13px;color:var(--textSec);">전체 목록</div>
+      <button id="toggleList">펼치기</button>
+    </div>
+    <div id="list" style="display:none;"></div>
+    <textarea id="copyBox" readonly></textarea>
+  </div>
+
+  <div style="border:1px dashed var(--hair);border-radius:12px;padding:12px 16px;font-size:11.5px;color:var(--textTer);line-height:1.6;background:var(--surface);">
+    ⚠ Yahoo Finance 비공식 조회로 가져온 값입니다. 공식 API가 아니라서 예고 없이 멈추거나 값이 어긋날 수 있습니다.
+    미국 장중에는 3분, 장이 닫혀 있을 때는 30분 간격으로 갱신됩니다.
+  </div>
+</div>
+
+<script>
+const UP = "#E5484D", DOWN = "#2F6FED";
+let DATA = null;
+
+// 등락률에 따라 타일 색 진하기를 정합니다(±4%에서 가장 진해짐).
+function tileColor(pct) {
+  if (pct == null) return null;
+  const a = Math.min(Math.abs(pct) / 4, 1);
+  const alpha = 0.18 + a * 0.82;
+  const rgb = pct >= 0 ? "229,72,77" : "47,111,237";
+  return `rgba(${rgb},${alpha.toFixed(2)})`;
+}
+
+function fmtPct(v) {
+  if (v == null) return "—";
+  return (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2) + "%";
+}
+
+function groupLabel(g) {
+  return g.sub ? `<span class="hm-title">${g.name}</span><span class="hm-sub">${g.sub}</span>`
+               : `<span class="hm-title">${g.name}</span>`;
+}
+
+function renderHeat(groups) {
+  return groups.map(g => `
+    <div class="hm-group">
+      <div class="hm-head">
+        ${groupLabel(g)}
+        <span class="hm-avg" style="color:${(g.avgChangePct ?? 0) >= 0 ? UP : DOWN}">${fmtPct(g.avgChangePct)}</span>
+      </div>
+      <div class="hm-tiles">
+        ${g.items.map(it => {
+          const c = tileColor(it.changePct);
+          return c
+            ? `<div class="tile" style="background:${c}" title="${it.symbol}">
+                 <div class="tile-name">${it.name}</div>
+                 <div class="tile-pct">${fmtPct(it.changePct)}</div>
+               </div>`
+            : `<div class="tile dead" title="${it.symbol}">
+                 <div class="tile-name">${it.name}</div>
+                 <div class="tile-pct">—</div>
+               </div>`;
+        }).join("")}
+      </div>
+    </div>`).join("");
+}
+
+function renderList(groups) {
+  return groups.map(g => `
+    <div class="ls-group">
+      <div class="ls-head">
+        <span class="ls-title">${g.name}</span>
+        ${g.sub ? `<span class="ls-sub">${g.sub}</span>` : ""}
+        <span class="ls-avg" style="color:${(g.avgChangePct ?? 0) >= 0 ? UP : DOWN}">${fmtPct(g.avgChangePct)}</span>
+      </div>
+      <div class="ls-items">
+        ${g.items.map(it => `<span class="ls-item">${it.name}<span class="ls-tk">${it.symbol}</span><b style="color:${(it.changePct ?? 0) >= 0 ? UP : DOWN}">${fmtPct(it.changePct)}</b></span>`).join("")}
+      </div>
+    </div>`).join("");
+}
+
+// 방송 자료로 붙여넣기 좋은 텍스트를 만듭니다.
+function buildText(d) {
+  const lines = [];
+  let lastName = null;
+  for (const g of d.groups) {
+    const items = g.items.filter(x => x.changePct != null)
+      .sort((a, b) => b.changePct - a.changePct)
+      .map(x => `${x.name} (${fmtPct(x.changePct).replace("−", "-")})`);
+    if (!items.length) continue;
+
+    if (g.sub) {
+      if (g.name !== lastName) { lines.push(`[${g.name}]`); lastName = g.name; }
+      lines.push(`* [${g.sub}] ${items.join(", ")}`);
+    } else {
+      lines.push(`[${g.name}]`);
+      lines.push(items.join(", "));
+      lastName = g.name;
+    }
+  }
+  return lines.join("\n");
+}
+
+function paint() {
+  if (!DATA) return;
+  document.getElementById("heat").innerHTML = renderHeat(DATA.groups);
+  document.getElementById("list").innerHTML = renderList(DATA.groups);
+  document.getElementById("copyBox").value = buildText(DATA);
+
+  const t = DATA.generatedAt ? new Date(DATA.generatedAt) : null;
+  const time = t ? t.toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Seoul" }) : "";
+  const miss = DATA.missing ? ` · 미조회 ${DATA.missing}` : "";
+  document.getElementById("meta").textContent = `${time} 조회 · ${DATA.total}종목${miss}`;
+}
+
+async function load() {
+  try {
+    const r = await fetch("/api/us-stocks", { cache: "no-store" });
+    const d = await r.json();
+    if (d.error || !d.groups) throw new Error(d.error || "no data");
+    DATA = d;
+    paint();
+  } catch (e) {
+    if (!DATA) document.getElementById("heat").innerHTML = `<div class="empty">데이터를 불러오지 못했습니다.</div>`;
+  }
+}
+
+document.getElementById("toggleList").addEventListener("click", () => {
+  const el = document.getElementById("list");
+  const on = el.style.display === "none";
+  el.style.display = on ? "block" : "none";
+  document.getElementById("toggleList").textContent = on ? "접기" : "펼치기";
+});
+
+document.getElementById("copyBtn").addEventListener("click", async () => {
+  const box = document.getElementById("copyBox");
+  const btn = document.getElementById("copyBtn");
+  if (!box.value) return;
+  try {
+    await navigator.clipboard.writeText(box.value);
+    btn.textContent = "복사됨!";
+    setTimeout(() => { btn.textContent = "텍스트 복사"; }, 1500);
+  } catch (e) {
+    // 클립보드가 막힌 환경에서는 직접 선택할 수 있도록 보여줍니다.
+    box.style.display = "block";
+    box.select();
+    btn.textContent = "직접 복사하세요";
+  }
+});
+
+document.getElementById("refreshBtn").addEventListener("click", load);
+load();
+setInterval(load, 180000);
+</script>
+</body>
+</html>
