@@ -154,7 +154,7 @@
 
       <div class="card">
         <div class="between" style="margin-bottom:12px;">
-          <div style="font-size:13px;color:var(--textSec);">순매수 상위 10</div>
+          <div style="font-size:13px;color:var(--textSec);">순매수·순매도 상위 10</div>
           <span id="rankMeta" style="font-size:10.5px;color:var(--textTer);font-family:var(--mono);"></span>
         </div>
         <div class="rank-grid">
@@ -509,6 +509,16 @@ function renderRankRows(list, field){
       <span class="rank-amt" style="color:${it[field]>=0?T.up:T.down}">${fmtNet(it[field])}</span>
     </div>`).join("");
 }
+// 순매수 10 아래에 순매도 10을 이어 붙입니다.
+function rankBlock(side, field){
+  if (!side) return `<div class="news-empty" style="padding-top:10px;">데이터가 없습니다.</div>`;
+  const cap = (txt, color) =>
+    `<div style="font-size:11px;color:${color};margin:10px 0 2px;">${txt}</div>`;
+  return cap("순매수 상위", T.up) + renderRankRows(side.buy, field)
+       + `<div style="border-top:1px solid var(--hair);margin-top:8px;"></div>`
+       + cap("순매도 상위", T.down) + renderRankRows(side.sell, field);
+}
+
 async function fetchInvestorRank(){
   const fEl = document.getElementById("foreignRank");
   const oEl = document.getElementById("orgnRank");
@@ -516,13 +526,13 @@ async function fetchInvestorRank(){
     const r = await fetch("/api/investor-rank", { cache: "no-store" });
     const data = await r.json();
     if (data.error) throw new Error(data.error);
-    fEl.innerHTML = renderRankRows(data.foreign && data.foreign.buy, "foreignNet");
-    oEl.innerHTML = renderRankRows(data.institution && data.institution.buy, "orgnNet");
+    fEl.innerHTML = rankBlock(data.foreign, "foreignNet");
+    oEl.innerHTML = rankBlock(data.institution, "orgnNet");
     const d = data.date || "";
     document.getElementById("rankMeta").textContent =
       (d.length === 8 ? `${d.slice(0,4)}.${d.slice(4,6)}.${d.slice(6,8)} 종가 기준 · ` : "") + "단위 억원";
   } catch (e) {
-    const msg = `<div class="news-empty" style="padding-top:10px;">순매수 순위를 불러오지 못했습니다.</div>`;
+    const msg = `<div class="news-empty" style="padding-top:10px;">순매수·순매도 순위를 불러오지 못했습니다.</div>`;
     fEl.innerHTML = msg;
     oEl.innerHTML = msg;
   }
