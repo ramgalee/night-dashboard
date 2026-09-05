@@ -548,8 +548,6 @@ function paintSupply() {
   tabs.querySelectorAll(".sup-tab").forEach(b => {
     b.addEventListener("click", () => { SUPPLY_TAB = b.dataset.inv; paintSupply(); });
   });
-  const g = SUPPLY.generatedAt ? new Date(SUPPLY.generatedAt) : null;
-  const snap = g ? g.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Seoul" }) + " 조회 · " : "";
   const d = (SUPPLY.data || {})[SUPPLY_TAB] || { buy: [], sell: [] };
   body.innerHTML = `<div class="sup-grid">
     <div>
