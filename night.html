@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>주간 증시 모니터</title>
+<title>야간 증시 모니터</title>
 <style>
   :root {
     --void:#F2F4F9; --surface:#FFFFFF; --surface2:#F0F2F8; --hair:#E1E5F0;
@@ -85,16 +85,16 @@
   .sup-ratio { font-family:var(--mono); font-size:12.5px; font-weight:600; flex:none; width:62px; text-align:right; }
 </style>
 </head>
-<body data-page="day">
+<body data-page="night">
 <div class="wrap">
   <div class="between" style="margin-bottom:20px;">
     <div>
-      <div class="eyebrow">DAY SESSION MONITOR</div>
-      <h1>주간 증시 모니터</h1>
+      <div class="eyebrow">NIGHT SESSION MONITOR</div>
+      <h1>야간 증시 모니터</h1>
     </div>
     <div class="row" style="gap:8px;">
-      <a href="/night.html" style="text-decoration:none;">
-        <button style="background:var(--surface2);color:var(--textSec);border:1px solid var(--hair);">야간 증시 →</button>
+      <a href="/index.html" style="text-decoration:none;">
+        <button style="background:var(--surface2);color:var(--textSec);border:1px solid var(--hair);">← 주간 증시</button>
       </a>
       <a href="/us.html" style="text-decoration:none;">
         <button style="background:var(--surface2);color:var(--textSec);border:1px solid var(--hair);">미국 증시 →</button>
@@ -106,63 +106,35 @@
     </div>
   </div>
 
-  <div class="card">
-    <div class="between" style="margin-bottom:14px;">
-      <div style="font-size:13px;color:var(--textSec);">국내 지수</div>
-      <span id="idxMeta" style="font-size:10.5px;color:var(--textTer);font-family:var(--mono);"></span>
-    </div>
-    <div class="idx-grid" id="idxGrid">
-      <div class="news-empty">불러오는 중...</div>
-    </div>
-  </div>
-
   <div class="layout">
     <div>
-      <div class="card">
-        <div style="font-size:13px;color:var(--textSec);margin-bottom:12px;">아시아 증시</div>
-        <div class="grid" id="asiaGrid"></div>
+      <div class="card row">
+        <label class="row" style="gap:6px;font-size:12px;color:var(--textSec);cursor:pointer;">
+          <input type="checkbox" id="kimchiToggle" checked style="accent-color:var(--signature);" />
+          김프 제거 (은행간 환율로 계산)
+        </label>
+        <span id="updatedAt" style="font-size:11px;color:var(--textTer);margin-left:auto;">로딩 중...</span>
       </div>
+
+      <div class="card" id="kr200Card">
+        <div class="between" style="margin-bottom:14px;">
+          <div style="font-size:13px;color:var(--textSec);">코스피200 야간 <span style="font-size:11px;color:var(--textTer);">KR200</span></div>
+          <span id="kr200Meta" style="font-size:10.5px;color:var(--textTer);font-family:var(--mono);"></span>
+        </div>
+        <div id="kr200Body"><div class="news-empty">불러오는 중...</div></div>
+      </div>
+
+      <div class="stock-grid" id="stockGrid"></div>
 
       <div class="card">
         <div style="font-size:13px;color:var(--textSec);margin-bottom:12px;">참고 지표</div>
         <div class="grid" id="macroGrid"></div>
       </div>
 
-      <div class="card">
-        <div class="between" style="margin-bottom:12px;">
-          <div style="font-size:13px;color:var(--textSec);">시총대비 수급 <span style="font-size:11px;color:var(--textTer);">장중 잠정</span></div>
-          <span id="supMeta" style="font-size:10.5px;color:var(--textTer);font-family:var(--mono);"></span>
-        </div>
-        <div class="sup-tabs" id="supTabs"></div>
-        <div id="supBody"><div class="news-empty">불러오는 중...</div></div>
+      <div class="disclaimer">
+        ⚠ 위 가격은 실제 KRX 공식 시세가 아니라, 해외 파생상품 시장(Hyperliquid)에서 형성된 가격을 원화로 환산한 참고값입니다.
+        다음 날 시가를 보장하지 않으며, 유동성이 낮을 때는 괴리가 커질 수 있습니다.
       </div>
-
-      <div class="card">
-        <div class="between" style="margin-bottom:12px;">
-          <div style="font-size:13px;color:var(--textSec);">시총대비 수급 <span style="font-size:11px;color:var(--textTer);">마감 확정</span></div>
-          <span id="finMeta" style="font-size:10.5px;color:var(--textTer);font-family:var(--mono);"></span>
-        </div>
-        <div class="sup-tabs" id="finTabs"></div>
-        <div id="finBody"><div class="news-empty">불러오는 중...</div></div>
-      </div>
-
-      <div class="card">
-        <div class="between" style="margin-bottom:12px;">
-          <div style="font-size:13px;color:var(--textSec);">순매수·순매도 상위 10</div>
-          <span id="rankMeta" style="font-size:10.5px;color:var(--textTer);font-family:var(--mono);"></span>
-        </div>
-        <div class="rank-grid">
-          <div>
-            <div class="rank-head">외국인</div>
-            <div id="foreignRank"><div class="news-empty" style="padding-top:10px;">불러오는 중...</div></div>
-          </div>
-          <div>
-            <div class="rank-head">기관</div>
-            <div id="orgnRank"><div class="news-empty" style="padding-top:10px;">불러오는 중...</div></div>
-          </div>
-        </div>
-      </div>
-
     </div>
 
     <div class="card" style="margin-bottom:0;">

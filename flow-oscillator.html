@@ -4,7 +4,9 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>수급오실레이터</title>
-<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<!-- 차트 라이브러리. 첫 번째가 실패하면 두 번째에서 다시 받습니다. -->
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"
+        onerror="var s=document.createElement('script');s.src='https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js';s.onerror=function(){window.__chartFail=true;};document.head.appendChild(s);"></script>
 <style>
   :root {
     --void:#F2F4F9; --surface:#FFFFFF; --surface2:#F0F2F8; --hair:#E1E5F0;
@@ -41,8 +43,11 @@
       <a href="/us.html" style="text-decoration:none;">
         <button style="background:var(--surface2);color:var(--textSec);border:1px solid var(--hair);">미국 증시 →</button>
       </a>
+      <a href="/night.html" style="text-decoration:none;">
+        <button style="background:var(--surface2);color:var(--textSec);border:1px solid var(--hair);">야간 증시 →</button>
+      </a>
       <a href="/index.html" style="text-decoration:none;">
-        <button style="background:var(--surface2);color:var(--textSec);border:1px solid var(--hair);">← 야간증시 모니터</button>
+        <button style="background:var(--surface2);color:var(--textSec);border:1px solid var(--hair);">← 주간 증시</button>
       </a>
     </div>
   </div>
@@ -73,6 +78,10 @@
 </div>
 
 <script>
+if (typeof LightweightCharts === "undefined") {
+  document.getElementById('statusText').textContent = "차트 라이브러리를 불러오지 못했습니다. 새로고침(Ctrl+Shift+R)을 눌러보세요.";
+  throw new Error("LightweightCharts 로드 실패");
+}
 const chart = LightweightCharts.createChart(document.getElementById('chart'), {
   layout: { background: { color: '#FFFFFF' }, textColor: '#5B6483' },
   grid: { vertLines: { color: '#E1E5F0' }, horzLines: { color: '#E1E5F0' } },
