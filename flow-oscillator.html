@@ -56,6 +56,7 @@
     <span style="font-size:12px;color:var(--textSec);">종목코드</span>
     <input type="text" id="codeInput" value="000660" placeholder="예: 000660" />
     <button id="loadBtn">조회</button>
+    <button id="fitBtn" style="background:var(--surface2);color:var(--textSec);border:1px solid var(--hair);font-weight:400;">전체 기간</button>
     <span id="statusText" class="status" style="margin-left:auto;">SK하이닉스(000660) 조회 중...</span>
   </div>
 
@@ -157,8 +158,16 @@ async function loadData(code){
     oscLine.setData(series.map(s => ({
       time: fmtDate(s.date), value: s.oscillator,
     })));
-    chart.timeScale().fitContent();
-    oscChart.timeScale().fitContent();
+    // 처음에는 최근 6개월(약 120거래일)만 보여줍니다.
+    // 마우스로 끌거나 휠을 돌리면 예전 구간도 볼 수 있습니다.
+    const SHOW_BARS = 120;
+    if (series.length > SHOW_BARS) {
+      const from = series.length - SHOW_BARS;
+      chart.timeScale().setVisibleLogicalRange({ from, to: series.length - 1 + 3 });
+    } else {
+      chart.timeScale().fitContent();
+      oscChart.timeScale().fitContent();
+    }
 
     statusEl.textContent = code + " · " + series.length + "거래일 · 최근 업데이트 " + new Date().toLocaleTimeString("ko-KR");
 
@@ -171,6 +180,11 @@ async function loadData(code){
     statusEl.textContent = "불러오지 못했습니다: " + e;
   }
 }
+
+document.getElementById('fitBtn').addEventListener('click', () => {
+  chart.timeScale().fitContent();
+  oscChart.timeScale().fitContent();
+});
 
 document.getElementById('loadBtn').addEventListener('click', () => {
   const code = document.getElementById('codeInput').value.trim();
