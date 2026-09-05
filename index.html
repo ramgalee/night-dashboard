@@ -563,8 +563,9 @@ function paintSupply() {
   </div>`;
 
   const cd = SUPPLY.capDate || "";
-   const stale = SUPPLY.stale ? " · 갱신 지연" : "";
-
+  const stale = SUPPLY.stale ? " · 갱신 지연" : "";
+  const g = SUPPLY.generatedAt ? new Date(SUPPLY.generatedAt) : null;
+  const snap = g ? g.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Seoul" }) + " 조회 · " : "";
   document.getElementById("supMeta").textContent =
     snap +
     (cd.length === 8 ? `시총 ${cd.slice(4, 6)}.${cd.slice(6, 8)} 기준 · ` : "") +
