@@ -83,6 +83,16 @@
   .sup-mkt { font-family:var(--mono); font-size:9.5px; color:var(--textTer); margin-left:5px; }
   .sup-net { font-family:var(--mono); font-size:11px; color:var(--textTer); flex:none; width:62px; text-align:right; }
   .sup-ratio { font-family:var(--mono); font-size:12.5px; font-weight:600; flex:none; width:62px; text-align:right; }
+  .tr-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(300px,1fr)); gap:18px; }
+  .tr-head { font-size:12px; padding-bottom:8px; border-bottom:1px solid var(--hair); }
+  .tr-scroll { max-height:460px; overflow-y:auto; }
+  .tr-row { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--hair); }
+  .tr-row:last-child { border-bottom:none; }
+  .tr-no { font-family:var(--mono); font-size:10.5px; color:var(--textTer); width:22px; flex:none; text-align:right; }
+  .tr-name { font-size:12.5px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .tr-mkt { font-family:var(--mono); font-size:9.5px; color:var(--textTer); margin-left:5px; }
+  .tr-val { font-family:var(--mono); font-size:11px; color:var(--textTer); flex:none; width:64px; text-align:right; }
+  .tr-pct { font-family:var(--mono); font-size:12.5px; font-weight:600; flex:none; width:56px; text-align:right; }
 </style>
 </head>
 <body data-page="day">
@@ -126,6 +136,14 @@
       <div class="card">
         <div style="font-size:13px;color:var(--textSec);margin-bottom:12px;">참고 지표</div>
         <div class="grid" id="macroGrid"></div>
+      </div>
+
+      <div class="card">
+        <div class="between" style="margin-bottom:12px;">
+          <div style="font-size:13px;color:var(--textSec);">거래대금 상위 <span style="font-size:11px;color:var(--textTer);">코스피+코스닥</span></div>
+          <span id="trMeta" style="font-size:10.5px;color:var(--textTer);font-family:var(--mono);"></span>
+        </div>
+        <div id="trBody"><div class="news-empty">불러오는 중...</div></div>
       </div>
 
       <div class="card">
@@ -663,6 +681,49 @@ async function fetchFinalSupply() {
   }
 }
 
+// 거래대금 상위 150 · 그중 상승률 상위 50
+function trRows(rows, 순위키) {
+  if (!rows || !rows.length) return `<div class="news-empty" style="padding-top:10px;">데이터가 없습니다.</div>`;
+  return rows.map(r => {
+    const up = (r.changePct ?? 0) >= 0;
+    const 억 = r.tradeValue == null ? "—" : Math.round(r.tradeValue / 100).toLocaleString("ko-KR") + "억";
+    return `<div class="tr-row">
+      <span class="tr-no">${r[순위키]}</span>
+      <span class="tr-name">${r.name}<span class="tr-mkt">${r.market === "KOSPI" ? "KP" : "KQ"}</span></span>
+      <span class="tr-val">${억}</span>
+      <span class="tr-pct" style="color:${up ? T.up : T.down}">${r.changePct == null ? "—" : (up ? "+" : "−") + Math.abs(r.changePct).toFixed(2) + "%"}</span>
+    </div>`;
+  }).join("");
+}
+
+async function fetchTradeRank() {
+  const body = document.getElementById("trBody");
+  if (!body) return;
+  try {
+    const r = await fetch("/api/trade-rank", { cache: "no-store" });
+    const d = await r.json();
+    if (d.error || !d.top150) throw new Error(d.error || "no data");
+
+    body.innerHTML = `<div class="tr-grid">
+      <div>
+        <div class="tr-head" style="color:var(--textSec)">거래대금 상위 150</div>
+        <div class="tr-scroll">${trRows(d.top150, "rank")}</div>
+      </div>
+      <div>
+        <div class="tr-head" style="color:${T.up}">그중 상승률 상위 50</div>
+        <div class="tr-scroll">${trRows(d.up50, "upRank")}</div>
+      </div>
+    </div>`;
+
+    const t = d.generatedAt ? new Date(d.generatedAt) : null;
+    document.getElementById("trMeta").textContent =
+      (t ? t.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Seoul" }) + " 조회 · " : "")
+      + "거래대금 억원";
+  } catch (e) {
+    body.innerHTML = `<div class="news-empty">거래대금 순위를 불러오지 못했습니다.</div>`;
+  }
+}
+
 let KOSPI200_CLOSE = null;
 let LAST_KR200 = null;
 
@@ -929,7 +990,7 @@ STOCKS.forEach(s => {
     }
   });
 });
-document.getElementById("refreshBtn").addEventListener("click", () => { fetchAndRender(); fetchInvestorRank(); fetchIndexIntraday(); fetchMacroSpark(); fetchTwse(); fetchKr200(); fetchSupplyRatio(); fetchFinalSupply(); });
+document.getElementById("refreshBtn").addEventListener("click", () => { fetchAndRender(); fetchInvestorRank(); fetchIndexIntraday(); fetchMacroSpark(); fetchTwse(); fetchKr200(); fetchSupplyRatio(); fetchFinalSupply(); fetchTradeRank(); });
 const kimchiEl = document.getElementById("kimchiToggle");
 if (kimchiEl) kimchiEl.addEventListener("change", fetchAndRender);
 fetchAndRender();
@@ -940,6 +1001,7 @@ fetchTwse();
 fetchKr200();
 fetchSupplyRatio();
 fetchFinalSupply();
+fetchTradeRank();
 fetchInvestorRank();
 fetchIndexIntraday();
 setInterval(fetchAndRender, 6000);
@@ -949,6 +1011,7 @@ setInterval(fetchMacroSpark, 60000);
 setInterval(fetchTwse, 30000);
 setInterval(fetchKr200, 15000);
 setInterval(fetchSupplyRatio, 300000);
+setInterval(fetchTradeRank, 60000);
 setInterval(fetchFinalSupply, 600000);
 setInterval(fetchInvestorRank, 600000);
 setInterval(fetchIndexIntraday, 30000);
