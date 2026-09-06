@@ -28,6 +28,24 @@
   .status { font-size:12px; color:var(--textTer); }
   .warning { border:1px dashed var(--up); border-radius:12px; padding:10px 14px; font-size:12px; color:var(--up); margin-bottom:16px; }
   .notice { border:1px dashed var(--hair); border-radius:12px; padding:10px 14px; font-size:12px; color:var(--textTer); margin-bottom:16px; }
+  .split { display:grid; grid-template-columns: minmax(0,1fr) 320px; gap:16px; align-items:start; }
+  @media (max-width: 1100px) { .split { grid-template-columns: 1fr; } }
+
+  .pick-tabs { display:flex; gap:6px; margin-bottom:12px; }
+  .pick-tab { flex:1; border:1px solid var(--hair); background:var(--surface); color:var(--textSec);
+              border-radius:999px; padding:7px 8px; font-size:11.5px; font-family:inherit; cursor:pointer; font-weight:400; }
+  .pick-tab.on { background:var(--textPri); border-color:var(--textPri); color:#fff; }
+  .pick-scroll { max-height:640px; overflow-y:auto; }
+  .pick-row { display:flex; align-items:center; gap:8px; padding:7px 4px; border-bottom:1px solid var(--hair);
+              cursor:pointer; border-radius:6px; }
+  .pick-row:hover { background:var(--surface2); }
+  .pick-row.on { background:var(--surface2); box-shadow: inset 2px 0 0 var(--signature); }
+  .pick-no { font-family:var(--mono); font-size:10.5px; color:var(--textTer); width:20px; flex:none; text-align:right; }
+  .pick-name { font-size:12.5px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pick-mkt { font-family:var(--mono); font-size:9.5px; color:var(--textTer); margin-left:4px; }
+  .pick-val { font-family:var(--mono); font-size:12px; font-weight:600; flex:none; }
+  .pick-meta { font-size:10.5px; color:var(--textTer); font-family:var(--mono); margin-bottom:8px; }
+
   #chart { width:100%; height:420px; }
   #oscChart { width:100%; height:140px; }
 </style>
@@ -62,14 +80,27 @@
 
   <div id="warningBox"></div>
 
-  <div class="card">
-    <div style="font-size:13px;color:var(--textSec);margin-bottom:8px;">캔들 차트</div>
-    <div id="chart"></div>
-  </div>
+  <div class="split">
+    <div>
+      <div class="card">
+        <div style="font-size:13px;color:var(--textSec);margin-bottom:8px;">캔들 차트</div>
+        <div id="chart"></div>
+      </div>
 
-  <div class="card">
-    <div style="font-size:13px;color:var(--textSec);margin-bottom:8px;">수급오실레이터</div>
-    <div id="oscChart"></div>
+      <div class="card">
+        <div style="font-size:13px;color:var(--textSec);margin-bottom:8px;">수급오실레이터</div>
+        <div id="oscChart"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="pick-tabs" id="pickTabs">
+        <button class="pick-tab on" data-src="up">상승률 상위 50</button>
+        <button class="pick-tab" data-src="samo">사모펀드 상위 20</button>
+      </div>
+      <div class="pick-meta" id="pickMeta"></div>
+      <div class="pick-scroll" id="pickList"><div class="status">불러오는 중...</div></div>
+    </div>
   </div>
 
   <div class="notice">
@@ -181,6 +212,72 @@ async function loadData(code){
   }
 }
 
+// ── 종목 고르기 목록 ──────────────────────────────────────
+// 왼쪽 차트를 종목코드 입력 없이 바로 바꿔 볼 수 있게 합니다.
+const PICK = { up: null, samo: null };
+let PICK_SRC = "up";
+let PICK_CODE = null;
+
+const fmtPct = v => v == null ? "—" : (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2) + "%";
+
+function pickRows() {
+  const list = PICK[PICK_SRC];
+  if (!list) return `<div class="status">불러오는 중...</div>`;
+  if (!list.length) return `<div class="status">데이터가 없습니다.</div>`;
+
+  return list.map((r, i) => `
+    <div class="pick-row${r.code === PICK_CODE ? " on" : ""}" data-code="${r.code}">
+      <span class="pick-no">${i + 1}</span>
+      <span class="pick-name">${r.name}<span class="pick-mkt">${r.market === "KOSPI" ? "KP" : "KQ"}</span></span>
+      <span class="pick-val" style="color:${(r.value ?? 0) >= 0 ? '#E5484D' : '#2F6FED'}">${fmtPct(r.value)}</span>
+    </div>`).join("");
+}
+
+function paintPick() {
+  document.getElementById("pickTabs").querySelectorAll(".pick-tab").forEach(b => {
+    b.classList.toggle("on", b.dataset.src === PICK_SRC);
+  });
+  const el = document.getElementById("pickList");
+  el.innerHTML = pickRows();
+  el.querySelectorAll(".pick-row").forEach(row => {
+    row.addEventListener("click", () => {
+      PICK_CODE = row.dataset.code;
+      document.getElementById("codeInput").value = PICK_CODE;
+      paintPick();
+      loadData(PICK_CODE);
+    });
+  });
+  document.getElementById("pickMeta").textContent =
+    PICK_SRC === "up" ? "거래대금 상위 150 중 상승률 순" : "확정수급 · 시총대비 순매수 순";
+}
+
+async function loadPicks() {
+  // 1) 거래대금 상위 150 중 상승률 상위 50
+  try {
+    const d = await (await fetch("/api/trade-rank", { cache: "no-store" })).json();
+    PICK.up = (d.up50 || []).map(r => ({ code: r.code, name: r.name, market: r.market, value: r.changePct }));
+  } catch (e) { PICK.up = []; }
+
+  // 2) 마감 확정 · 사모펀드 시총대비 순매수 상위 20
+  try {
+    const f = await (await fetch("/supply_final.json", { cache: "no-store" })).json();
+    const side = (f.data && (f.data["사모"] || f.data["사모펀드"])) || {};
+    PICK.samo = (side.buy || []).slice(0, 20)
+      .map(r => ({ code: r.code, name: r.name, market: r.market, value: r.ratio }));
+  } catch (e) { PICK.samo = []; }
+
+  paintPick();
+}
+
+document.getElementById("pickTabs").addEventListener("click", (e) => {
+  const b = e.target.closest(".pick-tab");
+  if (!b) return;
+  PICK_SRC = b.dataset.src;
+  paintPick();
+});
+
+loadPicks();
+
 document.getElementById('fitBtn').addEventListener('click', () => {
   chart.timeScale().fitContent();
   oscChart.timeScale().fitContent();
@@ -188,7 +285,7 @@ document.getElementById('fitBtn').addEventListener('click', () => {
 
 document.getElementById('loadBtn').addEventListener('click', () => {
   const code = document.getElementById('codeInput').value.trim();
-  if (code) loadData(code);
+  if (code) { PICK_CODE = code; paintPick(); loadData(code); }
 });
 document.getElementById('codeInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') document.getElementById('loadBtn').click();
