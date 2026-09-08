@@ -95,8 +95,9 @@
 
     <div class="card">
       <div class="pick-tabs" id="pickTabs">
-        <button class="pick-tab on" data-src="up">상승률 상위 50</button>
-        <button class="pick-tab" data-src="samo">사모펀드 상위 20</button>
+        <button class="pick-tab on" data-src="up">상승률 50</button>
+        <button class="pick-tab" data-src="prog">프로그램 50</button>
+        <button class="pick-tab" data-src="samo">사모 20</button>
       </div>
       <div class="pick-meta" id="pickMeta"></div>
       <div class="pick-scroll" id="pickList"><div class="status">불러오는 중...</div></div>
@@ -214,7 +215,7 @@ async function loadData(code){
 
 // ── 종목 고르기 목록 ──────────────────────────────────────
 // 왼쪽 차트를 종목코드 입력 없이 바로 바꿔 볼 수 있게 합니다.
-const PICK = { up: null, samo: null };
+const PICK = { up: null, prog: null, samo: null };
 let PICK_SRC = "up";
 let PICK_CODE = null;
 
@@ -247,8 +248,12 @@ function paintPick() {
       loadData(PICK_CODE);
     });
   });
-  document.getElementById("pickMeta").textContent =
-    PICK_SRC === "up" ? "거래대금 상위 150 중 상승률 순" : "확정수급 · 시총대비 순매수 순";
+  const notes = {
+    up: "거래대금 상위 150 중 상승률 순",
+    prog: "장중 · 시총대비 프로그램 순매수 순",
+    samo: "마감 확정 · 시총대비 순매수 순",
+  };
+  document.getElementById("pickMeta").textContent = notes[PICK_SRC] || "";
 }
 
 async function loadPicks() {
@@ -258,7 +263,13 @@ async function loadPicks() {
     PICK.up = (d.up50 || []).map(r => ({ code: r.code, name: r.name, market: r.market, value: r.changePct }));
   } catch (e) { PICK.up = []; }
 
-  // 2) 마감 확정 · 사모펀드 시총대비 순매수 상위 20
+  // 2) 장중 · 시총대비 프로그램 순매수 상위 50
+  try {
+    const p = await (await fetch("/api/program-flow", { cache: "no-store" })).json();
+    PICK.prog = (p.buy || []).map(r => ({ code: r.code, name: r.name, market: r.market, value: r.ratio }));
+  } catch (e) { PICK.prog = []; }
+
+  // 3) 마감 확정 · 사모펀드 시총대비 순매수 상위 20
   try {
     const f = await (await fetch("/supply_final.json", { cache: "no-store" })).json();
     const side = (f.data && (f.data["사모"] || f.data["사모펀드"])) || {};
