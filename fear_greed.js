@@ -23,6 +23,7 @@ const APP_SECRET = pick('KIWOOM_APP_SECRET', 'APP_SECRET', 'KIWOOM_SECRETKEY', '
 
 const BASE = 'https://api.kiwoom.com';
 const SEED_URL = 'https://raw.githubusercontent.com/ramgalee/night-dashboard/main/index_history.json';
+const EXTRA_URL = 'https://raw.githubusercontent.com/ramgalee/night-dashboard/main/fg_extra.json';
 const STORE = '/root/app/index_history.json';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -121,6 +122,25 @@ async function extend(db) {
   return added;
 }
 
+// ── 보조 데이터 (VKOSPI · 국채금리차 · Put/Call) ─────────
+// 주피터에서 피어앤그리드.xlsx 를 읽어 만든 fg_extra.json 입니다.
+// 없으면 세 항목만으로 계산합니다.
+const EXTRA = { data: null, at: 0 };
+
+async function getExtra() {
+  if (EXTRA.data && Date.now() - EXTRA.at < 30 * 60 * 1000) return EXTRA.data;
+  try {
+    const r = await fetch(EXTRA_URL, { headers: { 'Cache-Control': 'no-cache' } });
+    if (!r.ok) throw new Error('extra ' + r.status);
+    const j = await r.json();
+    if (j && j.data) { EXTRA.data = j.data; EXTRA.at = Date.now(); }
+  } catch (e) {
+    if (!EXTRA.data) EXTRA.data = {};
+    EXTRA.at = Date.now();
+  }
+  return EXTRA.data || {};
+}
+
 // ── 지표 계산 ──────────────────────────────────────────
 const clamp = v => Math.max(0, Math.min(100, v));
 
@@ -166,9 +186,10 @@ function ema(arr, n) {
   return out;
 }
 
-function computeFG(rows) {
+function computeFG(rows, extra) {
   const closes = rows.map(r => r.close);
   const out = [];
+  const ex = extra || {};
 
   for (let i = 0; i < rows.length; i++) {
     const ma125 = sma(closes, 125, i);
@@ -183,14 +204,45 @@ function computeFG(rows) {
     // 3) 변동성: 연율 10%(탐욕) ~ 40%(공포). 낮을수록 탐욕이므로 뒤집습니다.
     const vl = 100 - scale(vol, 10, 40);
 
+    // 보조 데이터가 있는 날은 다섯 항목으로 계산합니다.
+    const e = ex[rows[i].date];
+    const parts = [mom, rs, vl];
+    let vkScore = null, pcScore = null, bondScore = null;
+
+    if (e) {
+      // VKOSPI: 12(탐욕) ~ 35(공포). 낮을수록 탐욕이므로 뒤집습니다.
+      if (e.vkospi != null) {
+        vkScore = 100 - scale(e.vkospi, 12, 35);
+        parts.push(vkScore);
+      }
+      // Put/Call: 0.7(탐욕) ~ 1.3(공포). 풋이 많을수록 공포입니다.
+      if (e.putCall != null) {
+        pcScore = 100 - scale(e.putCall, 0.7, 1.3);
+        parts.push(pcScore);
+      }
+      // 국채 10년-5년 지수 비율의 20일 변화. 안전자산 선호가 강하면 공포입니다.
+      if (e.bondSpread != null) {
+        bondScore = scale(e.bondSpread, -2, 2);
+        parts.push(bondScore);
+      }
+    }
+
+    const fg = parts.reduce((a, b) => a + b, 0) / parts.length;
+
     out.push({
       date: rows[i].date,
       close: closes[i],
-      fg: Number(((mom + rs + vl) / 3).toFixed(2)),
+      fg: Number(fg.toFixed(2)),
       momentum: Number(mom.toFixed(2)),
       rsi: Number(rs.toFixed(2)),
       volScore: Number(vl.toFixed(2)),
       vol: Number(vol.toFixed(2)),
+      vkScore: vkScore == null ? null : Number(vkScore.toFixed(2)),
+      vkospi: e && e.vkospi != null ? e.vkospi : null,
+      pcScore: pcScore == null ? null : Number(pcScore.toFixed(2)),
+      putCall: e && e.putCall != null ? e.putCall : null,
+      bondScore: bondScore == null ? null : Number(bondScore.toFixed(2)),
+      parts: parts.length,
     });
   }
 
@@ -217,16 +269,19 @@ async function build(days) {
   const added = await extend(db);
   if (added) save(db);
 
+  const extra = await getExtra();
+
   const out = {};
   for (const mkt of MARKETS) {
     const rows = db.data[mkt.key] || [];
-    const series = computeFG(rows);
+    const series = computeFG(rows, extra[mkt.key] || extra.ALL || null);
     out[mkt.key] = series.slice(-days);
   }
 
   return {
     added,
     lastDate: (out.KOSPI && out.KOSPI.length) ? out.KOSPI[out.KOSPI.length - 1].date : null,
+    parts: (out.KOSPI && out.KOSPI.length) ? out.KOSPI[out.KOSPI.length - 1].parts : 3,
     data: out,
     generatedAt: new Date().toISOString(),
   };
