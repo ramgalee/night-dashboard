@@ -52,6 +52,11 @@ async function getToken(force) {
   return TOKEN;
 }
 
+// 오늘 날짜(한국 기준). ka20006 은 base_dt 가 비어 있으면 오류가 납니다.
+function today() {
+  return new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10).replace(/-/g, '');
+}
+
 async function call(indsCd, force) {
   const token = await getToken(force);
   const r = await fetch(BASE + '/api/dostk/chart', {
@@ -61,7 +66,7 @@ async function call(indsCd, force) {
       authorization: 'Bearer ' + token,
       'api-id': 'ka20006', 'cont-yn': 'N', 'next-key': ''
     },
-    body: JSON.stringify({ inds_cd: indsCd, base_dt: '' })
+    body: JSON.stringify({ inds_cd: indsCd, base_dt: today() })
   });
   const t = await r.text();
   let j;
