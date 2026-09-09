@@ -216,10 +216,10 @@ function computeFG(rows, extra) {
         vkScore = 100 - scale(e.vkospi, 26, 85);
         parts.push(vkScore);
       }
-      // Put/Call: 0.83(탐욕) ~ 2.0(공포). 풋이 많을수록 공포입니다.
+      // Put/Call: 0.6(탐욕) ~ 2.0(공포). 풋이 많을수록 공포입니다.
       // 실제로는 7까지 튀지만 그 이상은 어차피 극단이라 2.0에서 끊습니다.
       if (e.putCall != null) {
-        pcScore = 100 - scale(e.putCall, 0.83, 2.0);
+        pcScore = 100 - scale(e.putCall, 0.6, 2.0);
         parts.push(pcScore);
       }
       // 국채 10년-5년 지수 비율의 20일 변화. 안전자산 선호가 강하면 공포입니다.
