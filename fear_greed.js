@@ -186,80 +186,89 @@ function ema(arr, n) {
   return out;
 }
 
+// 원본 코랩 코드와 같은 방식으로 계산합니다.
+//   Momentum          125일 이동평균 대비 괴리율(%)
+//   Put_Call_Ratio    PUT ATM / CALL ATM
+//   Market_Volatility VKOSPI
+//   Bond_Yield_Diff   10년 국채선물지수 - 5년 국채선물지수
+//   RSI_10            10일 RSI
+// 다섯 항목을 각각 MinMax(최솟값 0, 최댓값 1)로 정규화한 뒤
+//   F&G = Mom*0.2 + (1-PC)*0.2 + (1-Vol)*0.2 + Bond*0.2 + RSI*0.2
+// 오실레이터는 F&G 의 MACD(12,26,9) 히스토그램입니다.
+
+function minmax(arr) {
+  const v = arr.filter(x => x != null && isFinite(x));
+  if (!v.length) return () => null;
+  const lo = Math.min(...v), hi = Math.max(...v);
+  if (hi === lo) return () => 0.5;
+  return x => (x == null || !isFinite(x)) ? null : (x - lo) / (hi - lo);
+}
+
+function emaSeries(arr, n) {
+  const k = 2 / (n + 1);
+  let prev = null;
+  return arr.map(v => {
+    if (v == null) return null;
+    prev = prev == null ? v : v * k + prev * (1 - k);
+    return prev;
+  });
+}
+
 function computeFG(rows, extra) {
-  const closes = rows.map(r => r.close);
-  const out = [];
   const ex = extra || {};
+  const closes = rows.map(r => r.close);
 
+  // 보조 데이터가 있는 날만 계산 대상으로 삼습니다(원본의 dropna 와 같습니다).
+  const idx = [];
   for (let i = 0; i < rows.length; i++) {
-    const ma125 = sma(closes, 125, i);
-    const r10 = rsi(closes, 10, i);
-    const vol = realizedVol(closes, 20, i);
-    if (ma125 == null || r10 == null || vol == null) { out.push(null); continue; }
-
-    // 1) 모멘텀: 125일선 대비 ±10% 를 0~100 으로
-    const mom = scale((closes[i] / ma125 - 1) * 100, -10, 10);
-    // 2) RSI 는 그대로 0~100
-    const rs = clamp(r10);
-    // 3) 변동성: 연율 10%(탐욕) ~ 40%(공포). 낮을수록 탐욕이므로 뒤집습니다.
-    const vl = 100 - scale(vol, 10, 40);
-
-    // 보조 데이터가 있는 날은 다섯 항목으로 계산합니다.
     const e = ex[rows[i].date];
-    const parts = [mom, rs, vl];
-    let vkScore = null, pcScore = null, bondScore = null;
-
-    if (e) {
-      // VKOSPI: 최근 1년 분포의 하위10%~상위10% 구간(26~85)을 씁니다.
-      // 낮을수록 탐욕이므로 뒤집습니다.
-      if (e.vkospi != null) {
-        vkScore = 100 - scale(e.vkospi, 26, 85);
-        parts.push(vkScore);
-      }
-      // Put/Call: 0.6(탐욕) ~ 2.0(공포). 풋이 많을수록 공포입니다.
-      // 실제로는 7까지 튀지만 그 이상은 어차피 극단이라 2.0에서 끊습니다.
-      if (e.putCall != null) {
-        pcScore = 100 - scale(e.putCall, 0.6, 2.0);
-        parts.push(pcScore);
-      }
-      // 국채 10년-5년 지수 비율의 20일 변화. 안전자산 선호가 강하면 공포입니다.
-      if (e.bondSpread != null) {
-        bondScore = scale(e.bondSpread, -2, 2);
-        parts.push(bondScore);
-      }
-    }
-
-    const fg = parts.reduce((a, b) => a + b, 0) / parts.length;
-
-    out.push({
-      date: rows[i].date,
-      close: closes[i],
-      fg: Number(fg.toFixed(2)),
-      momentum: Number(mom.toFixed(2)),
-      rsi: Number(rs.toFixed(2)),
-      volScore: Number(vl.toFixed(2)),
-      vol: Number(vol.toFixed(2)),
-      vkScore: vkScore == null ? null : Number(vkScore.toFixed(2)),
-      vkospi: e && e.vkospi != null ? e.vkospi : null,
-      pcScore: pcScore == null ? null : Number(pcScore.toFixed(2)),
-      putCall: e && e.putCall != null ? e.putCall : null,
-      bondScore: bondScore == null ? null : Number(bondScore.toFixed(2)),
-      parts: parts.length,
-    });
+    if (!e || e.vkospi == null || e.putCall == null || e.bondDiff == null) continue;
+    if (sma(closes, 125, i) == null || rsi(closes, 10, i) == null) continue;
+    idx.push(i);
   }
+  if (idx.length < 30) return [];
 
-  const valid = out.filter(Boolean);
-  const fgs = valid.map(x => x.fg);
-  const e20 = ema(fgs, 20);
-  const e30 = ema(fgs, 30);
-  const e50 = ema(fgs, 50);
+  const mom = idx.map(i => (closes[i] / sma(closes, 125, i) - 1) * 100);
+  const pc = idx.map(i => ex[rows[i].date].putCall);
+  const vol = idx.map(i => ex[rows[i].date].vkospi);
+  const bond = idx.map(i => ex[rows[i].date].bondDiff);
+  const rs = idx.map(i => rsi(closes, 10, i));
 
-  return valid.map((x, i) => Object.assign({}, x, {
-    ema20: e20[i] == null ? null : Number(e20[i].toFixed(2)),
-    ema30: e30[i] == null ? null : Number(e30[i].toFixed(2)),
-    ema50: e50[i] == null ? null : Number(e50[i].toFixed(2)),
-    // 오실레이터: F&G 와 EMA20 의 차이
-    osc: e20[i] == null ? null : Number((x.fg - e20[i]).toFixed(2)),
+  const nm = minmax(mom), np = minmax(pc), nv = minmax(vol), nb = minmax(bond), nr = minmax(rs);
+
+  // 0~1 로 나온 값을 화면에서 보기 쉽게 0~100 으로 표시합니다.
+  const fg = idx.map((_, k) =>
+    (nm(mom[k]) * 0.2 + (1 - np(pc[k])) * 0.2 + (1 - nv(vol[k])) * 0.2
+      + nb(bond[k]) * 0.2 + nr(rs[k]) * 0.2) * 100);
+
+  // MACD(12,26,9) 히스토그램
+  const e12 = emaSeries(fg, 12);
+  const e26 = emaSeries(fg, 26);
+  const macd = fg.map((_, k) => e12[k] - e26[k]);
+  const signal = emaSeries(macd, 9);
+  const ema20 = emaSeries(fg, 20);
+  const ema30 = emaSeries(fg, 30);
+  const ema50 = emaSeries(fg, 50);
+
+  return idx.map((i, k) => ({
+    date: rows[i].date,
+    close: closes[i],
+    fg: Number(fg[k].toFixed(2)),
+    ema20: Number(ema20[k].toFixed(2)),
+    ema30: Number(ema30[k].toFixed(2)),
+    ema50: Number(ema50[k].toFixed(2)),
+    macd: Number(macd[k].toFixed(4)),
+    signal: Number(signal[k].toFixed(4)),
+    osc: Number((macd[k] - signal[k]).toFixed(4)),
+    momentum: Number((nm(mom[k]) * 100).toFixed(2)),
+    rsi: Number((nr(rs[k]) * 100).toFixed(2)),
+    volScore: Number(((1 - nv(vol[k])) * 100).toFixed(2)),
+    pcScore: Number(((1 - np(pc[k])) * 100).toFixed(2)),
+    bondScore: Number((nb(bond[k]) * 100).toFixed(2)),
+    vkospi: vol[k],
+    putCall: Number(pc[k].toFixed(4)),
+    vol: vol[k],
+    parts: 5,
   }));
 }
 
@@ -283,7 +292,7 @@ async function build(days) {
   return {
     added,
     lastDate: (out.KOSPI && out.KOSPI.length) ? out.KOSPI[out.KOSPI.length - 1].date : null,
-    parts: (out.KOSPI && out.KOSPI.length) ? out.KOSPI[out.KOSPI.length - 1].parts : 3,
+    parts: 5,
     data: out,
     generatedAt: new Date().toISOString(),
   };
