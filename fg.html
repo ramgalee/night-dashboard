@@ -125,12 +125,17 @@ const base = {
 };
 
 const fgChart = LightweightCharts.createChart(document.getElementById('fgChart'), base);
-const fgLine = fgChart.addLineSeries({ color: UP, lineWidth: 2, title: 'F&G' });
-const emaLine = fgChart.addLineSeries({ color: PURPLE, lineWidth: 2, title: 'EMA20' });
+const fgLine = fgChart.addLineSeries({ color: UP, lineWidth: 2, title: 'F&G', priceLineVisible: false });
+const emaLine = fgChart.addLineSeries({ color: PURPLE, lineWidth: 2, title: 'EMA20', priceLineVisible: false });
+// 지수는 F&G(0~100)와 자릿수가 달라 왼쪽 별도 축에 그립니다.
 const idxLine = fgChart.addLineSeries({
-  color: GRAY, lineWidth: 1, title: '지수', priceScaleId: 'idx',
+  color: GRAY, lineWidth: 1, title: '지수', priceScaleId: 'left',
+  priceLineVisible: false, lastValueVisible: false,
 });
-fgChart.priceScale('idx').applyOptions({ scaleMargins: { top: 0.1, bottom: 0.1 }, visible: true });
+fgChart.priceScale('left').applyOptions({
+  scaleMargins: { top: 0.08, bottom: 0.08 }, visible: true, borderColor: '#E1E5F0',
+});
+fgChart.applyOptions({ leftPriceScale: { visible: true, borderColor: '#E1E5F0' } });
 
 const oscChart = LightweightCharts.createChart(document.getElementById('oscChart'), base);
 const oscBars = oscChart.addHistogramSeries({ color: PURPLE, priceFormat: { type: 'price', precision: 3, minMove: 0.001 } });
