@@ -15,19 +15,27 @@ const B = 'https://api.kiwoom.com';
     body: JSON.stringify({ grant_type: 'client_credentials', appkey: K, secretkey: S })
   })).json();
 
-  for (const id of ['ka20006', 'ka20007', 'ka20009']) {
-    const r = await fetch(B + '/api/dostk/chart', {
+  const tries = [
+    ['ka20006', '/api/dostk/chart', { mrkt_tp: '0', inds_cd: '001', base_dt: '' }],
+    ['ka20006', '/api/dostk/chart', { inds_cd: '001', base_dt: '20260909' }],
+    ['ka20007', '/api/dostk/chart', { mrkt_tp: '0', inds_cd: '001', base_dt: '' }],
+    ['ka20009', '/api/dostk/sect',  { mrkt_tp: '0', inds_cd: '001' }],
+  ];
+
+  for (const [id, path, body] of tries) {
+    const r = await fetch(B + path, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         authorization: 'Bearer ' + t.token,
         'api-id': id, 'cont-yn': 'N', 'next-key': ''
       },
-      body: JSON.stringify({ inds_cd: '001', base_dt: '' })
+      body: JSON.stringify(body)
     });
     const j = await r.json();
     const k = Object.keys(j).filter(x => Array.isArray(j[x]));
-    console.log(id, 'rc=' + j.return_code, String(j.return_msg || '').slice(0, 30), '배열=' + k.join(','));
+    console.log(id, path, JSON.stringify(body));
+    console.log('   rc=' + j.return_code, String(j.return_msg || '').slice(0, 50), '배열=' + k.join(','));
     if (k.length) console.log('   ', JSON.stringify(j[k[0]][0]).slice(0, 200));
     await new Promise(z => setTimeout(z, 500));
   }
