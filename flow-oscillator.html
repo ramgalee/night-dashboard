@@ -97,6 +97,7 @@
       <div class="pick-tabs" id="pickTabs">
         <button class="pick-tab on" data-src="up">상승률 50</button>
         <button class="pick-tab" data-src="prog">프로그램 50</button>
+        <button class="pick-tab" data-src="orgn">잠정 기관</button>
         <button class="pick-tab" data-src="samo">사모 20</button>
       </div>
       <div class="pick-meta" id="pickMeta"></div>
@@ -215,7 +216,7 @@ async function loadData(code){
 
 // ── 종목 고르기 목록 ──────────────────────────────────────
 // 왼쪽 차트를 종목코드 입력 없이 바로 바꿔 볼 수 있게 합니다.
-const PICK = { up: null, prog: null, samo: null };
+const PICK = { up: null, prog: null, orgn: null, samo: null };
 let PICK_SRC = "up";
 let PICK_CODE = null;
 
@@ -251,6 +252,7 @@ function paintPick() {
   const notes = {
     up: "거래대금 상위 150 중 상승률 순",
     prog: "장중 · 시총대비 프로그램 순매수 순",
+    orgn: "장중 잠정 · 기관합계 시총대비 순매수 순",
     samo: "마감 확정 · 시총대비 순매수 순",
   };
   document.getElementById("pickMeta").textContent = notes[PICK_SRC] || "";
@@ -269,7 +271,15 @@ async function loadPicks() {
     PICK.prog = (p.buy || []).map(r => ({ code: r.code, name: r.name, market: r.market, value: r.ratio }));
   } catch (e) { PICK.prog = []; }
 
-  // 3) 마감 확정 · 사모펀드 시총대비 순매수 상위 20
+  // 3) 장중 잠정 · 기관합계 시총대비 순매수
+  try {
+    const g = await (await fetch("/api/supply-ratio", { cache: "no-store" })).json();
+    const side = (g.data && g.data["기관합계"]) || {};
+    PICK.orgn = (side.buy || []).slice(0, 30)
+      .map(r => ({ code: r.code, name: r.name, market: r.market, value: r.ratio }));
+  } catch (e) { PICK.orgn = []; }
+
+  // 4) 마감 확정 · 사모펀드 시총대비 순매수 상위 20
   try {
     const f = await (await fetch("/supply_final.json", { cache: "no-store" })).json();
     const side = (f.data && (f.data["사모"] || f.data["사모펀드"])) || {};
