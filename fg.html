@@ -94,14 +94,16 @@
   </div>
 
   <div class="card">
-    <div style="font-size:13px;color:var(--textSec);margin-bottom:8px;">오실레이터 (F&amp;G − EMA20)</div>
+    <div style="font-size:13px;color:var(--textSec);margin-bottom:8px;">오실레이터 <span style="font-size:11px;color:var(--textTer);">MACD 12·26·9 히스토그램</span></div>
     <div id="oscChart"></div>
   </div>
 
   <div class="note">
-    ⚠ 자체 산출 지표입니다. 125일 모멘텀, RSI 10일, 실현변동성 20일 세 가지를 0~100으로 환산해 평균냈습니다.
-    원본 공포·탐욕 지수가 쓰는 VKOSPI·Put/Call 비율·국채 금리차는 데이터 확보 문제로 아직 빠져 있어,
-    다른 곳에서 보시는 값과 차이가 납니다. 투자 판단의 근거로 사용할 수 없습니다.
+    ⚠ 자체 산출 지표입니다. 125일 모멘텀, Put/Call 비율, VKOSPI, 국채 10년−5년, RSI 10일 다섯 항목을
+    각각 전체 기간 최솟값~최댓값으로 환산해 20%씩 동일 가중으로 더했습니다.
+    오실레이터는 F&amp;G의 MACD(12·26·9) 히스토그램입니다.
+    VKOSPI·옵션·국채는 장 마감 후 수동으로 갱신되므로 당일 값은 다음 날 반영됩니다.
+    투자 판단의 근거로 사용할 수 없습니다.
   </div>
 </div>
 
@@ -131,7 +133,8 @@ const idxLine = fgChart.addLineSeries({
 fgChart.priceScale('idx').applyOptions({ scaleMargins: { top: 0.1, bottom: 0.1 }, visible: true });
 
 const oscChart = LightweightCharts.createChart(document.getElementById('oscChart'), base);
-const oscBars = oscChart.addHistogramSeries({ color: PURPLE });
+const oscBars = oscChart.addHistogramSeries({ color: PURPLE, priceFormat: { type: 'price', precision: 3, minMove: 0.001 } });
+const zeroLine = oscChart.addLineSeries({ color: '#C3C2B7', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
 
 fgChart.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) oscChart.timeScale().setVisibleLogicalRange(r); });
 oscChart.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) fgChart.timeScale().setVisibleLogicalRange(r); });
@@ -152,11 +155,12 @@ function paint() {
   if (!rows.length) return;
 
   fgLine.setData(rows.map(r => ({ time: fmtDate(r.date), value: r.fg })));
-  emaLine.setData(rows.filter(r => r.ema20 != null).map(r => ({ time: fmtDate(r.date), value: r.ema20 })));
+  emaLine.setData(rows.map(r => ({ time: fmtDate(r.date), value: r.ema20 })));
   idxLine.setData(rows.map(r => ({ time: fmtDate(r.date), value: r.close })));
-  oscBars.setData(rows.filter(r => r.osc != null).map(r => ({
+  oscBars.setData(rows.map(r => ({
     time: fmtDate(r.date), value: r.osc, color: r.osc >= 0 ? UP : DOWN,
   })));
+  zeroLine.setData(rows.map(r => ({ time: fmtDate(r.date), value: 0 })));
 
   const SHOW = 120;
   if (rows.length > SHOW) {
@@ -180,13 +184,17 @@ function paint() {
     <div class="part-s">${s || ''}</div>
   </div>`;
 
+  const sgn = v => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(3);
+
   document.getElementById('parts').innerHTML =
     cell('지수 종가', last.close.toLocaleString('ko-KR'), fmtDate(last.date)) +
-    cell('EMA20', last.ema20 == null ? '—' : last.ema20.toFixed(1), 'EMA30 ' + (last.ema30 == null ? '—' : last.ema30.toFixed(1))) +
-    cell('오실레이터', last.osc == null ? '—' : (last.osc >= 0 ? '+' : '−') + Math.abs(last.osc).toFixed(2), last.osc >= 0 ? 'EMA20 위' : 'EMA20 아래') +
-    cell('125일 모멘텀', last.momentum.toFixed(1), '0~100') +
-    cell('RSI 10일', last.rsi.toFixed(1), '0~100') +
-    cell('실현변동성', last.volScore.toFixed(1), '연율 ' + last.vol.toFixed(1) + '%');
+    cell('EMA20', last.ema20.toFixed(2), 'EMA30 ' + last.ema30.toFixed(2) + ' · EMA50 ' + last.ema50.toFixed(2)) +
+    cell('오실레이터', sgn(last.osc), last.osc >= 0 ? '상승 우위' : '하락 우위') +
+    cell('125일 모멘텀', last.momentum.toFixed(1), '가중 20%') +
+    cell('RSI 10일', last.rsi.toFixed(1), '가중 20%') +
+    cell('VKOSPI', last.volScore.toFixed(1), '실제 ' + last.vkospi.toFixed(2)) +
+    cell('Put/Call', last.pcScore.toFixed(1), '실제 ' + last.putCall.toFixed(3)) +
+    cell('국채 10년−5년', last.bondScore.toFixed(1), '가중 20%');
 
   document.getElementById('statusText').textContent =
     `${MKT} · ${rows.length}거래일 · 최종 ${fmtDate(last.date)}`;
