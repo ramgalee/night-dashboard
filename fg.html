@@ -44,7 +44,7 @@
   .part-s { font-size:10.5px; color:var(--textTer); font-family:var(--mono); margin-top:2px; }
 
   #fgChart { width:100%; height:380px; }
-  #oscChart { width:100%; height:150px; }
+  #oscChart { width:100%; height:190px; }
   .note { border:1px dashed var(--hair); border-radius:12px; padding:12px 16px; font-size:11.5px;
           color:var(--textTer); line-height:1.7; background:var(--surface); }
 </style>
@@ -167,13 +167,19 @@ function paint() {
   })));
   zeroLine.setData(rows.map(r => ({ time: fmtDate(r.date), value: 0 })));
 
+  // 처음에는 최근 6개월(약 120거래일)만 보여줍니다.
+  // 차트가 그려진 뒤에 범위를 잡아야 밀리지 않습니다.
   const SHOW = 120;
-  if (rows.length > SHOW) {
-    fgChart.timeScale().setVisibleLogicalRange({ from: rows.length - SHOW, to: rows.length + 2 });
-  } else {
-    fgChart.timeScale().fitContent();
-    oscChart.timeScale().fitContent();
-  }
+  requestAnimationFrame(() => {
+    if (rows.length > SHOW) {
+      const range = { from: rows.length - SHOW, to: rows.length + 2 };
+      fgChart.timeScale().setVisibleLogicalRange(range);
+      oscChart.timeScale().setVisibleLogicalRange(range);
+    } else {
+      fgChart.timeScale().fitContent();
+      oscChart.timeScale().fitContent();
+    }
+  });
 
   const last = rows[rows.length - 1];
   const [txt, color] = label(last.fg);
