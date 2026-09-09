@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>공포·탐욕 지수</title>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"
+        onerror="var s=document.createElement('script');s.src='https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js';document.head.appendChild(s);"></script>
+<style>
+  :root {
+    --void:#F2F4F9; --surface:#FFFFFF; --surface2:#F0F2F8; --hair:#E1E5F0;
+    --textPri:#131A2C; --textSec:#5B6483; --textTer:#8B94B0;
+    --up:#E5484D; --down:#2F6FED; --signature:#6D4FE0;
+    --mono: ui-monospace,'SF Mono','Roboto Mono',Menlo,Consolas,monospace;
+    --sans: -apple-system,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--void); color:var(--textPri); font-family:var(--sans); margin:0; padding:24px 16px; }
+  .wrap { max-width:1180px; margin:0 auto; }
+  .row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .between { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .card { background:var(--surface); border:1px solid var(--hair); border-radius:16px; padding:18px;
+          margin-bottom:16px; box-shadow:0 1px 3px rgba(19,26,44,.06); }
+  .eyebrow { font-size:11px; letter-spacing:2px; color:var(--textTer); font-family:var(--mono); }
+  h1 { font-size:22px; margin:2px 0 0; }
+  button { background:var(--surface2); border:1px solid var(--hair); color:var(--textSec);
+           padding:8px 14px; border-radius:10px; font-size:12px; cursor:pointer; font-family:var(--sans); }
+  button.on { background:var(--textPri); border-color:var(--textPri); color:#fff; font-weight:600; }
+  .status { font-size:12px; color:var(--textTer); }
+
+  .gauge { display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
+  .gauge-num { font-family:var(--mono); font-size:46px; font-weight:700; line-height:1; letter-spacing:-1px; }
+  .gauge-label { font-size:15px; font-weight:600; margin-top:4px; }
+  .gauge-bar { flex:1; min-width:240px; height:12px; border-radius:999px; position:relative;
+               background:linear-gradient(90deg,#2F6FED 0%,#7C9BE8 25%,#C8CCD8 50%,#EFA98C 75%,#E5484D 100%); }
+  .gauge-pin { position:absolute; top:-5px; width:4px; height:22px; border-radius:2px; background:var(--textPri); }
+  .gauge-scale { display:flex; justify-content:space-between; font-size:10px; color:var(--textTer);
+                 font-family:var(--mono); margin-top:6px; }
+
+  .parts { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-top:16px; }
+  .part { background:var(--surface2); border-radius:10px; padding:10px 12px; }
+  .part-l { font-size:11px; color:var(--textTer); margin-bottom:4px; }
+  .part-v { font-family:var(--mono); font-size:17px; font-weight:600; }
+  .part-s { font-size:10.5px; color:var(--textTer); font-family:var(--mono); margin-top:2px; }
+
+  #fgChart { width:100%; height:380px; }
+  #oscChart { width:100%; height:150px; }
+  .note { border:1px dashed var(--hair); border-radius:12px; padding:12px 16px; font-size:11.5px;
+          color:var(--textTer); line-height:1.7; background:var(--surface); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="between" style="margin-bottom:16px;">
+    <div>
+      <div class="eyebrow">FEAR &amp; GREED</div>
+      <h1>공포·탐욕 지수</h1>
+    </div>
+    <div class="row" style="gap:8px;">
+      <a href="/night.html" style="text-decoration:none;"><button>야간 증시 →</button></a>
+      <a href="/us.html" style="text-decoration:none;"><button>미국 증시 →</button></a>
+      <a href="/flow-oscillator.html" style="text-decoration:none;"><button>수급오실레이터 →</button></a>
+      <a href="/index.html" style="text-decoration:none;"><button>← 주간 증시</button></a>
+    </div>
+  </div>
+
+  <div class="card row" style="gap:8px;">
+    <button id="tabKOSPI" class="on" data-mkt="KOSPI">코스피</button>
+    <button id="tabKOSDAQ" data-mkt="KOSDAQ">코스닥</button>
+    <span id="statusText" class="status" style="margin-left:auto;">불러오는 중...</span>
+  </div>
+
+  <div class="card">
+    <div class="gauge">
+      <div style="min-width:130px;">
+        <div class="gauge-num" id="gNum">—</div>
+        <div class="gauge-label" id="gLabel">—</div>
+      </div>
+      <div style="flex:1;min-width:240px;">
+        <div class="gauge-bar"><div class="gauge-pin" id="gPin" style="left:50%;"></div></div>
+        <div class="gauge-scale">
+          <span>0 극단적 공포</span><span>25</span><span>50 중립</span><span>75</span><span>100 극단적 탐욕</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="parts" id="parts"></div>
+  </div>
+
+  <div class="card">
+    <div style="font-size:13px;color:var(--textSec);margin-bottom:8px;">F&amp;G · EMA20 · 지수</div>
+    <div id="fgChart"></div>
+  </div>
+
+  <div class="card">
+    <div style="font-size:13px;color:var(--textSec);margin-bottom:8px;">오실레이터 (F&amp;G − EMA20)</div>
+    <div id="oscChart"></div>
+  </div>
+
+  <div class="note">
+    ⚠ 자체 산출 지표입니다. 125일 모멘텀, RSI 10일, 실현변동성 20일 세 가지를 0~100으로 환산해 평균냈습니다.
+    원본 공포·탐욕 지수가 쓰는 VKOSPI·Put/Call 비율·국채 금리차는 데이터 확보 문제로 아직 빠져 있어,
+    다른 곳에서 보시는 값과 차이가 납니다. 투자 판단의 근거로 사용할 수 없습니다.
+  </div>
+</div>
+
+<script>
+if (typeof LightweightCharts === "undefined") {
+  document.getElementById('statusText').textContent = "차트 라이브러리를 불러오지 못했습니다. Ctrl+Shift+R을 눌러보세요.";
+  throw new Error("chart lib");
+}
+
+const UP = "#E5484D", DOWN = "#2F6FED", PURPLE = "#6D4FE0", GRAY = "#8B94B0";
+let DATA = null;
+let MKT = "KOSPI";
+
+const base = {
+  layout: { background: { color: '#FFFFFF' }, textColor: '#5B6483' },
+  grid: { vertLines: { color: '#E1E5F0' }, horzLines: { color: '#E1E5F0' } },
+  timeScale: { borderColor: '#E1E5F0' },
+  rightPriceScale: { borderColor: '#E1E5F0' },
+};
+
+const fgChart = LightweightCharts.createChart(document.getElementById('fgChart'), base);
+const fgLine = fgChart.addLineSeries({ color: UP, lineWidth: 2, title: 'F&G' });
+const emaLine = fgChart.addLineSeries({ color: PURPLE, lineWidth: 2, title: 'EMA20' });
+const idxLine = fgChart.addLineSeries({
+  color: GRAY, lineWidth: 1, title: '지수', priceScaleId: 'idx',
+});
+fgChart.priceScale('idx').applyOptions({ scaleMargins: { top: 0.1, bottom: 0.1 }, visible: true });
+
+const oscChart = LightweightCharts.createChart(document.getElementById('oscChart'), base);
+const oscBars = oscChart.addHistogramSeries({ color: PURPLE });
+
+fgChart.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) oscChart.timeScale().setVisibleLogicalRange(r); });
+oscChart.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) fgChart.timeScale().setVisibleLogicalRange(r); });
+
+const fmtDate = d => d.slice(0,4) + "-" + d.slice(4,6) + "-" + d.slice(6,8);
+
+function label(v) {
+  if (v < 25) return ["극단적 공포", DOWN];
+  if (v < 45) return ["공포", "#5A87EA"];
+  if (v <= 55) return ["중립", "#8B94B0"];
+  if (v <= 75) return ["탐욕", "#E8845F"];
+  return ["극단적 탐욕", UP];
+}
+
+function paint() {
+  if (!DATA) return;
+  const rows = DATA.data[MKT] || [];
+  if (!rows.length) return;
+
+  fgLine.setData(rows.map(r => ({ time: fmtDate(r.date), value: r.fg })));
+  emaLine.setData(rows.filter(r => r.ema20 != null).map(r => ({ time: fmtDate(r.date), value: r.ema20 })));
+  idxLine.setData(rows.map(r => ({ time: fmtDate(r.date), value: r.close })));
+  oscBars.setData(rows.filter(r => r.osc != null).map(r => ({
+    time: fmtDate(r.date), value: r.osc, color: r.osc >= 0 ? UP : DOWN,
+  })));
+
+  const SHOW = 120;
+  if (rows.length > SHOW) {
+    fgChart.timeScale().setVisibleLogicalRange({ from: rows.length - SHOW, to: rows.length + 2 });
+  } else {
+    fgChart.timeScale().fitContent();
+    oscChart.timeScale().fitContent();
+  }
+
+  const last = rows[rows.length - 1];
+  const [txt, color] = label(last.fg);
+  document.getElementById('gNum').textContent = last.fg.toFixed(1);
+  document.getElementById('gNum').style.color = color;
+  document.getElementById('gLabel').textContent = txt;
+  document.getElementById('gLabel').style.color = color;
+  document.getElementById('gPin').style.left = `calc(${Math.max(0, Math.min(100, last.fg))}% - 2px)`;
+
+  const cell = (l, v, s) => `<div class="part">
+    <div class="part-l">${l}</div>
+    <div class="part-v">${v}</div>
+    <div class="part-s">${s || ''}</div>
+  </div>`;
+
+  document.getElementById('parts').innerHTML =
+    cell('지수 종가', last.close.toLocaleString('ko-KR'), fmtDate(last.date)) +
+    cell('EMA20', last.ema20 == null ? '—' : last.ema20.toFixed(1), 'EMA30 ' + (last.ema30 == null ? '—' : last.ema30.toFixed(1))) +
+    cell('오실레이터', last.osc == null ? '—' : (last.osc >= 0 ? '+' : '−') + Math.abs(last.osc).toFixed(2), last.osc >= 0 ? 'EMA20 위' : 'EMA20 아래') +
+    cell('125일 모멘텀', last.momentum.toFixed(1), '0~100') +
+    cell('RSI 10일', last.rsi.toFixed(1), '0~100') +
+    cell('실현변동성', last.volScore.toFixed(1), '연율 ' + last.vol.toFixed(1) + '%');
+
+  document.getElementById('statusText').textContent =
+    `${MKT} · ${rows.length}거래일 · 최종 ${fmtDate(last.date)}`;
+}
+
+async function load() {
+  try {
+    const r = await fetch('/api/fear-greed?days=250', { cache: 'no-store' });
+    const d = await r.json();
+    if (d.error || !d.data) throw new Error(d.error || 'no data');
+    DATA = d;
+    paint();
+  } catch (e) {
+    document.getElementById('statusText').textContent = '데이터를 불러오지 못했습니다.';
+  }
+}
+
+document.querySelectorAll('[data-mkt]').forEach(b => {
+  b.addEventListener('click', () => {
+    MKT = b.dataset.mkt;
+    document.querySelectorAll('[data-mkt]').forEach(x => x.classList.toggle('on', x === b));
+    paint();
+  });
+});
+
+load();
+</script>
+</body>
+</html>
