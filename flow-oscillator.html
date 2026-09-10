@@ -44,7 +44,13 @@
   .pick-no { font-family:var(--mono); font-size:10.5px; color:var(--textTer); width:20px; flex:none; text-align:right; }
   .pick-name { font-size:12.5px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .pick-mkt { font-family:var(--mono); font-size:9.5px; color:var(--textTer); margin-left:4px; }
-  .pick-val { font-family:var(--mono); font-size:12px; font-weight:600; flex:none; }
+  .pick-val { font-family:var(--mono); font-size:12px; font-weight:600; flex:none; width:58px; text-align:right; }
+  .rs-badge { font-family:var(--mono); font-size:10px; font-weight:600; flex:none; width:26px; text-align:center;
+              border-radius:5px; padding:2px 0; }
+  .rs-hot  { background:#E5484D; color:#fff; }
+  .rs-warm { background:#FBE3D6; color:#B8560A; }
+  .rs-cool { background:var(--surface2); color:var(--textTer); }
+  .rs-none { background:transparent; color:var(--hair); }
   .pick-meta { font-size:10.5px; color:var(--textTer); font-family:var(--mono); margin-bottom:8px; }
 
   #chart { width:100%; height:420px; }
@@ -103,6 +109,7 @@
         <button class="pick-tab" data-src="prog">프로그램&#10;50</button>
         <button class="pick-tab" data-src="orgn">잠정&#10;기관</button>
         <button class="pick-tab" data-src="samo">사모&#10;20</button>
+        <button class="pick-tab" data-src="rs">RS&#10;상위</button>
       </div>
       <div class="pick-meta" id="pickMeta"></div>
       <div class="pick-scroll" id="pickList"><div class="status">불러오는 중...</div></div>
@@ -220,14 +227,35 @@ async function loadData(code){
 
 // ── 종목 고르기 목록 ──────────────────────────────────────
 // 왼쪽 차트를 종목코드 입력 없이 바로 바꿔 볼 수 있게 합니다.
-const PICK = { up: null, prog: null, orgn: null, samo: null };
+const PICK = { up: null, prog: null, orgn: null, samo: null, rs: null };
+let RS = {};          // 종목코드 → RS 값
+let RS_DATE = "";
 let PICK_SRC = "up";
 let PICK_CODE = null;
 
 const fmtPct = v => v == null ? "—" : (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2) + "%";
 
+// RS 배지. 90 이상이면 진하게, 70 이상이면 옅게 표시합니다.
+function rsBadge(code) {
+  const v = RS[code];
+  if (v == null) return `<span class="rs-badge rs-none">·</span>`;
+  const cls = v >= 90 ? "rs-hot" : (v >= 70 ? "rs-warm" : "rs-cool");
+  return `<span class="rs-badge ${cls}">${v}</span>`;
+}
+
 function pickRows() {
   const list = PICK[PICK_SRC];
+  if (PICK_SRC === "rs") {
+    if (!list) return `<div class="status">불러오는 중...</div>`;
+    if (!list.length) return `<div class="status">rs.json 파일이 없습니다.</div>`;
+    return list.map((r, i) => `
+      <div class="pick-row${r.code === PICK_CODE ? " on" : ""}" data-code="${r.code}">
+        <span class="pick-no">${i + 1}</span>
+        <span class="pick-name">${r.name}<span class="pick-mkt">${r.market === "KOSPI" ? "KP" : "KQ"}</span></span>
+        ${rsBadge(r.code)}
+        <span class="pick-val" style="color:${r.m3 >= 0 ? '#E5484D' : '#2F6FED'}">${fmtPct(r.m3)}</span>
+      </div>`).join("");
+  }
   if (!list) return `<div class="status">불러오는 중...</div>`;
   if (!list.length) return `<div class="status">데이터가 없습니다.</div>`;
 
@@ -235,6 +263,7 @@ function pickRows() {
     <div class="pick-row${r.code === PICK_CODE ? " on" : ""}" data-code="${r.code}">
       <span class="pick-no">${i + 1}</span>
       <span class="pick-name">${r.name}<span class="pick-mkt">${r.market === "KOSPI" ? "KP" : "KQ"}</span></span>
+      ${rsBadge(r.code)}
       <span class="pick-val" style="color:${(r.value ?? 0) >= 0 ? '#E5484D' : '#2F6FED'}">${fmtPct(r.value)}</span>
     </div>`).join("");
 }
@@ -258,6 +287,7 @@ function paintPick() {
     prog: "장중 · 시총대비 프로그램 순매수 순",
     orgn: "장중 잠정 · 기관합계 시총대비 순매수 순",
     samo: "마감 확정 · 시총대비 순매수 순",
+    rs: "상대강도 상위 · 오른쪽은 3개월 수익률",
   };
   document.getElementById("pickMeta").textContent = notes[PICK_SRC] || "";
 }
@@ -274,6 +304,19 @@ async function loadPicks() {
     const p = await (await fetch("/api/program-flow", { cache: "no-store" })).json();
     PICK.prog = (p.buy || []).map(r => ({ code: r.code, name: r.name, market: r.market, value: r.ratio }));
   } catch (e) { PICK.prog = []; }
+
+  // 0) RS (하루 한 번 갱신되는 파일)
+  try {
+    const j = await (await fetch("/rs.json", { cache: "no-store" })).json();
+    RS = {};
+    const list = [];
+    for (const [code, v] of Object.entries(j.data || {})) {
+      RS[code] = v.rs;
+      list.push({ code, name: v.name, market: v.market, value: v.rs, m3: v.m3 });
+    }
+    RS_DATE = j.date || "";
+    PICK.rs = list.sort((a, b) => b.value - a.value || b.m3 - a.m3).slice(0, 50);
+  } catch (e) { PICK.rs = []; }
 
   // 3) 장중 잠정 · 기관합계 시총대비 순매수
   try {
