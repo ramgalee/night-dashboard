@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>국내 히트맵</title>
+<style>
+  :root {
+    --void:#F2F4F9; --surface:#FFFFFF; --surface2:#F0F2F8; --hair:#E1E5F0;
+    --textPri:#131A2C; --textSec:#5B6483; --textTer:#8B94B0;
+    --up:#E5484D; --down:#2F6FED; --signature:#6D4FE0;
+    --mono: ui-monospace,'SF Mono','Roboto Mono',Menlo,Consolas,monospace;
+    --sans: -apple-system,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--void); color:var(--textPri); font-family:var(--sans); margin:0; padding:24px 16px; }
+  .wrap { max-width:1180px; margin:0 auto; }
+  .row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .between { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .card { background:var(--surface); border:1px solid var(--hair); border-radius:16px; padding:18px;
+          margin-bottom:16px; box-shadow:0 1px 3px rgba(19,26,44,.06); }
+  .eyebrow { font-size:11px; letter-spacing:2px; color:var(--textTer); font-family:var(--mono); }
+  h1 { font-size:22px; margin:2px 0 0; }
+  button { background:var(--surface2); border:1px solid var(--hair); color:var(--textSec);
+           padding:8px 14px; border-radius:10px; font-size:12px; cursor:pointer; font-family:var(--sans); }
+  button.on { background:var(--textPri); border-color:var(--textPri); color:#fff; font-weight:600; }
+  .empty { font-size:12px; color:var(--textTer); line-height:1.6; }
+  .meta { font-size:10.5px; color:var(--textTer); font-family:var(--mono); }
+
+  /* 업종 타일 */
+  .sec-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(122px,1fr)); gap:5px; }
+  .sec { border-radius:9px; padding:9px 8px; min-height:66px; cursor:pointer;
+         display:flex; flex-direction:column; justify-content:space-between; border:2px solid transparent; }
+  .sec:hover { filter:brightness(1.06); }
+  .sec.on { border-color:var(--textPri); }
+  .sec-n { font-size:11.5px; line-height:1.25; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sec-p { font-family:var(--mono); font-size:14px; font-weight:700; color:#fff; }
+  .sec-b { font-family:var(--mono); font-size:9.5px; color:rgba(255,255,255,.85); }
+
+  /* 종목 타일 */
+  .stk-wrap { display:flex; flex-wrap:wrap; gap:4px; align-items:stretch; }
+  .stk { border-radius:7px; padding:7px 8px; display:flex; flex-direction:column; justify-content:space-between;
+         overflow:hidden; min-width:62px; }
+  .stk-n { font-size:11px; color:#fff; line-height:1.2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .stk-p { font-family:var(--mono); font-weight:700; color:#fff; }
+
+  .legend { display:flex; align-items:center; gap:8px; font-size:10.5px; color:var(--textTer); font-family:var(--mono); }
+  .legend .bar { width:150px; height:9px; border-radius:999px;
+                 background:linear-gradient(90deg,#2F6FED,#7C9BE8,#C8CCD8,#EFA98C,#E5484D); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="between" style="margin-bottom:16px;">
+    <div>
+      <div class="eyebrow">MARKET MAP</div>
+      <h1>국내 히트맵</h1>
+    </div>
+    <div class="row" style="gap:8px;">
+      <a href="/fg.html" style="text-decoration:none;"><button>F&amp;G 지수 →</button></a>
+      <a href="/flow-oscillator.html" style="text-decoration:none;"><button>수급오실레이터 →</button></a>
+      <a href="/index.html" style="text-decoration:none;"><button>← 주간 증시</button></a>
+    </div>
+  </div>
+
+  <div class="card row" style="gap:8px;">
+    <button id="mKOSPI" class="on" data-mkt="KOSPI">코스피</button>
+    <button id="mKOSDAQ" data-mkt="KOSDAQ">코스닥</button>
+    <span id="totalText" class="meta" style="margin-left:12px;"></span>
+    <div class="legend" style="margin-left:auto;">
+      <span>-3%</span><span class="bar"></span><span>+3%</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="between" style="margin-bottom:12px;">
+      <div style="font-size:13px;color:var(--textSec);">업종별 <span style="font-size:11px;color:var(--textTer);">클릭하면 종목이 펼쳐집니다</span></div>
+      <span id="secMeta" class="meta"></span>
+    </div>
+    <div id="secGrid"><div class="empty">불러오는 중...</div></div>
+  </div>
+
+  <div class="card" id="stkCard" style="display:none;">
+    <div class="between" style="margin-bottom:12px;">
+      <div style="font-size:13px;color:var(--textSec);" id="stkTitle">종목</div>
+      <span id="stkMeta" class="meta"></span>
+    </div>
+    <div id="stkBody"><div class="empty">불러오는 중...</div></div>
+  </div>
+
+  <div style="border:1px dashed var(--hair);border-radius:12px;padding:12px 16px;font-size:11.5px;
+              color:var(--textTer);line-height:1.7;background:var(--surface);">
+    ⚠ 업종 타일의 크기는 그 업종의 거래대금, 종목 타일의 크기는 그 종목의 거래대금에 비례합니다.
+    색은 등락률이며 ±3%에서 가장 진해집니다. 종목 거래대금은 현재가 × 거래량으로 계산한 값이라
+    실제 체결 기준 거래대금과 다소 차이가 날 수 있습니다.
+  </div>
+</div>
+
+<script>
+const UP = "#E5484D", DOWN = "#2F6FED";
+let MKT = "KOSPI";
+let SEC = null;         // 지금 펼친 업종
+let MAP = {};           // 시장별 업종 목록
+
+// 등락률에 따라 색 진하기를 정합니다(±3%에서 가장 진해짐).
+function tone(pct) {
+  if (pct == null) return "rgba(200,204,216,0.5)";
+  const a = Math.min(Math.abs(pct) / 3, 1);
+  const alpha = 0.2 + a * 0.8;
+  return `rgba(${pct >= 0 ? "229,72,77" : "47,111,237"},${alpha.toFixed(2)})`;
+}
+const fmtPct = v => v == null ? "—" : (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2) + "%";
+const 억 = v => v == null ? "—" : Math.round(v / 1e8).toLocaleString("ko-KR") + "억";
+
+function renderSectors(d) {
+  const list = (d.sectors || []).slice().sort((a, b) => (b.tradeValue || 0) - (a.tradeValue || 0));
+  return `<div class="sec-grid">${list.map(s => `
+    <div class="sec${s.code === SEC ? " on" : ""}" data-code="${s.code}" style="background:${tone(s.changePct)}">
+      <div class="sec-n">${s.name}</div>
+      <div>
+        <div class="sec-p">${fmtPct(s.changePct)}</div>
+        <div class="sec-b">↑${s.rising ?? "-"} ↓${s.falling ?? "-"}</div>
+      </div>
+    </div>`).join("")}</div>`;
+}
+
+// 거래대금에 비례해 타일 폭과 높이를 정합니다.
+function renderStocks(items) {
+  const live = items.filter(x => x.changePct != null);
+  if (!live.length) return `<div class="empty">종목이 없습니다.</div>`;
+
+  const sorted = live.slice().sort((a, b) => (b.tradeValue || 0) - (a.tradeValue || 0)).slice(0, 60);
+  const max = Math.max(...sorted.map(x => x.tradeValue || 0), 1);
+
+  return `<div class="stk-wrap">${sorted.map(x => {
+    const r = Math.sqrt((x.tradeValue || 0) / max);        // 넓이가 거래대금에 비례하도록
+    const w = Math.round(62 + r * 138);
+    const h = Math.round(44 + r * 46);
+    const fs = Math.round(10 + r * 5);
+    return `<div class="stk" title="${x.name} ${fmtPct(x.changePct)} · ${억(x.tradeValue)}"
+                 style="background:${tone(x.changePct)};width:${w}px;height:${h}px;">
+      <div class="stk-n" style="font-size:${Math.round(9 + r * 3)}px">${x.name}</div>
+      <div class="stk-p" style="font-size:${fs}px">${fmtPct(x.changePct)}</div>
+    </div>`;
+  }).join("")}</div>`;
+}
+
+async function loadSectors() {
+  const grid = document.getElementById("secGrid");
+  try {
+    const r = await fetch(`/api/sector-map?market=${MKT}`, { cache: "no-store" });
+    const d = await r.json();
+    if (d.error || !d.sectors) throw new Error(d.error || "no data");
+    MAP[MKT] = d;
+
+    grid.innerHTML = renderSectors(d);
+    grid.querySelectorAll(".sec").forEach(el => {
+      el.addEventListener("click", () => loadStocks(el.dataset.code));
+    });
+
+    const t = d.total || {};
+    document.getElementById("totalText").textContent =
+      `${MKT} ${t.index != null ? t.index.toLocaleString("ko-KR") : "—"} ${fmtPct(t.changePct)}`;
+    document.getElementById("totalText").style.color = (t.changePct ?? 0) >= 0 ? UP : DOWN;
+    document.getElementById("secMeta").textContent = `${d.sectors.length}개 업종 · 크기는 거래대금`;
+  } catch (e) {
+    grid.innerHTML = `<div class="empty">업종을 불러오지 못했습니다.</div>`;
+  }
+}
+
+async function loadStocks(code) {
+  SEC = code;
+  const card = document.getElementById("stkCard");
+  const body = document.getElementById("stkBody");
+  card.style.display = "block";
+
+  const sec = (MAP[MKT]?.sectors || []).find(s => s.code === code);
+  document.getElementById("stkTitle").textContent = sec ? `${sec.name} 종목` : "종목";
+  document.getElementById("secGrid").innerHTML = renderSectors(MAP[MKT]);
+  document.getElementById("secGrid").querySelectorAll(".sec").forEach(el => {
+    el.addEventListener("click", () => loadStocks(el.dataset.code));
+  });
+  body.innerHTML = `<div class="empty">불러오는 중...</div>`;
+
+  try {
+    const r = await fetch(`/api/sector-stocks?market=${MKT}&code=${code}`, { cache: "no-store" });
+    const d = await r.json();
+    if (d.error || !d.items) throw new Error(d.error || "no data");
+    body.innerHTML = renderStocks(d.items);
+    document.getElementById("stkMeta").textContent =
+      `${d.count}종목 중 거래대금 상위 ${Math.min(d.count, 60)}개`;
+  } catch (e) {
+    body.innerHTML = `<div class="empty">종목을 불러오지 못했습니다.</div>`;
+  }
+}
+
+document.querySelectorAll("[data-mkt]").forEach(b => {
+  b.addEventListener("click", () => {
+    MKT = b.dataset.mkt;
+    SEC = null;
+    document.querySelectorAll("[data-mkt]").forEach(x => x.classList.toggle("on", x === b));
+    document.getElementById("stkCard").style.display = "none";
+    loadSectors();
+  });
+});
+
+loadSectors();
+setInterval(() => { loadSectors(); if (SEC) loadStocks(SEC); }, 60000);
+</script>
+</body>
+</html>
