@@ -4,6 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>국내 히트맵</title>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"
+        onerror="var t=document.createElement('script');t.src='https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js';document.head.appendChild(t);"></script>
 <style>
   :root {
     --void:#F2F4F9; --surface:#FFFFFF; --surface2:#F0F2F8; --hair:#E1E5F0;
@@ -44,6 +46,11 @@
   .stk-n { font-size:11px; color:#fff; line-height:1.2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .stk-p { font-family:var(--mono); font-weight:700; color:#fff; }
 
+  .ind-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px; }
+  .ind-head { font-size:12px; color:var(--textSec); margin-bottom:6px; }
+  .ind-box { height:190px; }
+  .ind-now { font-family:var(--mono); font-size:13px; font-weight:600; margin-left:6px; }
+
   .legend { display:flex; align-items:center; gap:8px; font-size:10.5px; color:var(--textTer); font-family:var(--mono); }
   .legend .bar { width:150px; height:9px; border-radius:999px;
                  background:linear-gradient(90deg,#2F6FED,#7C9BE8,#C8CCD8,#EFA98C,#E5484D); }
@@ -81,6 +88,23 @@
     <div id="secGrid"><div class="empty">불러오는 중...</div></div>
   </div>
 
+  <div class="card" id="indCard" style="display:none;">
+    <div class="between" style="margin-bottom:12px;">
+      <div style="font-size:13px;color:var(--textSec);" id="indTitle">업종 지표</div>
+      <span id="indMeta" class="meta"></span>
+    </div>
+    <div class="ind-grid">
+      <div>
+        <div class="ind-head">공포·탐욕 <span style="color:var(--textTer)">빨강 F&amp;G · 보라 EMA20</span><span class="ind-now" id="fgNow"></span></div>
+        <div class="ind-box" id="fgBox"></div>
+      </div>
+      <div>
+        <div class="ind-head">MACD 히스토그램 <span style="color:var(--textTer)">12·26·9</span><span class="ind-now" id="macdNow"></span></div>
+        <div class="ind-box" id="macdBox"></div>
+      </div>
+    </div>
+  </div>
+
   <div class="card" id="stkCard" style="display:none;">
     <div class="between" style="margin-bottom:12px;">
       <div style="font-size:13px;color:var(--textSec);" id="stkTitle">종목</div>
@@ -94,6 +118,8 @@
     ⚠ 업종 타일의 크기는 그 업종의 거래대금, 종목 타일의 크기는 그 종목의 거래대금에 비례합니다.
     색은 등락률이며 ±3%에서 가장 진해집니다. 종목 거래대금은 현재가 × 거래량으로 계산한 값이라
     실제 체결 기준 거래대금과 다소 차이가 날 수 있습니다.
+    업종 공포·탐욕은 60일선 대비 괴리와 RSI 10일 두 항목을 전체 기간 최소~최대로 환산해 평균낸 자체 지표로,
+    코스피·코스닥 F&amp;G와는 계산 항목이 다릅니다.
   </div>
 </div>
 
@@ -156,7 +182,7 @@ async function loadSectors() {
 
     grid.innerHTML = renderSectors(d);
     grid.querySelectorAll(".sec").forEach(el => {
-      el.addEventListener("click", () => loadStocks(el.dataset.code));
+      el.addEventListener("click", () => { loadStocks(el.dataset.code); loadIndicator(el.dataset.code); });
     });
 
     const t = d.total || {};
@@ -166,6 +192,74 @@ async function loadSectors() {
     document.getElementById("secMeta").textContent = `${d.sectors.length}개 업종 · 크기는 거래대금`;
   } catch (e) {
     grid.innerHTML = `<div class="empty">업종을 불러오지 못했습니다.</div>`;
+  }
+}
+
+// ── 업종 지표 차트 ────────────────────────────────
+let fgChart = null, macdChart = null, fgLine = null, emaLine = null, macdBars = null;
+
+function initCharts() {
+  if (fgChart || typeof LightweightCharts === "undefined") return;
+  const base = {
+    layout: { background: { color: '#FFFFFF' }, textColor: '#5B6483' },
+    grid: { vertLines: { color: '#E1E5F0' }, horzLines: { color: '#E1E5F0' } },
+    timeScale: { borderColor: '#E1E5F0' },
+    rightPriceScale: { borderColor: '#E1E5F0' },
+    height: 190,
+  };
+  fgChart = LightweightCharts.createChart(document.getElementById('fgBox'), base);
+  fgLine = fgChart.addLineSeries({ color: UP, lineWidth: 2, priceLineVisible: false });
+  emaLine = fgChart.addLineSeries({ color: '#6D4FE0', lineWidth: 2, priceLineVisible: false });
+
+  macdChart = LightweightCharts.createChart(document.getElementById('macdBox'), base);
+  macdBars = macdChart.addHistogramSeries({ color: '#6D4FE0' });
+
+  fgChart.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) macdChart.timeScale().setVisibleLogicalRange(r); });
+  macdChart.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) fgChart.timeScale().setVisibleLogicalRange(r); });
+}
+
+const fmtDate = d => d.slice(0,4) + "-" + d.slice(4,6) + "-" + d.slice(6,8);
+
+async function loadIndicator(code) {
+  const card = document.getElementById("indCard");
+  card.style.display = "block";
+  initCharts();
+  if (!fgChart) { document.getElementById("indMeta").textContent = "차트를 불러오지 못했습니다."; return; }
+
+  const sec = (MAP[MKT]?.sectors || []).find(s => s.code === code);
+  document.getElementById("indTitle").textContent = sec ? `${sec.name} 지표` : "업종 지표";
+  document.getElementById("indMeta").textContent = "불러오는 중...";
+
+  try {
+    const r = await fetch(`/api/sector-indicator?code=${code}`, { cache: "no-store" });
+    const d = await r.json();
+    if (d.error || !d.series || !d.series.length) throw new Error(d.error || "no data");
+
+    const rows = d.series.slice(-250);
+    fgLine.setData(rows.map(x => ({ time: fmtDate(x.date), value: x.fg })));
+    emaLine.setData(rows.map(x => ({ time: fmtDate(x.date), value: x.fgEma })));
+    macdBars.setData(rows.map(x => ({
+      time: fmtDate(x.date), value: x.hist, color: x.hist >= 0 ? UP : DOWN,
+    })));
+
+    const SHOW = 120;
+    requestAnimationFrame(() => {
+      const range = { from: Math.max(0, rows.length - SHOW), to: rows.length + 2 };
+      fgChart.timeScale().setVisibleLogicalRange(range);
+      macdChart.timeScale().setVisibleLogicalRange(range);
+    });
+
+    const l = d.last;
+    const fgEl = document.getElementById("fgNow");
+    fgEl.textContent = l.fg.toFixed(1);
+    fgEl.style.color = l.fg >= 50 ? UP : DOWN;
+    const mEl = document.getElementById("macdNow");
+    mEl.textContent = (l.hist >= 0 ? "+" : "−") + Math.abs(l.hist).toLocaleString("ko-KR");
+    mEl.style.color = l.hist >= 0 ? UP : DOWN;
+
+    document.getElementById("indMeta").textContent = `${fmtDate(l.date)} 기준 · 최근 6개월`;
+  } catch (e) {
+    document.getElementById("indMeta").textContent = "지표를 불러오지 못했습니다.";
   }
 }
 
@@ -179,7 +273,7 @@ async function loadStocks(code) {
   document.getElementById("stkTitle").textContent = sec ? `${sec.name} 종목` : "종목";
   document.getElementById("secGrid").innerHTML = renderSectors(MAP[MKT]);
   document.getElementById("secGrid").querySelectorAll(".sec").forEach(el => {
-    el.addEventListener("click", () => loadStocks(el.dataset.code));
+    el.addEventListener("click", () => { loadStocks(el.dataset.code); loadIndicator(el.dataset.code); });
   });
   body.innerHTML = `<div class="empty">불러오는 중...</div>`;
 
@@ -201,6 +295,7 @@ document.querySelectorAll("[data-mkt]").forEach(b => {
     SEC = null;
     document.querySelectorAll("[data-mkt]").forEach(x => x.classList.toggle("on", x === b));
     document.getElementById("stkCard").style.display = "none";
+    document.getElementById("indCard").style.display = "none";
     loadSectors();
   });
 });
