@@ -51,6 +51,19 @@
   .ind-box { height:190px; }
   .ind-now { font-family:var(--mono); font-size:13px; font-weight:600; margin-left:6px; }
 
+  /* 종목 차트 창 */
+  #modal { position:fixed; inset:0; background:rgba(19,26,44,.45); display:none;
+           align-items:center; justify-content:center; padding:24px; z-index:50; }
+  #modal.on { display:flex; }
+  .modal-box { background:var(--surface); border-radius:16px; width:100%; max-width:960px;
+               max-height:92vh; overflow:auto; padding:18px 20px; box-shadow:0 12px 40px rgba(19,26,44,.25); }
+  .modal-x { background:transparent; border:none; font-size:20px; line-height:1; color:var(--textTer);
+             cursor:pointer; padding:2px 6px; }
+  #mChart { width:100%; height:320px; }
+  #mOsc { width:100%; height:150px; }
+  .stk { cursor:pointer; }
+  .stk:hover { filter:brightness(1.08); }
+
   .legend { display:flex; align-items:center; gap:8px; font-size:10.5px; color:var(--textTer); font-family:var(--mono); }
   .legend .bar { width:150px; height:9px; border-radius:999px;
                  background:linear-gradient(90deg,#2F6FED,#7C9BE8,#C8CCD8,#EFA98C,#E5484D); }
@@ -124,6 +137,22 @@
   </div>
 </div>
 
+<div id="modal">
+  <div class="modal-box">
+    <div class="between" style="margin-bottom:10px;">
+      <div>
+        <div style="font-size:15px;font-weight:600;" id="mName">종목</div>
+        <div class="meta" id="mMeta"></div>
+      </div>
+      <button class="modal-x" id="mClose">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--textSec);margin-bottom:6px;">캔들 차트</div>
+    <div id="mChart"></div>
+    <div style="font-size:12px;color:var(--textSec);margin:12px 0 6px;">수급오실레이터</div>
+    <div id="mOsc"></div>
+  </div>
+</div>
+
 <script>
 const UP = "#E5484D", DOWN = "#2F6FED";
 let MKT = "KOSPI";
@@ -166,7 +195,7 @@ function renderStocks(items) {
     const w = Math.round(62 + r * 138);
     const h = Math.round(44 + r * 46);
     const fs = Math.round(10 + r * 5);
-    return `<div class="stk" title="${x.name} ${fmtPct(x.changePct)} · ${억(x.tradeValue)}"
+    return `<div class="stk" data-code="${x.code}" data-name="${x.name}" title="${x.name} ${fmtPct(x.changePct)} · ${억(x.tradeValue)} · 클릭하면 차트"
                  style="background:${tone(x.changePct)};width:${w}px;height:${h}px;">
       <div class="stk-n" style="font-size:${Math.round(9 + r * 3)}px">${x.name}</div>
       <div class="stk-p" style="font-size:${fs}px">${fmtPct(x.changePct)}</div>
@@ -271,6 +300,71 @@ async function loadIndicator(code, label) {
   }
 }
 
+// ── 종목 차트 창 ──────────────────────────────────
+let mChart = null, mOsc = null, mCandle = null, mOscBars = null;
+
+function initModal() {
+  if (mChart || typeof LightweightCharts === "undefined") return;
+  const base = {
+    layout: { background: { color: '#FFFFFF' }, textColor: '#5B6483' },
+    grid: { vertLines: { color: '#E1E5F0' }, horzLines: { color: '#E1E5F0' } },
+    timeScale: { borderColor: '#E1E5F0' },
+    rightPriceScale: { borderColor: '#E1E5F0' },
+  };
+  mChart = LightweightCharts.createChart(document.getElementById('mChart'), base);
+  mCandle = mChart.addCandlestickSeries({
+    upColor: UP, downColor: DOWN, borderUpColor: UP, borderDownColor: DOWN,
+    wickUpColor: UP, wickDownColor: DOWN,
+  });
+  mOsc = LightweightCharts.createChart(document.getElementById('mOsc'), base);
+  mOscBars = mOsc.addHistogramSeries({ color: '#6D4FE0' });
+
+  mChart.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) mOsc.timeScale().setVisibleLogicalRange(r); });
+  mOsc.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) mChart.timeScale().setVisibleLogicalRange(r); });
+}
+
+async function openStock(code, name) {
+  const modal = document.getElementById("modal");
+  modal.classList.add("on");
+  document.getElementById("mName").textContent = `${name} (${code})`;
+  document.getElementById("mMeta").textContent = "불러오는 중...";
+  initModal();
+  if (!mChart) { document.getElementById("mMeta").textContent = "차트를 불러오지 못했습니다."; return; }
+
+  try {
+    const r = await fetch(`/api/flow-oscillator?code=${code}`, { cache: "no-store" });
+    const d = await r.json();
+    const s = d.series || [];
+    if (!s.length) throw new Error("데이터 없음");
+
+    const fd = x => x.slice(0,4) + "-" + x.slice(4,6) + "-" + x.slice(6,8);
+    mCandle.setData(s.map(x => ({
+      time: fd(x.date), open: x.open, high: x.high, low: x.low, close: x.close,
+    })));
+    mOscBars.setData(s.map(x => ({
+      time: fd(x.date), value: x.oscillator, color: x.oscillator >= 0 ? UP : DOWN,
+    })));
+
+    const SHOW = 120;
+    requestAnimationFrame(() => {
+      const range = { from: Math.max(0, s.length - SHOW), to: s.length + 2 };
+      mChart.timeScale().setVisibleLogicalRange(range);
+      mOsc.timeScale().setVisibleLogicalRange(range);
+    });
+
+    document.getElementById("mMeta").textContent = `${s.length}거래일 · 최근 6개월`;
+  } catch (e) {
+    document.getElementById("mMeta").textContent = "데이터를 불러오지 못했습니다.";
+  }
+}
+
+function closeModal() { document.getElementById("modal").classList.remove("on"); }
+document.getElementById("mClose").addEventListener("click", closeModal);
+document.getElementById("modal").addEventListener("click", e => {
+  if (e.target.id === "modal") closeModal();
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+
 async function loadStocks(code) {
   SEC = code;
   const card = document.getElementById("stkCard");
@@ -290,6 +384,9 @@ async function loadStocks(code) {
     const d = await r.json();
     if (d.error || !d.items) throw new Error(d.error || "no data");
     body.innerHTML = renderStocks(d.items);
+    body.querySelectorAll(".stk").forEach(el => {
+      el.addEventListener("click", () => openStock(el.dataset.code, el.dataset.name));
+    });
     document.getElementById("stkMeta").textContent =
       `${d.count}종목 중 거래대금 상위 ${Math.min(d.count, 60)}개`;
   } catch (e) {
