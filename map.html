@@ -118,8 +118,9 @@
     ⚠ 업종 타일의 크기는 그 업종의 거래대금, 종목 타일의 크기는 그 종목의 거래대금에 비례합니다.
     색은 등락률이며 ±3%에서 가장 진해집니다. 종목 거래대금은 현재가 × 거래량으로 계산한 값이라
     실제 체결 기준 거래대금과 다소 차이가 날 수 있습니다.
-    업종 공포·탐욕은 60일선 대비 괴리와 RSI 10일 두 항목을 전체 기간 최소~최대로 환산해 평균낸 자체 지표로,
-    코스피·코스닥 F&amp;G와는 계산 항목이 다릅니다.
+    코스피·코스닥 종합 지표는 F&amp;G 페이지와 같은 값입니다(모멘텀·RSI·VKOSPI·Put/Call·국채 5개 항목).
+    개별 업종은 VKOSPI·옵션·국채 자료가 없어 60일선 대비 괴리와 RSI 10일 두 항목만으로 계산하므로
+    종합 지표와 값의 성격이 다릅니다.
   </div>
 </div>
 
@@ -262,7 +263,9 @@ async function loadIndicator(code, label) {
     mEl.textContent = (l.hist >= 0 ? "+" : "−") + Math.abs(l.hist).toFixed(3);
     mEl.style.color = l.hist >= 0 ? UP : DOWN;
 
-    document.getElementById("indMeta").textContent = `${fmtDate(l.date)} 기준 · 최근 6개월`;
+    const isTotal = d.source === "fear-greed";
+    document.getElementById("indMeta").textContent =
+      `${fmtDate(l.date)} 기준 · 최근 6개월 · ` + (isTotal ? "5개 항목" : "2개 항목(모멘텀·RSI)");
   } catch (e) {
     document.getElementById("indMeta").textContent = "지표를 불러오지 못했습니다.";
   }

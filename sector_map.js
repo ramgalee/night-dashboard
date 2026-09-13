@@ -237,10 +237,44 @@ module.exports = (app) => {
   });
 
   // 업종 지표 (F&G · MACD)
+  // 코스피(001)·코스닥(101) 종합은 F&G 페이지와 같은 값을 쓰도록
+  // 서버 안의 /fear-greed 결과를 그대로 가져옵니다.
+  const MARKET_OF = { '001': 'KOSPI', '101': 'KOSDAQ' };
+
   app.get('/sector-indicator', async (req, res) => {
     try {
       const code = String(req.query.code || '').replace(/\D/g, '');
       if (!code) throw new Error('업종코드가 없습니다');
+
+      if (MARKET_OF[code]) {
+        const c = CACHE.ind[code];
+        if (c && Date.now() - c.at < 10 * 60 * 1000) return res.json(c.data);
+
+        const r = await fetch('http://127.0.0.1:3000/fear-greed?days=400');
+        const j = await r.json();
+        const rows = (j.data && j.data[MARKET_OF[code]]) || [];
+        if (!rows.length) throw new Error('fear-greed 결과가 비어 있습니다');
+
+        const series = rows.map(x => ({
+          date: x.date,
+          close: x.close,
+          fg: x.fg,
+          fgEma: x.ema20,
+          macd: x.macd,
+          signal: x.signal,
+          hist: x.osc,
+        }));
+        const data = {
+          code,
+          source: 'fear-greed',
+          bars: series.length,
+          series,
+          last: series[series.length - 1],
+          generatedAt: new Date().toISOString(),
+        };
+        CACHE.ind[code] = { data, at: Date.now() };
+        return res.json(data);
+      }
 
       const c = CACHE.ind[code];
       if (c && Date.now() - c.at < 10 * 60 * 1000) return res.json(c.data);
