@@ -114,11 +114,100 @@ async function stocksOf(mktKey, indsCd) {
       price: num(x.cur_prc) == null ? null : Math.abs(num(x.cur_prc)),
       changePct: num(x.flu_rt),
       volume: num(x.now_trde_qty),
+      tradeValue: (num(x.cur_prc) && num(x.now_trde_qty)) ? Math.abs(num(x.cur_prc)) * num(x.now_trde_qty) : 0,
     };
   }).filter(x => x.code);
 }
 
-const CACHE = { sectors: {}, stocks: {} };
+// ── 업종 일봉 → F&G · MACD ─────────────────────────
+// ka20006 업종일봉조회. base_dt 가 비어 있으면 오류가 나므로 오늘 날짜를 넣습니다.
+function today() {
+  return new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10).replace(/-/g, '');
+}
+
+async function dailyBars(indsCd) {
+  const token = await getToken(false);
+  const r = await fetch(BASE + '/api/dostk/chart', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8',
+      authorization: 'Bearer ' + token,
+      'api-id': 'ka20006', 'cont-yn': 'N', 'next-key': ''
+    },
+    body: JSON.stringify({ inds_cd: indsCd, base_dt: today() })
+  });
+  const t = await r.text();
+  let j;
+  try { j = JSON.parse(t); } catch (e) { throw new Error('ka20006 ' + r.status); }
+  if (j.return_code && j.return_code !== 0) throw new Error(j.return_msg || 'ka20006');
+
+  const rows = (j.inds_dt_pole_qry || [])
+    .map(x => ({ date: String(x.dt || '').slice(0, 8), close: num(x.cur_prc) }))
+    .filter(x => x.date.length === 8 && x.close != null)
+    .map(x => ({ date: x.date, close: Math.abs(x.close) / 100 }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  return rows;
+}
+
+function emaArr(a, n) {
+  const k = 2 / (n + 1);
+  let p = null;
+  return a.map(v => { p = p == null ? v : v * k + p * (1 - k); return p; });
+}
+function smaAt(a, n, i) {
+  if (i + 1 < n) return null;
+  let s = 0;
+  for (let k = i - n + 1; k <= i; k++) s += a[k];
+  return s / n;
+}
+function rsiAt(a, n, i) {
+  if (i < n) return null;
+  let up = 0, dn = 0;
+  for (let k = i - n + 1; k <= i; k++) {
+    const d = a[k] - a[k - 1];
+    if (d >= 0) up += d; else dn -= d;
+  }
+  return up + dn === 0 ? 50 : (up / (up + dn)) * 100;
+}
+function minmax(arr) {
+  const lo = Math.min(...arr), hi = Math.max(...arr);
+  return x => (hi === lo ? 0.5 : (x - lo) / (hi - lo));
+}
+
+function indicators(rows) {
+  const px = rows.map(r => r.close);
+
+  // MACD(12,26,9) 히스토그램
+  const e12 = emaArr(px, 12), e26 = emaArr(px, 26);
+  const macd = px.map((_, i) => e12[i] - e26[i]);
+  const signal = emaArr(macd, 9);
+
+  // 업종 F&G: 60일선 대비 괴리 + RSI10 을 전체 기간 최소~최대로 정규화해 평균
+  const idx = [];
+  const mom = [], rs = [];
+  for (let i = 0; i < px.length; i++) {
+    const m = smaAt(px, 60, i), r = rsiAt(px, 10, i);
+    if (m == null || r == null) continue;
+    idx.push(i); mom.push(px[i] / m - 1); rs.push(r);
+  }
+  if (idx.length < 25) return [];
+
+  const nm = minmax(mom), nr = minmax(rs);
+  const fg = idx.map((_, k) => (nm(mom[k]) * 0.5 + nr(rs[k]) * 0.5) * 100);
+  const fgE = emaArr(fg, 20);
+
+  return idx.map((i, k) => ({
+    date: rows[i].date,
+    close: Number(px[i].toFixed(2)),
+    fg: Number(fg[k].toFixed(1)),
+    fgEma: Number(fgE[k].toFixed(1)),
+    macd: Number(macd[i].toFixed(2)),
+    signal: Number(signal[i].toFixed(2)),
+    hist: Number((macd[i] - signal[i]).toFixed(2)),
+  }));
+}
+
+const CACHE = { sectors: {}, stocks: {}, ind: {} };
 const FRESH = 60 * 1000;
 
 module.exports = (app) => {
@@ -140,6 +229,31 @@ module.exports = (app) => {
         generatedAt: new Date().toISOString(),
       };
       CACHE.sectors[mkt] = { data, at: Date.now() };
+      res.json(data);
+    } catch (e) {
+      res.status(500).json({ error: String((e && e.message) || e) });
+    }
+  });
+
+  // 업종 지표 (F&G · MACD)
+  app.get('/sector-indicator', async (req, res) => {
+    try {
+      const code = String(req.query.code || '').replace(/\D/g, '');
+      if (!code) throw new Error('업종코드가 없습니다');
+
+      const c = CACHE.ind[code];
+      if (c && Date.now() - c.at < 10 * 60 * 1000) return res.json(c.data);
+
+      const rows = await dailyBars(code);
+      const series = indicators(rows);
+      const data = {
+        code,
+        bars: rows.length,
+        series,
+        last: series.length ? series[series.length - 1] : null,
+        generatedAt: new Date().toISOString(),
+      };
+      CACHE.ind[code] = { data, at: Date.now() };
       res.json(data);
     } catch (e) {
       res.status(500).json({ error: String((e && e.message) || e) });
