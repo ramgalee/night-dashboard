@@ -146,7 +146,7 @@
       </div>
       <button class="modal-x" id="mClose">✕</button>
     </div>
-    <div style="font-size:12px;color:var(--textSec);margin-bottom:6px;">캔들 차트</div>
+    <div style="font-size:12px;color:var(--textSec);margin-bottom:6px;">캔들 차트 <span style="color:var(--textTer)">빨간 실선은 수급오실레이터</span></div>
     <div id="mChart"></div>
     <div style="font-size:12px;color:var(--textSec);margin:12px 0 6px;">수급오실레이터</div>
     <div id="mOsc"></div>
@@ -301,7 +301,7 @@ async function loadIndicator(code, label) {
 }
 
 // ── 종목 차트 창 ──────────────────────────────────
-let mChart = null, mOsc = null, mCandle = null, mOscBars = null;
+let mChart = null, mOsc = null, mCandle = null, mOscBars = null, mOverlay = null;
 
 function initModal() {
   if (mChart || typeof LightweightCharts === "undefined") return;
@@ -315,6 +315,14 @@ function initModal() {
   mCandle = mChart.addCandlestickSeries({
     upColor: UP, downColor: DOWN, borderUpColor: UP, borderDownColor: DOWN,
     wickUpColor: UP, wickDownColor: DOWN,
+  });
+  // 캔들 위에 오실레이터를 겹쳐 그립니다(값 크기가 달라 별도 축을 씁니다).
+  mOverlay = mChart.addLineSeries({
+    color: UP, lineWidth: 2, priceScaleId: 'osc-overlay',
+    priceLineVisible: false, lastValueVisible: false,
+  });
+  mChart.priceScale('osc-overlay').applyOptions({
+    scaleMargins: { top: 0.1, bottom: 0.1 }, visible: false,
   });
   mOsc = LightweightCharts.createChart(document.getElementById('mOsc'), base);
   mOscBars = mOsc.addHistogramSeries({ color: '#6D4FE0' });
@@ -341,6 +349,7 @@ async function openStock(code, name) {
     mCandle.setData(s.map(x => ({
       time: fd(x.date), open: x.open, high: x.high, low: x.low, close: x.close,
     })));
+    mOverlay.setData(s.map(x => ({ time: fd(x.date), value: x.oscillator })));
     mOscBars.setData(s.map(x => ({
       time: fd(x.date), value: x.oscillator, color: x.oscillator >= 0 ? UP : DOWN,
     })));
