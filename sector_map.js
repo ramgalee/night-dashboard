@@ -177,11 +177,6 @@ function minmax(arr) {
 function indicators(rows) {
   const px = rows.map(r => r.close);
 
-  // MACD(12,26,9) 히스토그램
-  const e12 = emaArr(px, 12), e26 = emaArr(px, 26);
-  const macd = px.map((_, i) => e12[i] - e26[i]);
-  const signal = emaArr(macd, 9);
-
   // 업종 F&G: 60일선 대비 괴리 + RSI10 을 전체 기간 최소~최대로 정규화해 평균
   const idx = [];
   const mom = [], rs = [];
@@ -190,20 +185,26 @@ function indicators(rows) {
     if (m == null || r == null) continue;
     idx.push(i); mom.push(px[i] / m - 1); rs.push(r);
   }
-  if (idx.length < 25) return [];
+  if (idx.length < 40) return [];
 
   const nm = minmax(mom), nr = minmax(rs);
   const fg = idx.map((_, k) => (nm(mom[k]) * 0.5 + nr(rs[k]) * 0.5) * 100);
   const fgE = emaArr(fg, 20);
+
+  // MACD(12,26,9) 는 F&G 에 겁니다.
+  // 코스피·코스닥 F&G 페이지와 같은 방식이라 두 화면의 값이 일치합니다.
+  const e12 = emaArr(fg, 12), e26 = emaArr(fg, 26);
+  const macd = fg.map((_, k) => e12[k] - e26[k]);
+  const signal = emaArr(macd, 9);
 
   return idx.map((i, k) => ({
     date: rows[i].date,
     close: Number(px[i].toFixed(2)),
     fg: Number(fg[k].toFixed(1)),
     fgEma: Number(fgE[k].toFixed(1)),
-    macd: Number(macd[i].toFixed(2)),
-    signal: Number(signal[i].toFixed(2)),
-    hist: Number((macd[i] - signal[i]).toFixed(2)),
+    macd: Number(macd[k].toFixed(4)),
+    signal: Number(signal[k].toFixed(4)),
+    hist: Number((macd[k] - signal[k]).toFixed(4)),
   }));
 }
 

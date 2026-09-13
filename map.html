@@ -99,7 +99,7 @@
         <div class="ind-box" id="fgBox"></div>
       </div>
       <div>
-        <div class="ind-head">MACD 히스토그램 <span style="color:var(--textTer)">12·26·9</span><span class="ind-now" id="macdNow"></span></div>
+        <div class="ind-head">MACD 히스토그램 <span style="color:var(--textTer)">F&amp;G 기준 12·26·9</span><span class="ind-now" id="macdNow"></span></div>
         <div class="ind-box" id="macdBox"></div>
       </div>
     </div>
@@ -259,7 +259,7 @@ async function loadIndicator(code, label) {
     fgEl.textContent = l.fg.toFixed(1);
     fgEl.style.color = l.fg >= 50 ? UP : DOWN;
     const mEl = document.getElementById("macdNow");
-    mEl.textContent = (l.hist >= 0 ? "+" : "−") + Math.abs(l.hist).toLocaleString("ko-KR");
+    mEl.textContent = (l.hist >= 0 ? "+" : "−") + Math.abs(l.hist).toFixed(3);
     mEl.style.color = l.hist >= 0 ? UP : DOWN;
 
     document.getElementById("indMeta").textContent = `${fmtDate(l.date)} 기준 · 최근 6개월`;
