@@ -88,7 +88,7 @@
     <div id="secGrid"><div class="empty">불러오는 중...</div></div>
   </div>
 
-  <div class="card" id="indCard" style="display:none;">
+  <div class="card" id="indCard">
     <div class="between" style="margin-bottom:12px;">
       <div style="font-size:13px;color:var(--textSec);" id="indTitle">업종 지표</div>
       <span id="indMeta" class="meta"></span>
@@ -128,6 +128,7 @@ const UP = "#E5484D", DOWN = "#2F6FED";
 let MKT = "KOSPI";
 let SEC = null;         // 지금 펼친 업종
 let MAP = {};           // 시장별 업종 목록
+const MARKET_CODE = { KOSPI: "001", KOSDAQ: "101" };
 
 // 등락률에 따라 색 진하기를 정합니다(±3%에서 가장 진해짐).
 function tone(pct) {
@@ -190,6 +191,9 @@ async function loadSectors() {
       `${MKT} ${t.index != null ? t.index.toLocaleString("ko-KR") : "—"} ${fmtPct(t.changePct)}`;
     document.getElementById("totalText").style.color = (t.changePct ?? 0) >= 0 ? UP : DOWN;
     document.getElementById("secMeta").textContent = `${d.sectors.length}개 업종 · 크기는 거래대금`;
+
+    // 아직 업종을 고르지 않았으면 종합지수 지표를 보여줍니다.
+    if (!SEC) loadIndicator(MARKET_CODE[MKT], `${MKT} 종합`);
   } catch (e) {
     grid.innerHTML = `<div class="empty">업종을 불러오지 못했습니다.</div>`;
   }
@@ -220,14 +224,15 @@ function initCharts() {
 
 const fmtDate = d => d.slice(0,4) + "-" + d.slice(4,6) + "-" + d.slice(6,8);
 
-async function loadIndicator(code) {
+async function loadIndicator(code, label) {
   const card = document.getElementById("indCard");
   card.style.display = "block";
   initCharts();
   if (!fgChart) { document.getElementById("indMeta").textContent = "차트를 불러오지 못했습니다."; return; }
 
   const sec = (MAP[MKT]?.sectors || []).find(s => s.code === code);
-  document.getElementById("indTitle").textContent = sec ? `${sec.name} 지표` : "업종 지표";
+  document.getElementById("indTitle").textContent =
+    (label || (sec ? sec.name : "업종")) + " 지표";
   document.getElementById("indMeta").textContent = "불러오는 중...";
 
   try {
@@ -295,13 +300,15 @@ document.querySelectorAll("[data-mkt]").forEach(b => {
     SEC = null;
     document.querySelectorAll("[data-mkt]").forEach(x => x.classList.toggle("on", x === b));
     document.getElementById("stkCard").style.display = "none";
-    document.getElementById("indCard").style.display = "none";
     loadSectors();
   });
 });
 
 loadSectors();
-setInterval(() => { loadSectors(); if (SEC) loadStocks(SEC); }, 60000);
+setInterval(() => {
+  loadSectors();
+  if (SEC) { loadStocks(SEC); loadIndicator(SEC); }
+}, 60000);
 </script>
 </body>
 </html>
