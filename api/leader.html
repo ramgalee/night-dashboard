@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>대형주 수급</title>
+<style>
+  :root {
+    --void:#F2F4F9; --surface:#FFFFFF; --surface2:#F0F2F8; --hair:#E1E5F0;
+    --textPri:#131A2C; --textSec:#5B6483; --textTer:#8B94B0;
+    --up:#E5484D; --down:#2F6FED; --signature:#6D4FE0;
+    --frgn:#6D4FE0; --orgn:#E8845F; --indi:#8B94B0;
+    --mono: ui-monospace,'SF Mono','Roboto Mono',Menlo,Consolas,monospace;
+    --sans: -apple-system,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--void); color:var(--textPri); font-family:var(--sans); margin:0; padding:24px 16px; }
+  .wrap { max-width:1180px; margin:0 auto; }
+  .row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .between { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .card { background:var(--surface); border:1px solid var(--hair); border-radius:16px; padding:18px;
+          margin-bottom:16px; box-shadow:0 1px 3px rgba(19,26,44,.06); }
+  .eyebrow { font-size:11px; letter-spacing:2px; color:var(--textTer); font-family:var(--mono); }
+  h1 { font-size:22px; margin:2px 0 0; }
+  button { background:var(--surface2); border:1px solid var(--hair); color:var(--textSec);
+           padding:8px 14px; border-radius:10px; font-size:12px; cursor:pointer; font-family:var(--sans); }
+  button.on { background:var(--textPri); border-color:var(--textPri); color:#fff; font-weight:600; }
+  .status { font-size:12px; color:var(--textTer); }
+
+  /* 종목 목록 */
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  thead th { font-size:11px; color:var(--textTer); font-weight:500; text-align:right;
+             padding:6px 8px; border-bottom:1px solid var(--hair); white-space:nowrap; }
+  thead th:nth-child(1), thead th:nth-child(2) { text-align:left; }
+  tbody td { padding:7px 8px; border-bottom:1px solid var(--surface2); text-align:right;
+             font-family:var(--mono); white-space:nowrap; }
+  tbody td:nth-child(1) { color:var(--textTer); font-size:11px; }
+  tbody td:nth-child(2) { text-align:left; font-family:var(--sans); font-weight:500; }
+  tbody tr { cursor:pointer; }
+  tbody tr:hover { background:var(--surface2); }
+  tbody tr.sel { background:#EDE9FB; }
+  tbody tr.sel td:nth-child(2) { font-weight:700; }
+  .code { font-family:var(--mono); font-size:9.5px; color:var(--textTer); margin-left:4px; }
+  .osc-cell { position:relative; }
+  .osc-bar { display:inline-block; height:9px; border-radius:2px; vertical-align:middle; margin-right:5px; }
+
+  .scroller { max-height:520px; overflow-y:auto; }
+  #chartWrap { display:none; }
+  .chart-title { font-size:15px; font-weight:600; }
+  .chart-sub { font-size:11.5px; color:var(--textTer); font-family:var(--mono); }
+  svg { width:100%; display:block; }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:11.5px; color:var(--textSec); margin-top:8px; }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+  .note { border:1px dashed var(--hair); border-radius:12px; padding:12px 16px; font-size:11.5px;
+          color:var(--textTer); line-height:1.7; background:var(--surface); }
+  .empty { font-size:12.5px; color:var(--textTer); padding:20px 4px; line-height:1.7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="between" style="margin-bottom:16px;">
+    <div>
+      <div class="eyebrow">LEADER FLOW</div>
+      <h1>대형주 수급</h1>
+    </div>
+    <div class="row" style="gap:8px;">
+      <a href="/flow-oscillator.html" style="text-decoration:none;"><button>수급오실레이터 →</button></a>
+      <a href="/map.html" style="text-decoration:none;"><button>히트맵 →</button></a>
+      <a href="/fg.html" style="text-decoration:none;"><button>F&amp;G 지수 →</button></a>
+      <a href="/us.html" style="text-decoration:none;"><button>미국 증시 →</button></a>
+      <a href="/night.html" style="text-decoration:none;"><button>야간 증시 →</button></a>
+      <a href="/index.html" style="text-decoration:none;"><button>← 주간 증시</button></a>
+    </div>
+  </div>
+
+  <div class="card row" style="gap:8px;">
+    <button id="tabKOSPI" class="on" data-mkt="KOSPI">코스피</button>
+    <button id="tabKOSDAQ" data-mkt="KOSDAQ">코스닥</button>
+    <span style="width:10px;"></span>
+    <button class="on" data-sort="osc">수급 강한 순</button>
+    <button data-sort="cap">시총 순</button>
+    <button data-sort="chg">등락률 순</button>
+    <span id="statusText" class="status" style="margin-left:auto;">불러오는 중...</span>
+  </div>
+
+  <div class="card">
+    <div class="scroller">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:34px;">#</th>
+            <th>종목</th>
+            <th>종가</th>
+            <th>등락률</th>
+            <th>외국인 20일</th>
+            <th>기관 20일</th>
+            <th style="width:120px;">오실레이터</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div id="listEmpty" class="empty" style="display:none;"></div>
+    </div>
+  </div>
+
+  <div class="card" id="chartWrap">
+    <div class="between" style="margin-bottom:4px;">
+      <div>
+        <div class="chart-title" id="cTitle">—</div>
+        <div class="chart-sub" id="cSub"></div>
+      </div>
+      <div class="row" style="gap:6px;">
+        <button class="on" data-inv="외국인">외국인</button>
+        <button class="on" data-inv="기관">기관</button>
+        <button data-inv="개인">개인</button>
+      </div>
+    </div>
+
+    <div style="font-size:12px;color:var(--textSec);margin:14px 0 2px;">일별 시총대비 순매수 <span style="color:var(--textTer);">(%)</span></div>
+    <svg id="flowSvg" viewBox="0 0 900 260" preserveAspectRatio="xMidYMid meet"></svg>
+
+    <div style="font-size:12px;color:var(--textSec);margin:16px 0 2px;">수급 오실레이터 <span style="font-size:11px;color:var(--textTer);">외국인+기관 누적의 MACD 5·10·4</span></div>
+    <svg id="oscSvg" viewBox="0 0 900 130" preserveAspectRatio="xMidYMid meet"></svg>
+
+    <div class="legend">
+      <span><i class="dot" style="background:var(--frgn)"></i>외국인</span>
+      <span><i class="dot" style="background:var(--orgn)"></i>기관</span>
+      <span><i class="dot" style="background:var(--indi)"></i>개인</span>
+    </div>
+  </div>
+
+  <div class="note">
+    ⚠ 시가총액 상위 30종목의 수급을 시가총액으로 나눈 비율입니다.
+    금액이 아니라 비율이라 삼성전자와 중소형주를 같은 잣대로 비교할 수 있습니다.
+    수급은 키움 ka10059를 넥스트레이드 통합(<code>_AL</code>) 기준으로 받았고,
+    시가총액은 장 마감 후 갱신되는 <code>marketcap.json</code>을 씁니다.
+    오실레이터는 20거래일치라 앞쪽 며칠은 값이 덜 자리 잡습니다.
+    서버가 3시간마다 새로 모으므로 장중 값은 실시간이 아닙니다.
+    투자 판단의 근거로 사용할 수 없습니다.
+  </div>
+</div>
+
+<script>
+const UP = "#E5484D", DOWN = "#2F6FED";
+const COLOR = { "외국인":"#6D4FE0", "기관":"#E8845F", "개인":"#8B94B0" };
+
+let DATA = null;
+let MKT = "KOSPI";
+let SORT = "osc";
+let SEL = null;                                   // 선택된 종목코드
+let SHOW = { "외국인":true, "기관":true, "개인":false };
+
+const fmtDate = d => d.slice(4,6) + "/" + d.slice(6,8);
+const sgn = (v, n) => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(n);
+
+function rows() {
+  if (!DATA || !DATA.data) return [];
+  const list = (DATA.data[MKT] || []).slice();
+  const last = a => (a && a.length ? a[a.length - 1] : 0);
+  const sum = a => (a || []).reduce((s, v) => s + v, 0);
+  if (SORT === "osc") list.sort((a,b) => last(b.osc) - last(a.osc));
+  else if (SORT === "cap") list.sort((a,b) => b.cap - a.cap);
+  else list.sort((a,b) => (b.changePct ?? -99) - (a.changePct ?? -99));
+  return list.map(s => Object.assign({}, s, {
+    _osc: last(s.osc),
+    _f: sum(s.flow && s.flow["외국인"]),
+    _o: sum(s.flow && s.flow["기관"]),
+  }));
+}
+
+function paintList() {
+  const list = rows();
+  const tb = document.getElementById("tbody");
+  const empty = document.getElementById("listEmpty");
+
+  if (!list.length) {
+    tb.innerHTML = "";
+    empty.style.display = "block";
+    empty.textContent = MKT + " 데이터가 비어 있습니다. 잠시 후 새로고침해 주세요.";
+    return;
+  }
+  empty.style.display = "none";
+
+  const maxOsc = Math.max(...list.map(s => Math.abs(s._osc)), 0.0001);
+
+  tb.innerHTML = list.map((s, i) => {
+    const w = Math.round(Math.abs(s._osc) / maxOsc * 52);
+    const c = s._osc >= 0 ? UP : DOWN;
+    const bar = `<span class="osc-bar" style="width:${w}px;background:${c}"></span>`;
+    return `<tr data-code="${s.code}" class="${s.code === SEL ? "sel" : ""}">
+      <td>${i + 1}</td>
+      <td>${s.name}<span class="code">${s.code}</span></td>
+      <td>${s.close == null ? "—" : s.close.toLocaleString("ko-KR")}</td>
+      <td style="color:${(s.changePct ?? 0) >= 0 ? UP : DOWN}">${s.changePct == null ? "—" : sgn(s.changePct, 2) + "%"}</td>
+      <td style="color:${s._f >= 0 ? UP : DOWN}">${sgn(s._f, 2)}</td>
+      <td style="color:${s._o >= 0 ? UP : DOWN}">${sgn(s._o, 2)}</td>
+      <td class="osc-cell" style="color:${c}">${bar}${sgn(s._osc, 3)}</td>
+    </tr>`;
+  }).join("");
+
+  tb.querySelectorAll("tr").forEach(tr => {
+    tr.addEventListener("click", () => select(tr.dataset.code));
+  });
+}
+
+function find(code) {
+  return (DATA.data[MKT] || []).find(s => s.code === code) || null;
+}
+
+function select(code) {
+  SEL = code;
+  paintList();
+  const s = find(code);
+  if (!s) return;
+
+  document.getElementById("chartWrap").style.display = "block";
+  document.getElementById("cTitle").textContent = s.name + " · " + s.code;
+  const capJo = (s.cap / 1e12).toFixed(1);
+  document.getElementById("cSub").textContent =
+    `시총 ${capJo}조 · ${s.dates.length}거래일 (${fmtDate(s.dates[0])} ~ ${fmtDate(s.dates[s.dates.length-1])})`;
+
+  drawFlow(s);
+  drawOsc(s);
+}
+
+// ── 일별 수급 묶음 막대 ────────────────────────────
+function drawFlow(s) {
+  const W = 900, H = 260, PADL = 46, PADR = 10, PADT = 12, PADB = 26;
+  const keys = ["외국인","기관","개인"].filter(k => SHOW[k]);
+  const n = s.dates.length;
+
+  let vals = [];
+  keys.forEach(k => vals = vals.concat(s.flow[k] || []));
+  const m = Math.max(...vals.map(Math.abs), 0.01) * 1.15;
+
+  const iw = W - PADL - PADR, ih = H - PADT - PADB;
+  const y0 = PADT + ih / 2;
+  const y = v => y0 - (v / m) * (ih / 2);
+  const slot = iw / n;
+  const bw = Math.max(2, Math.min(9, (slot - 3) / Math.max(keys.length, 1)));
+
+  let g = "";
+  // 가로 눈금
+  [m, m/2, 0, -m/2, -m].forEach(v => {
+    g += `<line x1="${PADL}" x2="${W-PADR}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}"
+            stroke="${v === 0 ? "#C9CEDE" : "#EDF0F7"}" stroke-width="1"/>`;
+    g += `<text x="${PADL-6}" y="${(y(v)+3.5).toFixed(1)}" text-anchor="end"
+            font-size="9.5" fill="#8B94B0" font-family="ui-monospace,monospace">${v.toFixed(2)}</text>`;
+  });
+
+  for (let i = 0; i < n; i++) {
+    const cx = PADL + slot * (i + 0.5);
+    const total = keys.length * bw + (keys.length - 1) * 1;
+    keys.forEach((k, j) => {
+      const v = (s.flow[k] || [])[i] || 0;
+      const x = cx - total / 2 + j * (bw + 1);
+      const top = v >= 0 ? y(v) : y0;
+      const h = Math.max(0.8, Math.abs(y(v) - y0));
+      g += `<rect x="${x.toFixed(1)}" y="${top.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}"
+              fill="${COLOR[k]}" opacity="0.9" rx="1"><title>${fmtDate(s.dates[i])} ${k} ${sgn(v,3)}%</title></rect>`;
+    });
+    if (i % 3 === 0 || i === n - 1) {
+      g += `<text x="${cx.toFixed(1)}" y="${H-8}" text-anchor="middle"
+              font-size="9.5" fill="#8B94B0" font-family="ui-monospace,monospace">${fmtDate(s.dates[i])}</text>`;
+    }
+  }
+  document.getElementById("flowSvg").innerHTML = g;
+}
+
+// ── 오실레이터 ───────────────────────────────────
+function drawOsc(s) {
+  const W = 900, H = 130, PADL = 46, PADR = 10, PADT = 10, PADB = 22;
+  const a = s.osc || [];
+  const n = a.length;
+  const m = Math.max(...a.map(Math.abs), 0.001) * 1.2;
+  const iw = W - PADL - PADR, ih = H - PADT - PADB;
+  const y0 = PADT + ih / 2;
+  const y = v => y0 - (v / m) * (ih / 2);
+  const slot = iw / Math.max(n, 1);
+  const bw = Math.max(3, slot - 4);
+
+  let g = "";
+  [m, 0, -m].forEach(v => {
+    g += `<line x1="${PADL}" x2="${W-PADR}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}"
+            stroke="${v === 0 ? "#C9CEDE" : "#EDF0F7"}" stroke-width="1"/>`;
+    g += `<text x="${PADL-6}" y="${(y(v)+3.5).toFixed(1)}" text-anchor="end"
+            font-size="9.5" fill="#8B94B0" font-family="ui-monospace,monospace">${v.toFixed(2)}</text>`;
+  });
+
+  for (let i = 0; i < n; i++) {
+    const v = a[i];
+    const x = PADL + slot * (i + 0.5) - bw / 2;
+    const top = v >= 0 ? y(v) : y0;
+    const h = Math.max(0.8, Math.abs(y(v) - y0));
+    g += `<rect x="${x.toFixed(1)}" y="${top.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}"
+            fill="${v >= 0 ? UP : DOWN}" rx="1"><title>${fmtDate(s.dates[i])} ${sgn(v,4)}</title></rect>`;
+  }
+  document.getElementById("oscSvg").innerHTML = g;
+}
+
+// ── 불러오기 ─────────────────────────────────────
+async function load() {
+  const st = document.getElementById("statusText");
+  try {
+    const r = await fetch("/api/leader-flow", { cache: "no-store" });
+    const d = await r.json();
+
+    if (!r.ok || !d.data) {
+      st.textContent = d.building
+        ? "서버가 데이터를 모으는 중입니다. 1~2분 뒤 새로고침해 주세요."
+        : (d.error || "데이터를 불러오지 못했습니다.");
+      return;
+    }
+
+    DATA = d;
+    const n = (d.data.KOSPI || []).length + (d.data.KOSDAQ || []).length;
+    const fail = (d.failed || []).length;
+    st.textContent = `시총일 ${d.capDate || "—"} · ${n}종목`
+      + (d.ageMin != null ? ` · ${d.ageMin}분 전 수집` : "")
+      + (fail ? ` · 실패 ${fail}` : "");
+
+    paintList();
+    const first = rows()[0];
+    if (first) select(SEL && find(SEL) ? SEL : first.code);
+  } catch (e) {
+    st.textContent = "데이터를 불러오지 못했습니다.";
+  }
+}
+
+document.querySelectorAll("[data-mkt]").forEach(b => {
+  b.addEventListener("click", () => {
+    MKT = b.dataset.mkt;
+    document.querySelectorAll("[data-mkt]").forEach(x => x.classList.toggle("on", x === b));
+    SEL = null;
+    paintList();
+    const first = rows()[0];
+    if (first) select(first.code); else document.getElementById("chartWrap").style.display = "none";
+  });
+});
+
+document.querySelectorAll("[data-sort]").forEach(b => {
+  b.addEventListener("click", () => {
+    SORT = b.dataset.sort;
+    document.querySelectorAll("[data-sort]").forEach(x => x.classList.toggle("on", x === b));
+    paintList();
+  });
+});
+
+document.querySelectorAll("[data-inv]").forEach(b => {
+  b.addEventListener("click", () => {
+    const k = b.dataset.inv;
+    if (SHOW[k] && Object.values(SHOW).filter(Boolean).length === 1) return;  // 하나는 남겨둡니다
+    SHOW[k] = !SHOW[k];
+    b.classList.toggle("on", SHOW[k]);
+    const s = SEL && find(SEL);
+    if (s) drawFlow(s);
+  });
+});
+
+load();
+setInterval(load, 300000);
+</script>
+</body>
+</html>
