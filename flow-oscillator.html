@@ -241,6 +241,7 @@ let RS = {};          // 종목코드 → RS 값
 let RS_DATE = "";
 let RS_FILTER = "all";   // all / high60 / aligned / both
 let RS_ALL = [];         // 거르기 전 원본
+let TREND = {};          // 종목코드 → {high60, aligned}
 let RS_VALID = true;     // 신고가·정배열을 믿어도 되는지
 let PICK_SRC = "up";
 let PICK_CODE = null;
@@ -255,13 +256,26 @@ function rsBadge(code) {
   return `<span class="rs-badge ${cls}">${v}</span>`;
 }
 
-// RS 목록을 신고가·정배열로 거릅니다.
+// 신고가·정배열 표시. rs.json 에 없는 종목(시총 3,000억 미만)은 표시가 없습니다.
+function trendMark(code) {
+  const t = TREND[code];
+  if (!t) return "";
+  return (t.high60 ? '<span class="mark mark-hi">新</span>' : '')
+       + (t.aligned ? '<span class="mark mark-al">정</span>' : '');
+}
+
+// 어느 탭이든 같은 기준으로 거릅니다.
+function trendPass(code) {
+  if (RS_FILTER === "all") return true;
+  const t = TREND[code];
+  if (!t) return false;                      // 자료가 없으면 통과시키지 않습니다
+  if (RS_FILTER === "high60") return t.high60;
+  if (RS_FILTER === "aligned") return t.aligned;
+  return t.high60 && t.aligned;
+}
+
 function applyRsFilter() {
-  let a = RS_ALL;
-  if (RS_FILTER === "high60") a = a.filter(r => r.high60);
-  else if (RS_FILTER === "aligned") a = a.filter(r => r.aligned);
-  else if (RS_FILTER === "both") a = a.filter(r => r.high60 && r.aligned);
-  return a.slice(0, 50);
+  return RS_ALL.filter(r => trendPass(r.code)).slice(0, 50);
 }
 
 function pickRows() {
@@ -272,7 +286,7 @@ function pickRows() {
     return list.map((r, i) => `
       <div class="pick-row${r.code === PICK_CODE ? " on" : ""}" data-code="${r.code}">
         <span class="pick-no">${i + 1}</span>
-        <span class="pick-name">${r.name}<span class="pick-mkt">${r.market === "KOSPI" ? "KP" : "KQ"}</span>${r.high60 ? '<span class="mark mark-hi">新</span>' : ''}${r.aligned ? '<span class="mark mark-al">정</span>' : ''}</span>
+        <span class="pick-name">${r.name}<span class="pick-mkt">${r.market === "KOSPI" ? "KP" : "KQ"}</span>${trendMark(r.code)}</span>
         ${rsBadge(r.code)}
         <span class="pick-val" style="color:${r.m3 >= 0 ? '#E5484D' : '#2F6FED'}">${fmtPct(r.m3)}</span>
       </div>`).join("");
@@ -280,17 +294,20 @@ function pickRows() {
   if (!list) return `<div class="status">불러오는 중...</div>`;
   if (!list.length) return `<div class="status">데이터가 없습니다.</div>`;
 
-  return list.map((r, i) => `
+  const shown = list.filter(r => trendPass(r.code));
+  if (!shown.length) return `<div class="status">해당하는 종목이 없습니다.</div>`;
+
+  return shown.map((r, i) => `
     <div class="pick-row${r.code === PICK_CODE ? " on" : ""}" data-code="${r.code}">
       <span class="pick-no">${i + 1}</span>
-      <span class="pick-name">${r.name}<span class="pick-mkt">${r.market === "KOSPI" ? "KP" : "KQ"}</span></span>
+      <span class="pick-name">${r.name}<span class="pick-mkt">${r.market === "KOSPI" ? "KP" : "KQ"}</span>${trendMark(r.code)}</span>
       ${rsBadge(r.code)}
       <span class="pick-val" style="color:${(r.value ?? 0) >= 0 ? '#E5484D' : '#2F6FED'}">${fmtPct(r.value)}</span>
     </div>`).join("");
 }
 
 function paintPick() {
-  document.getElementById("rsFilter").style.display = (PICK_SRC === "rs") ? "flex" : "none";
+  document.getElementById("rsFilter").style.display = "flex";
   document.getElementById("pickTabs").querySelectorAll(".pick-tab").forEach(b => {
     b.classList.toggle("on", b.dataset.src === PICK_SRC);
   });
@@ -304,16 +321,30 @@ function paintPick() {
       loadData(PICK_CODE);
     });
   });
+  // 거른 결과를 안내 문구에 덧붙입니다.
+  let extra = "";
+  const cur = PICK[PICK_SRC];
+  if (cur && cur.length) {
+    const base = (PICK_SRC === "rs") ? RS_ALL : cur;
+    const noData = base.filter(r => !TREND[r.code]).length;
+    if (RS_FILTER !== "all") {
+      const hit = base.filter(r => trendPass(r.code)).length;
+      extra = ` · ${base.length}종목 중 ${hit}종목`;
+      if (noData) extra += ` (자료없음 ${noData})`;
+    } else if (noData) {
+      extra = ` · 시총 3,000억 미만 ${noData}종목은 新·정 표시 없음`;
+    }
+  }
+  if (!RS_VALID) extra += " · ⚠ 신고가·정배열 계산 안 됨";
+
   const notes = {
     up: "거래대금 상위 150 중 상승률 순",
     prog: "장중 · 시총대비 프로그램 순매수 순",
     orgn: "장중 잠정 · 기관합계 시총대비 순매수 순",
     samo: "마감 확정 · 시총대비 순매수 순",
-    rs: "상대강도 상위 · 오른쪽은 3개월 수익률"
-        + (RS_DATE ? " · " + RS_DATE : "")
-        + (RS_VALID ? "" : " · ⚠ 신고가·정배열 계산 안 됨(종가 자료 부족)"),
+    rs: "상대강도 상위 · 오른쪽은 3개월 수익률" + (RS_DATE ? " · " + RS_DATE : ""),
   };
-  document.getElementById("pickMeta").textContent = notes[PICK_SRC] || "";
+  document.getElementById("pickMeta").textContent = (notes[PICK_SRC] || "") + extra;
 }
 
 async function loadPicks() {
@@ -336,6 +367,7 @@ async function loadPicks() {
     const list = [];
     for (const [code, v] of Object.entries(j.data || {})) {
       RS[code] = v.rs;
+      TREND[code] = { high60: !!v.high60, aligned: !!v.aligned };
       list.push({ code, name: v.name, market: v.market, value: v.rs, m3: v.m3,
                   high60: !!v.high60, aligned: !!v.aligned });
     }
