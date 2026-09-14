@@ -83,6 +83,21 @@
   .sup-mkt { font-family:var(--mono); font-size:9.5px; color:var(--textTer); margin-left:5px; }
   .sup-net { font-family:var(--mono); font-size:11px; color:var(--textTer); flex:none; width:62px; text-align:right; }
   .sup-ratio { font-family:var(--mono); font-size:12.5px; font-weight:600; flex:none; width:62px; text-align:right; }
+
+  /* 좁은 화면에서 제목과 버튼이 한 줄을 다투지 않게 합니다 */
+  .between { flex-wrap: wrap; }
+  h1 { white-space: nowrap; }
+  @media (max-width: 860px) {
+    .between > div:first-child { width: 100%; }
+    .between > .row, .between > div:last-child { width: 100%; }
+    h1 { font-size: 19px; }
+  }
+  @media (max-width: 560px) {
+    body { padding: 16px 12px; }
+    .card { padding: 14px; border-radius: 13px; }
+    .between > .row button, .between > div:last-child button { font-size: 11px; padding: 7px 10px; }
+    h1 { font-size: 18px; }
+  }
 </style>
 </head>
 <body data-page="day">
