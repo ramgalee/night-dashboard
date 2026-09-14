@@ -51,6 +51,28 @@
   .ind-box { height:190px; }
   .ind-now { font-family:var(--mono); font-size:13px; font-weight:600; margin-left:6px; }
 
+  /* 신고가·정배열 목록 */
+  .tr-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+  .tr-tabs button { background:var(--surface2); border:1px solid var(--hair); color:var(--textSec);
+                    padding:6px 12px; border-radius:9px; font-size:11.5px; cursor:pointer; font-family:var(--sans); }
+  .tr-tabs button.on { background:var(--signature); border-color:var(--signature); color:#fff; font-weight:600; }
+  .tr-tabs .sep { width:8px; }
+  .tr-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(184px,1fr)); gap:6px; }
+  .tr-item { background:var(--surface2); border:1px solid var(--hair); border-radius:9px;
+             padding:8px 10px; cursor:pointer; display:flex; align-items:center; gap:6px; }
+  .tr-item:hover { border-color:var(--signature); background:#F6F4FE; }
+  .tr-nm { font-size:12px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .tr-mk { font-size:9px; color:var(--textTer); font-family:var(--mono); }
+  .tr-rs { margin-left:auto; font-family:var(--mono); font-size:11px; font-weight:700;
+           padding:1px 5px; border-radius:5px; }
+  .tr-hot { background:#FDEBEC; color:#E5484D; }
+  .tr-warm { background:#FDF0E7; color:#C9683C; }
+  .tr-cool { background:var(--hair); color:var(--textSec); }
+  .tr-pct { font-family:var(--mono); font-size:10.5px; }
+  .tr-more { margin-top:10px; text-align:center; }
+  .tr-more button { background:var(--surface2); border:1px solid var(--hair); color:var(--textSec);
+                    padding:6px 18px; border-radius:9px; font-size:11.5px; cursor:pointer; font-family:var(--sans); }
+
   /* 종목 차트 창 */
   #modal { position:fixed; inset:0; background:rgba(19,26,44,.45); display:none;
            align-items:center; justify-content:center; padding:24px; z-index:50; }
@@ -81,6 +103,7 @@
     .card { padding: 14px; border-radius: 13px; }
     .between > .row button, .between > div:last-child button { font-size: 11px; padding: 7px 10px; }
     h1 { font-size: 18px; }
+    .tr-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
   }
 </style>
 </head>
@@ -144,6 +167,23 @@
     <div id="stkBody"><div class="empty">불러오는 중...</div></div>
   </div>
 
+  <div class="card" id="trCard">
+    <div class="between" style="margin-bottom:10px;">
+      <div style="font-size:13px;color:var(--textSec);">60일 신고가 · 정배열</div>
+      <span id="trMeta" class="meta"></span>
+    </div>
+    <div class="tr-tabs" id="trTabs">
+      <button data-tr="high60">60일 신고가</button>
+      <button class="on" data-tr="aligned">정배열</button>
+      <button data-tr="both">신고가+정배열</button>
+      <span class="sep"></span>
+      <button class="on" data-trm="ALL">전체</button>
+      <button data-trm="KOSPI">코스피</button>
+      <button data-trm="KOSDAQ">코스닥</button>
+    </div>
+    <div id="trBody"><div class="empty">불러오는 중...</div></div>
+  </div>
+
   <div style="border:1px dashed var(--hair);border-radius:12px;padding:12px 16px;font-size:11.5px;
               color:var(--textTer);line-height:1.7;background:var(--surface);">
     ⚠ 업종 타일의 크기는 그 업종의 거래대금, 종목 타일의 크기는 그 종목의 거래대금에 비례합니다.
@@ -152,6 +192,9 @@
     코스피·코스닥 종합 지표는 F&amp;G 페이지와 같은 값입니다(모멘텀·RSI·VKOSPI·Put/Call·국채 5개 항목).
     개별 업종은 VKOSPI·옵션·국채 자료가 없어 60일선 대비 괴리와 RSI 10일 두 항목만으로 계산하므로
     종합 지표와 값의 성격이 다릅니다.
+    맨 아래 신고가·정배열은 <code>rs.json</code>을 쓰며 시가총액 3,000억 이상만 담겨 있습니다.
+    60일 신고가는 60거래일(약 3개월) 종가 기준이고, 정배열은 5일선 &gt; 20일선 &gt; 60일선입니다.
+    하루 한 번 갱신되므로 당일 장중 움직임은 반영되지 않습니다.
   </div>
 </div>
 
@@ -317,6 +360,104 @@ async function loadIndicator(code, label) {
     document.getElementById("indMeta").textContent = "지표를 불러오지 못했습니다.";
   }
 }
+
+
+// ── 60일 신고가 · 정배열 목록 ──────────────────────
+let TR_ROWS = [];           // rs.json 전체
+let TR_KIND = "aligned";    // high60 / aligned / both
+let TR_MKT = "ALL";         // ALL / KOSPI / KOSDAQ
+let TR_LIMIT = 40;          // 처음 보여줄 개수
+let TR_DATE = "";
+let TR_VALID = true;
+
+// 오늘 등락률이 있으면 그걸, 없으면 3개월 수익률에 3M 을 붙여 씁니다.
+function trVal(r) { return (r.chg == null ? r.m3 : r.chg) || 0; }
+function trPct(r) {
+  const v = trVal(r);
+  const t = (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(1) + "%";
+  return r.chg == null ? `<span style="color:var(--textTer);font-size:9px;">3M</span> ${t}` : t;
+}
+
+function trFiltered() {
+  return TR_ROWS.filter(r => {
+    if (TR_MKT !== "ALL" && r.market !== TR_MKT) return false;
+    if (TR_KIND === "high60") return r.high60;
+    if (TR_KIND === "aligned") return r.aligned;
+    return r.high60 && r.aligned;
+  });
+}
+
+function trPaint() {
+  const body = document.getElementById("trBody");
+  const all = trFiltered();
+
+  if (!TR_ROWS.length) {
+    body.innerHTML = `<div class="empty">rs.json 을 불러오지 못했습니다.</div>`;
+    document.getElementById("trMeta").textContent = "";
+    return;
+  }
+  if (!all.length) {
+    body.innerHTML = `<div class="empty">해당하는 종목이 없습니다.</div>`;
+  } else {
+    const shown = all.slice(0, TR_LIMIT);
+    const cls = v => v >= 90 ? "tr-hot" : (v >= 70 ? "tr-warm" : "tr-cool");
+    body.innerHTML = `<div class="tr-grid">` + shown.map(r => `
+      <div class="tr-item" data-code="${r.code}" data-name="${r.name}">
+        <span class="tr-nm">${r.name}</span>
+        <span class="tr-mk">${r.market === "KOSPI" ? "KP" : "KQ"}</span>
+        <span class="tr-pct" style="color:${trVal(r) >= 0 ? UP : DOWN}">${trPct(r)}</span>
+        <span class="tr-rs ${cls(r.rs)}">${r.rs}</span>
+      </div>`).join("") + `</div>`
+      + (all.length > TR_LIMIT
+          ? `<div class="tr-more"><button id="trMore">${all.length - TR_LIMIT}종목 더 보기</button></div>` : "");
+
+    body.querySelectorAll(".tr-item").forEach(el => {
+      el.addEventListener("click", () => openStock(el.dataset.code, el.dataset.name));
+    });
+    const more = document.getElementById("trMore");
+    if (more) more.addEventListener("click", () => { TR_LIMIT += 40; trPaint(); });
+  }
+
+  const label = { high60: "60일 신고가", aligned: "정배열", both: "신고가+정배열" }[TR_KIND];
+  document.getElementById("trMeta").textContent =
+    `${label} ${all.length}종목` + (all.length > TR_LIMIT ? ` (${TR_LIMIT}개 표시)` : "")
+    + (TR_ROWS.some(r => r.chg != null) ? " · 등락률" : " · 3개월 수익률")
+    + (TR_DATE ? ` · ${TR_DATE}` : "")
+    + (TR_VALID ? "" : " · ⚠ 계산 안 됨");
+}
+
+async function loadTrend() {
+  try {
+    const j = await (await fetch("/rs.json", { cache: "no-store" })).json();
+    TR_DATE = j.date || "";
+    TR_VALID = j.trendValid !== false;
+    TR_ROWS = Object.entries(j.data || {})
+      .map(([code, v]) => ({ code, name: v.name, market: v.market, rs: v.rs, m3: v.m3,
+                             chg: (v.chg === undefined ? null : v.chg),
+                             high60: !!v.high60, aligned: !!v.aligned }))
+      .sort((a, b) => b.rs - a.rs || b.m3 - a.m3);
+  } catch (e) {
+    TR_ROWS = [];
+  }
+  trPaint();
+}
+
+document.querySelectorAll("[data-tr]").forEach(b => {
+  b.addEventListener("click", () => {
+    TR_KIND = b.dataset.tr; TR_LIMIT = 40;
+    document.querySelectorAll("[data-tr]").forEach(x => x.classList.toggle("on", x === b));
+    trPaint();
+  });
+});
+document.querySelectorAll("[data-trm]").forEach(b => {
+  b.addEventListener("click", () => {
+    TR_MKT = b.dataset.trm; TR_LIMIT = 40;
+    document.querySelectorAll("[data-trm]").forEach(x => x.classList.toggle("on", x === b));
+    trPaint();
+  });
+});
+
+loadTrend();
 
 // ── 종목 차트 창 ──────────────────────────────────
 let mChart = null, mOsc = null, mCandle = null, mOscBars = null, mOverlay = null;
