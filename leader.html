@@ -4,6 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>대형주 수급</title>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"
+        onerror="var s=document.createElement('script');s.src='https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js';document.head.appendChild(s);"></script>
 <style>
   :root {
     --void:#F2F4F9; --surface:#FFFFFF; --surface2:#F0F2F8; --hair:#E1E5F0;
@@ -53,6 +55,22 @@
   .dot { display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
   .note { border:1px dashed var(--hair); border-radius:12px; padding:12px 16px; font-size:11.5px;
           color:var(--textTer); line-height:1.7; background:var(--surface); }
+  /* 종목 차트 창 */
+  #modal { position:fixed; inset:0; background:rgba(19,26,44,.45); display:none;
+           align-items:center; justify-content:center; padding:24px; z-index:50; }
+  #modal.on { display:flex; }
+  .modal-box { background:var(--surface); border-radius:16px; width:100%; max-width:960px;
+               max-height:92vh; overflow:auto; padding:18px 20px; box-shadow:0 12px 40px rgba(19,26,44,.25); }
+  .modal-x { background:transparent; border:none; font-size:20px; line-height:1; color:var(--textTer);
+             cursor:pointer; padding:2px 6px; }
+  #mChart { width:100%; height:320px; }
+  #mOsc { width:100%; height:150px; }
+  .meta { font-size:10.5px; color:var(--textTer); font-family:var(--mono); }
+  .cbtn { background:var(--surface2); border:1px solid var(--hair); color:var(--textSec);
+          font-size:9.5px; padding:2px 6px; border-radius:6px; cursor:pointer; margin-left:6px;
+          font-family:var(--sans); vertical-align:1px; }
+  .cbtn:hover { background:var(--signature); border-color:var(--signature); color:#fff; }
+
   .empty { font-size:12.5px; color:var(--textTer); padding:20px 4px; line-height:1.7; }
 </style>
 </head>
@@ -81,6 +99,8 @@
     <button class="on" data-sort="osc">수급 강한 순</button>
     <button data-sort="cap">시총 순</button>
     <button data-sort="chg">등락률 순</button>
+    <button data-sort="frgn">외국인 20일 순</button>
+    <button data-sort="orgn">기관 20일 순</button>
     <span id="statusText" class="status" style="margin-left:auto;">불러오는 중...</span>
   </div>
 
@@ -135,9 +155,29 @@
     금액이 아니라 비율이라 삼성전자와 중소형주를 같은 잣대로 비교할 수 있습니다.
     수급은 키움 ka10059를 넥스트레이드 통합(<code>_AL</code>) 기준으로 받았고,
     시가총액은 장 마감 후 갱신되는 <code>marketcap.json</code>을 씁니다.
+    <b>수급 강한 순</b>은 누적 총량이 아니라 오실레이터(외국인+기관 누적의 MACD 5·10·4) 마지막 값 기준입니다.
+    많이 산 종목이 아니라 최근 들어 빨라진 종목이 위로 올라옵니다.
+    누적 총량으로 보시려면 <b>외국인 20일 순</b>·<b>기관 20일 순</b> 버튼을 쓰세요.
+    종목명 옆 <b>차트</b> 버튼을 누르면 최근 6개월 캔들과 수급오실레이터가 열립니다.
     오실레이터는 20거래일치라 앞쪽 며칠은 값이 덜 자리 잡습니다.
     서버가 3시간마다 새로 모으므로 장중 값은 실시간이 아닙니다.
     투자 판단의 근거로 사용할 수 없습니다.
+  </div>
+</div>
+
+<div id="modal">
+  <div class="modal-box">
+    <div class="between" style="margin-bottom:10px;">
+      <div>
+        <div style="font-size:15px;font-weight:600;" id="mName">종목</div>
+        <div class="meta" id="mMeta"></div>
+      </div>
+      <button class="modal-x" id="mClose">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--textSec);margin-bottom:6px;">캔들 차트 <span style="color:var(--textTer)">빨간 실선은 수급오실레이터</span></div>
+    <div id="mChart"></div>
+    <div style="font-size:12px;color:var(--textSec);margin:12px 0 6px;">수급오실레이터</div>
+    <div id="mOsc"></div>
   </div>
 </div>
 
@@ -159,14 +199,17 @@ function rows() {
   const list = (DATA.data[MKT] || []).slice();
   const last = a => (a && a.length ? a[a.length - 1] : 0);
   const sum = a => (a || []).reduce((s, v) => s + v, 0);
-  if (SORT === "osc") list.sort((a,b) => last(b.osc) - last(a.osc));
-  else if (SORT === "cap") list.sort((a,b) => b.cap - a.cap);
-  else list.sort((a,b) => (b.changePct ?? -99) - (a.changePct ?? -99));
-  return list.map(s => Object.assign({}, s, {
+  const out = list.map(s => Object.assign({}, s, {
     _osc: last(s.osc),
     _f: sum(s.flow && s.flow["외국인"]),
     _o: sum(s.flow && s.flow["기관"]),
   }));
+  if (SORT === "osc") out.sort((a,b) => b._osc - a._osc);
+  else if (SORT === "cap") out.sort((a,b) => b.cap - a.cap);
+  else if (SORT === "frgn") out.sort((a,b) => b._f - a._f);
+  else if (SORT === "orgn") out.sort((a,b) => b._o - a._o);
+  else out.sort((a,b) => (b.changePct ?? -99) - (a.changePct ?? -99));
+  return out;
 }
 
 function paintList() {
@@ -190,7 +233,7 @@ function paintList() {
     const bar = `<span class="osc-bar" style="width:${w}px;background:${c}"></span>`;
     return `<tr data-code="${s.code}" class="${s.code === SEL ? "sel" : ""}">
       <td>${i + 1}</td>
-      <td>${s.name}<span class="code">${s.code}</span></td>
+      <td>${s.name}<span class="code">${s.code}</span><button class="cbtn" data-chart="${s.code}">차트</button></td>
       <td>${s.close == null ? "—" : s.close.toLocaleString("ko-KR")}</td>
       <td style="color:${(s.changePct ?? 0) >= 0 ? UP : DOWN}">${s.changePct == null ? "—" : sgn(s.changePct, 2) + "%"}</td>
       <td style="color:${s._f >= 0 ? UP : DOWN}">${sgn(s._f, 2)}</td>
@@ -201,6 +244,13 @@ function paintList() {
 
   tb.querySelectorAll("tr").forEach(tr => {
     tr.addEventListener("click", () => select(tr.dataset.code));
+  });
+  tb.querySelectorAll("[data-chart]").forEach(b => {
+    b.addEventListener("click", e => {
+      e.stopPropagation();                       // 행 선택과 겹치지 않게
+      const s = find(b.dataset.chart);
+      if (s) openStock(s.code, s.name);
+    });
   });
 }
 
@@ -298,6 +348,80 @@ function drawOsc(s) {
   }
   document.getElementById("oscSvg").innerHTML = g;
 }
+
+// ── 종목 차트 창 ──────────────────────────────────
+let mChart = null, mOsc = null, mCandle = null, mOscBars = null, mOverlay = null;
+
+function initModal() {
+  if (mChart || typeof LightweightCharts === "undefined") return;
+  const base = {
+    layout: { background: { color: '#FFFFFF' }, textColor: '#5B6483' },
+    grid: { vertLines: { color: '#E1E5F0' }, horzLines: { color: '#E1E5F0' } },
+    timeScale: { borderColor: '#E1E5F0' },
+    rightPriceScale: { borderColor: '#E1E5F0' },
+  };
+  mChart = LightweightCharts.createChart(document.getElementById('mChart'), base);
+  mCandle = mChart.addCandlestickSeries({
+    upColor: UP, downColor: DOWN, borderUpColor: UP, borderDownColor: DOWN,
+    wickUpColor: UP, wickDownColor: DOWN,
+  });
+  // 캔들 위에 오실레이터를 겹쳐 그립니다(값 크기가 달라 별도 축을 씁니다).
+  mOverlay = mChart.addLineSeries({
+    color: UP, lineWidth: 2, priceScaleId: 'osc-overlay',
+    priceLineVisible: false, lastValueVisible: false,
+  });
+  mChart.priceScale('osc-overlay').applyOptions({
+    scaleMargins: { top: 0.1, bottom: 0.1 }, visible: false,
+  });
+  mOsc = LightweightCharts.createChart(document.getElementById('mOsc'), base);
+  mOscBars = mOsc.addHistogramSeries({ color: '#6D4FE0' });
+
+  mChart.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) mOsc.timeScale().setVisibleLogicalRange(r); });
+  mOsc.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) mChart.timeScale().setVisibleLogicalRange(r); });
+}
+
+async function openStock(code, name) {
+  const modal = document.getElementById("modal");
+  modal.classList.add("on");
+  document.getElementById("mName").textContent = `${name} (${code})`;
+  document.getElementById("mMeta").textContent = "불러오는 중...";
+  initModal();
+  if (!mChart) { document.getElementById("mMeta").textContent = "차트를 불러오지 못했습니다."; return; }
+
+  try {
+    const r = await fetch(`/api/flow-oscillator?code=${code}`, { cache: "no-store" });
+    const d = await r.json();
+    const s = d.series || [];
+    if (!s.length) throw new Error("데이터 없음");
+
+    const fd = x => x.slice(0,4) + "-" + x.slice(4,6) + "-" + x.slice(6,8);
+    mCandle.setData(s.map(x => ({
+      time: fd(x.date), open: x.open, high: x.high, low: x.low, close: x.close,
+    })));
+    mOverlay.setData(s.map(x => ({ time: fd(x.date), value: x.oscillator })));
+    mOscBars.setData(s.map(x => ({
+      time: fd(x.date), value: x.oscillator, color: x.oscillator >= 0 ? UP : DOWN,
+    })));
+
+    const SHOW = 120;
+    requestAnimationFrame(() => {
+      const range = { from: Math.max(0, s.length - SHOW), to: s.length + 2 };
+      mChart.timeScale().setVisibleLogicalRange(range);
+      mOsc.timeScale().setVisibleLogicalRange(range);
+    });
+
+    document.getElementById("mMeta").textContent = `${s.length}거래일 · 최근 6개월`;
+  } catch (e) {
+    document.getElementById("mMeta").textContent = "데이터를 불러오지 못했습니다.";
+  }
+}
+
+function closeModal() { document.getElementById("modal").classList.remove("on"); }
+document.getElementById("mClose").addEventListener("click", closeModal);
+document.getElementById("modal").addEventListener("click", e => {
+  if (e.target.id === "modal") closeModal();
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
 
 // ── 불러오기 ─────────────────────────────────────
 async function load() {
