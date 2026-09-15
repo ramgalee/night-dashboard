@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>오늘의 브리핑</title>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"
+        onerror="var s=document.createElement('script');s.src='https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js';document.head.appendChild(s);"></script>
+<style>
+  :root {
+    --void:#F2F4F9; --surface:#FFFFFF; --surface2:#F0F2F8; --hair:#E1E5F0;
+    --textPri:#131A2C; --textSec:#5B6483; --textTer:#8B94B0;
+    --up:#E5484D; --down:#2F6FED; --signature:#6D4FE0;
+    --mono: ui-monospace,'SF Mono','Roboto Mono',Menlo,Consolas,monospace;
+    --sans: -apple-system,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--void); color:var(--textPri); font-family:var(--sans); margin:0; padding:24px 16px; }
+  .wrap { max-width:1180px; margin:0 auto; }
+  .row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .between { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .card { background:var(--surface); border:1px solid var(--hair); border-radius:16px; padding:18px;
+          margin-bottom:16px; box-shadow:0 1px 3px rgba(19,26,44,.06); }
+  .eyebrow { font-size:11px; letter-spacing:2px; color:var(--textTer); font-family:var(--mono); }
+  h1 { font-size:22px; margin:2px 0 0; white-space:nowrap; }
+  button { background:var(--surface2); border:1px solid var(--hair); color:var(--textSec);
+           padding:8px 14px; border-radius:10px; font-size:12px; cursor:pointer; font-family:var(--sans); }
+  button.on { background:var(--textPri); border-color:var(--textPri); color:#fff; font-weight:600; }
+  button.primary { background:var(--signature); border-color:var(--signature); color:#fff; font-weight:600; }
+  .meta { font-size:10.5px; color:var(--textTer); font-family:var(--mono); }
+  .empty { font-size:12.5px; color:var(--textTer); padding:18px 4px; line-height:1.7; }
+
+  /* 브리핑 본문 */
+  .brief { font-size:15px; line-height:2.05; color:var(--textPri); }
+  .brief p { margin:0 0 10px; }
+  .brief b { font-weight:700; }
+  .brief .u { color:var(--up); font-family:var(--mono); font-weight:600; }
+  .brief .d { color:var(--down); font-family:var(--mono); font-weight:600; }
+  .brief .n { font-family:var(--mono); font-weight:600; }
+  #copyBox { width:100%; height:180px; margin-top:12px; border:1px solid var(--hair); border-radius:10px;
+             padding:12px; font-family:var(--mono); font-size:11.5px; line-height:1.7; resize:vertical;
+             background:var(--surface2); color:var(--textPri); display:none; }
+
+  /* 숫자 요약 */
+  .nums { display:grid; grid-template-columns:repeat(auto-fit,minmax(138px,1fr)); gap:8px; margin-top:16px; }
+  .num { background:var(--surface2); border-radius:10px; padding:10px 12px; }
+  .num-l { font-size:10.5px; color:var(--textTer); margin-bottom:4px; }
+  .num-v { font-family:var(--mono); font-size:16px; font-weight:700; }
+  .num-s { font-size:10px; color:var(--textTer); font-family:var(--mono); margin-top:2px; }
+
+  /* 연속 순매수 */
+  .st-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+  .st-tabs button { padding:6px 12px; border-radius:9px; font-size:11.5px; }
+  .st-tabs button.on { background:var(--signature); border-color:var(--signature); color:#fff; font-weight:600; }
+  .st-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(196px,1fr)); gap:6px; }
+  .st-item { background:var(--surface2); border:1px solid var(--hair); border-radius:9px;
+             padding:9px 11px; cursor:pointer; display:flex; align-items:center; gap:6px; }
+  .st-item:hover { border-color:var(--signature); background:#F6F4FE; }
+  .st-nm { font-size:12px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .st-mk { font-size:9px; color:var(--textTer); font-family:var(--mono); }
+  .st-ratio { margin-left:auto; font-family:var(--mono); font-size:11px; font-weight:700; color:var(--up); }
+  .st-days { font-size:9px; color:var(--textTer); font-family:var(--mono); }
+  .gauge { height:6px; border-radius:999px; background:var(--hair); overflow:hidden; margin:10px 0 4px; }
+  .gauge > div { height:100%; background:var(--signature); }
+
+  /* 종목 차트 창 */
+  #modal { position:fixed; inset:0; background:rgba(19,26,44,.45); display:none;
+           align-items:center; justify-content:center; padding:24px; z-index:50; }
+  #modal.on { display:flex; }
+  .modal-box { background:var(--surface); border-radius:16px; width:100%; max-width:960px;
+               max-height:92vh; overflow:auto; padding:18px 20px; box-shadow:0 12px 40px rgba(19,26,44,.25); }
+  .modal-x { background:transparent; border:none; font-size:20px; line-height:1; color:var(--textTer);
+             cursor:pointer; padding:2px 6px; }
+  #mChart { width:100%; height:320px; }
+  #mOsc { width:100%; height:150px; }
+
+  .note { border:1px dashed var(--hair); border-radius:12px; padding:12px 16px; font-size:11.5px;
+          color:var(--textTer); line-height:1.7; background:var(--surface); }
+
+  @media (max-width: 860px) {
+    .between > div:first-child { width:100%; }
+    .between > .row, .between > div:last-child { width:100%; }
+    h1 { font-size:19px; }
+  }
+  @media (max-width: 560px) {
+    body { padding:16px 12px; }
+    .card { padding:14px; border-radius:13px; }
+    .between > .row button, .between > div:last-child button { font-size:11px; padding:7px 10px; }
+    h1 { font-size:18px; }
+    .brief { font-size:14px; line-height:1.95; }
+    .st-grid { grid-template-columns:repeat(auto-fill,minmax(155px,1fr)); }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="between" style="margin-bottom:16px;">
+    <div>
+      <div class="eyebrow">DAILY BRIEF</div>
+      <h1>오늘의 브리핑</h1>
+    </div>
+    <div class="row" style="gap:8px;">
+      <button id="copyBtn" class="primary">텍스트 복사</button>
+      <a href="/night.html" style="text-decoration:none;"><button>야간 증시 →</button></a>
+      <a href="/us.html" style="text-decoration:none;"><button>미국 증시 →</button></a>
+      <a href="/map.html" style="text-decoration:none;"><button>히트맵 →</button></a>
+      <a href="/fg.html" style="text-decoration:none;"><button>F&amp;G 지수 →</button></a>
+      <a href="/flow-oscillator.html" style="text-decoration:none;"><button>수급오실레이터 →</button></a>
+      <a href="/leader.html" style="text-decoration:none;"><button>대형주 수급 →</button></a>
+      <a href="/index.html" style="text-decoration:none;"><button>← 주간 증시</button></a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="between" style="margin-bottom:12px;">
+      <div style="font-size:13px;color:var(--textSec);">시장 요약</div>
+      <span id="briefMeta" class="meta"></span>
+    </div>
+    <div class="brief" id="brief"><div class="empty">불러오는 중...</div></div>
+    <div class="nums" id="nums"></div>
+    <textarea id="copyBox" readonly></textarea>
+  </div>
+
+  <div class="card">
+    <div class="between" style="margin-bottom:10px;">
+      <div style="font-size:13px;color:var(--textSec);">3거래일 연속 순매수</div>
+      <span id="stMeta" class="meta"></span>
+    </div>
+    <div class="st-tabs" id="stTabs">
+      <button class="on" data-inv="투신">투신</button>
+      <button data-inv="사모">사모</button>
+      <button data-inv="연기금">연기금</button>
+      <button data-inv="외국인">외국인</button>
+      <button data-inv="금융투자">금융투자</button>
+      <button data-inv="기관합계">기관합계</button>
+    </div>
+    <div id="stBody"><div class="empty">불러오는 중...</div></div>
+  </div>
+
+  <div class="note">
+    ⚠ 이 페이지는 이미 공개된 지표를 정리해 보여줄 뿐이며, 특정 종목을 추천하지 않습니다.
+    연속 순매수는 <code>supply_history.json</code>의 마감 확정 수급에서
+    각 창구의 시총대비 순매수 <b>상위 50종목</b>에 3거래일 내리 든 종목입니다.
+    50위 밖으로 하루라도 밀리면 빠지므로, 순매수였어도 목록에 없을 수 있습니다.
+    하루 한 번 장 마감 후 갱신되며 장중 움직임은 반영되지 않습니다.
+    투자 판단의 근거로 사용할 수 없습니다.
+  </div>
+</div>
+
+<div id="modal">
+  <div class="modal-box">
+    <div class="between" style="margin-bottom:10px;">
+      <div>
+        <div style="font-size:15px;font-weight:600;" id="mName">종목</div>
+        <div class="meta" id="mMeta"></div>
+      </div>
+      <button class="modal-x" id="mClose">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--textSec);margin-bottom:6px;">캔들 차트 <span style="color:var(--textTer)">빨간 실선은 수급오실레이터</span></div>
+    <div id="mChart"></div>
+    <div style="font-size:12px;color:var(--textSec);margin:12px 0 6px;">수급오실레이터</div>
+    <div id="mOsc"></div>
+  </div>
+</div>
+
+<script>
+const UP = "#E5484D", DOWN = "#2F6FED";
+const 억 = v => (v == null ? "—" : Math.round(v).toLocaleString("ko-KR"));
+const pct = v => (v == null ? "—" : (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2) + "%");
+const cls = v => (v >= 0 ? "u" : "d");
+const fmtD = d => (d && d.length === 8) ? `${d.slice(0,4)}.${d.slice(4,6)}.${d.slice(6,8)}` : "";
+
+let IDX = null, SECTOR = { KOSPI: null, KOSDAQ: null }, FG = null, RS = null;
+
+// ── 시장 요약 ────────────────────────────────────
+function paintBrief() {
+  const el = document.getElementById("brief");
+  if (!IDX || !IDX.kospi) { el.innerHTML = `<div class="empty">지수를 불러오지 못했습니다.</div>`; return; }
+
+  const kp = IDX.kospi, kq = IDX.kosdaq || {};
+  const f = kp.flow || {};
+  const 방향 = (kp.changePct ?? 0) >= 0 ? "상승" : "하락";
+
+  // 업종 등락 상하위 3개
+  function 업종문장(mkt) {
+    const s = SECTOR[mkt];
+    if (!s || !s.sectors || !s.sectors.length) return "";
+    const a = s.sectors.filter(x => x.changePct != null).sort((x, y) => y.changePct - x.changePct);
+    if (a.length < 4) return "";
+    const 위 = a.slice(0, 3).map(x => `${x.name} <span class="u">${pct(x.changePct)}</span>`).join(", ");
+    const 아래 = a.slice(-3).reverse().map(x => `${x.name} <span class="d">${pct(x.changePct)}</span>`).join(", ");
+    return `<p><b>${mkt === "KOSPI" ? "코스피" : "코스닥"} 업종</b>은 ${위} 순으로 올랐고, ${아래} 순으로 내렸습니다.</p>`;
+  }
+
+  let 문장 = "";
+  문장 += `<p><b>${fmtD(kp.date)}</b> 코스피는 <span class="${cls(kp.changePct)}">${pct(kp.changePct)}</span> ${방향}한 `
+        + `<span class="n">${kp.value == null ? "—" : kp.value.toLocaleString("ko-KR")}</span>, `
+        + `코스닥은 <span class="${cls(kq.changePct)}">${pct(kq.changePct)}</span>인 `
+        + `<span class="n">${kq.value == null ? "—" : kq.value.toLocaleString("ko-KR")}</span>으로 마감했습니다.</p>`;
+
+  if (f.개인 != null || f.외국인 != null || f.기관 != null) {
+    const 주체 = [["개인", f.개인], ["외국인", f.외국인], ["기관", f.기관]]
+      .filter(([, v]) => v != null)
+      .sort((a, b) => b[1] - a[1]);
+    const 산쪽 = 주체.filter(([, v]) => v > 0), 판쪽 = 주체.filter(([, v]) => v <= 0);
+    const 표기 = a => a.map(([n, v]) => `${n} <span class="${cls(v)}">${(v>=0?"+":"−")+억(Math.abs(v))}</span>억`).join(", ");
+    문장 += `<p><b>수급</b>은 `
+          + (산쪽.length ? `${표기(산쪽)}이 순매수` : "")
+          + (산쪽.length && 판쪽.length ? ", " : "")
+          + (판쪽.length ? `${표기(판쪽)}이 순매도` : "")
+          + `였습니다.</p>`;
+  }
+
+  if (kp.rising != null) {
+    문장 += `<p><b>코스피</b>는 상승 <span class="u">${kp.rising}</span>· 하락 <span class="d">${kp.falling}</span>종목`
+          + (kp.upperLimit ? ` (상한 ${kp.upperLimit})` : "")
+          + (kp.tradeValue != null ? `, 거래대금 <span class="n">${억(kp.tradeValue)}</span>억원` : "")
+          + `입니다.</p>`;
+  }
+
+  문장 += 업종문장("KOSPI");
+  문장 += 업종문장("KOSDAQ");
+
+  if (FG && FG.data) {
+    const g = m => {
+      const a = FG.data[m]; if (!a || !a.length) return null;
+      const l = a[a.length - 1], p = a.length > 1 ? a[a.length - 2] : null;
+      return { fg: l.fg, diff: p ? l.fg - p.fg : null };
+    };
+    const a = g("KOSPI"), b = g("KOSDAQ");
+    if (a) {
+      const d = v => v == null ? "" : ` (${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(1)})`;
+      문장 += `<p><b>공포·탐욕 지수</b>는 코스피 <span class="n">${a.fg.toFixed(1)}</span>${d(a.diff)}`
+            + (b ? `, 코스닥 <span class="n">${b.fg.toFixed(1)}</span>${d(b.diff)}` : "") + `입니다.</p>`;
+    }
+  }
+
+  if (RS && RS.data) {
+    const v = Object.values(RS.data);
+    const hi = v.filter(x => x.high60).length;
+    const al = v.filter(x => x.aligned).length;
+    const both = v.filter(x => x.high60 && x.aligned).length;
+    문장 += `<p><b>60일 신고가</b> <span class="n">${hi}</span>종목, <b>정배열</b> <span class="n">${al}</span>종목이며 `
+          + `이 가운데 <span class="n">${both}</span>종목이 둘 다 해당합니다. `
+          + `<span style="color:var(--textTer);font-size:12.5px;">(시총 3,000억 이상 ${v.length}종목 기준)</span></p>`;
+  }
+
+  el.innerHTML = 문장;
+  document.getElementById("briefMeta").textContent =
+    fmtD(kp.date) + " 기준 · " + new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) + " 작성";
+
+  // 숫자 요약
+  const cell = (l, v, s) => `<div class="num"><div class="num-l">${l}</div><div class="num-v">${v}</div><div class="num-s">${s || ""}</div></div>`;
+  document.getElementById("nums").innerHTML =
+    cell("코스피", kp.value == null ? "—" : kp.value.toLocaleString("ko-KR"),
+         `<span style="color:${(kp.changePct??0)>=0?UP:DOWN}">${pct(kp.changePct)}</span>`) +
+    cell("코스닥", kq.value == null ? "—" : kq.value.toLocaleString("ko-KR"),
+         `<span style="color:${(kq.changePct??0)>=0?UP:DOWN}">${pct(kq.changePct)}</span>`) +
+    (f.외국인 != null ? cell("외국인", 억(f.외국인), "억원") : "") +
+    (f.기관 != null ? cell("기관", 억(f.기관), "억원") : "") +
+    (f.개인 != null ? cell("개인", 억(f.개인), "억원") : "") +
+    (kp.tradeValue != null ? cell("코스피 거래대금", 억(kp.tradeValue), "억원") : "");
+
+  document.getElementById("copyBox").value = el.innerText.trim();
+}
+
+// ── 3거래일 연속 순매수 ───────────────────────────
+let HIST = null, ST_INV = "투신";
+
+function streaks(inv) {
+  if (!HIST || !HIST.dates || HIST.dates.length < 3) return null;
+  const 최근3 = HIST.dates.slice(-3);
+  const 표 = 최근3.map(d => {
+    const m = {};
+    for (const x of (HIST.days[d] || {})[inv] || []) m[x.code] = x;
+    return m;
+  });
+  const out = [];
+  for (const code of Object.keys(표[2])) {
+    if (표[0][code] && 표[1][code]) {
+      const 합 = 최근3.reduce((s, _, i) => s + (표[i][code].ratio || 0), 0);
+      out.push({ code, name: 표[2][code].name, market: 표[2][code].market, sum: 합, last: 표[2][code].ratio });
+    }
+  }
+  return { dates: 최근3, rows: out.sort((a, b) => b.sum - a.sum) };
+}
+
+function paintStreak() {
+  const body = document.getElementById("stBody");
+  const meta = document.getElementById("stMeta");
+
+  if (!HIST) {
+    body.innerHTML = `<div class="empty">supply_history.json 을 불러오지 못했습니다.<br>
+      장 마감 후 노트북에서 만들어 GitHub에 올리면 표시됩니다.</div>`;
+    meta.textContent = ""; return;
+  }
+  const n = (HIST.dates || []).length;
+  if (n < 3) {
+    const w = Math.round(n / 3 * 100);
+    body.innerHTML = `<div class="empty">아직 <b>${n}거래일</b>만 쌓였습니다. 3거래일이 모이면 목록이 나옵니다.
+      <div class="gauge"><div style="width:${w}%"></div></div>
+      ${(HIST.dates || []).map(fmtD).join(" · ")}</div>`;
+    meta.textContent = `${n}/3 거래일`;
+    return;
+  }
+
+  const r = streaks(ST_INV);
+  meta.textContent = `${fmtD(r.dates[0])} ~ ${fmtD(r.dates[2])} · ${HIST.topN || 50}위 이내`;
+
+  if (!r.rows.length) {
+    body.innerHTML = `<div class="empty">${ST_INV}은(는) 3거래일 연속으로 상위에 든 종목이 없습니다.</div>`;
+    return;
+  }
+  body.innerHTML = `<div class="st-grid">` + r.rows.map(x => `
+    <div class="st-item" data-code="${x.code}" data-name="${x.name}">
+      <span class="st-nm">${x.name}</span>
+      <span class="st-mk">${x.market === "KOSPI" ? "KP" : "KQ"}</span>
+      <span class="st-ratio">${x.sum.toFixed(2)}%</span>
+    </div>`).join("") + `</div>
+    <div class="meta" style="margin-top:8px;">${r.rows.length}종목 · 오른쪽은 3일 합산 시총대비 순매수</div>`;
+
+  body.querySelectorAll(".st-item").forEach(el => {
+    el.addEventListener("click", () => openStock(el.dataset.code, el.dataset.name));
+  });
+}
+
+document.querySelectorAll("[data-inv]").forEach(b => {
+  b.addEventListener("click", () => {
+    ST_INV = b.dataset.inv;
+    document.querySelectorAll("[data-inv]").forEach(x => x.classList.toggle("on", x === b));
+    paintStreak();
+  });
+});
+
+// ── 텍스트 복사 ──────────────────────────────────
+document.getElementById("copyBtn").addEventListener("click", async () => {
+  const box = document.getElementById("copyBox"), btn = document.getElementById("copyBtn");
+  if (!box.value) return;
+  try {
+    await navigator.clipboard.writeText(box.value);
+    btn.textContent = "복사됨!";
+    setTimeout(() => { btn.textContent = "텍스트 복사"; }, 1500);
+  } catch (e) {
+    box.style.display = "block"; box.select();
+    btn.textContent = "직접 복사하세요";
+  }
+});
+
+// ── 종목 차트 창 ──────────────────────────────────
+let mChart = null, mOsc = null, mCandle = null, mOscBars = null, mOverlay = null;
+
+function initModal() {
+  if (mChart || typeof LightweightCharts === "undefined") return;
+  const base = {
+    layout: { background: { color: '#FFFFFF' }, textColor: '#5B6483' },
+    grid: { vertLines: { color: '#E1E5F0' }, horzLines: { color: '#E1E5F0' } },
+    timeScale: { borderColor: '#E1E5F0' },
+    rightPriceScale: { borderColor: '#E1E5F0' },
+  };
+  mChart = LightweightCharts.createChart(document.getElementById('mChart'), base);
+  mCandle = mChart.addCandlestickSeries({
+    upColor: UP, downColor: DOWN, borderUpColor: UP, borderDownColor: DOWN,
+    wickUpColor: UP, wickDownColor: DOWN,
+  });
+  // 캔들 위에 오실레이터를 겹쳐 그립니다(값 크기가 달라 별도 축을 씁니다).
+  mOverlay = mChart.addLineSeries({
+    color: UP, lineWidth: 2, priceScaleId: 'osc-overlay',
+    priceLineVisible: false, lastValueVisible: false,
+  });
+  mChart.priceScale('osc-overlay').applyOptions({
+    scaleMargins: { top: 0.1, bottom: 0.1 }, visible: false,
+  });
+  mOsc = LightweightCharts.createChart(document.getElementById('mOsc'), base);
+  mOscBars = mOsc.addHistogramSeries({ color: '#6D4FE0' });
+
+  mChart.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) mOsc.timeScale().setVisibleLogicalRange(r); });
+  mOsc.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) mChart.timeScale().setVisibleLogicalRange(r); });
+}
+
+async function openStock(code, name) {
+  const modal = document.getElementById("modal");
+  modal.classList.add("on");
+  document.getElementById("mName").textContent = `${name} (${code})`;
+  document.getElementById("mMeta").textContent = "불러오는 중...";
+  initModal();
+  if (!mChart) { document.getElementById("mMeta").textContent = "차트를 불러오지 못했습니다."; return; }
+
+  try {
+    const r = await fetch(`/api/flow-oscillator?code=${code}`, { cache: "no-store" });
+    const d = await r.json();
+    const s = d.series || [];
+    if (!s.length) throw new Error("데이터 없음");
+
+    const fd = x => x.slice(0,4) + "-" + x.slice(4,6) + "-" + x.slice(6,8);
+    mCandle.setData(s.map(x => ({
+      time: fd(x.date), open: x.open, high: x.high, low: x.low, close: x.close,
+    })));
+    mOverlay.setData(s.map(x => ({ time: fd(x.date), value: x.oscillator })));
+    mOscBars.setData(s.map(x => ({
+      time: fd(x.date), value: x.oscillator, color: x.oscillator >= 0 ? UP : DOWN,
+    })));
+
+    const SHOW = 120;
+    requestAnimationFrame(() => {
+      const range = { from: Math.max(0, s.length - SHOW), to: s.length + 2 };
+      mChart.timeScale().setVisibleLogicalRange(range);
+      mOsc.timeScale().setVisibleLogicalRange(range);
+    });
+
+    document.getElementById("mMeta").textContent = `${s.length}거래일 · 최근 6개월`;
+  } catch (e) {
+    document.getElementById("mMeta").textContent = "데이터를 불러오지 못했습니다.";
+  }
+}
+
+function closeModal() { document.getElementById("modal").classList.remove("on"); }
+document.getElementById("mClose").addEventListener("click", closeModal);
+document.getElementById("modal").addEventListener("click", e => {
+  if (e.target.id === "modal") closeModal();
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+
+
+// ── 불러오기 ─────────────────────────────────────
+async function load() {
+  const get = async (u, o) => { try { const r = await fetch(u, o || { cache: "no-store" }); return await r.json(); } catch (e) { return null; } };
+
+  const [idx, kp, kq, fg, rs, hist] = await Promise.all([
+    get("/api/index-intraday"),
+    get("/api/sector-map?market=KOSPI"),
+    get("/api/sector-map?market=KOSDAQ"),
+    get("/api/fear-greed?days=5"),
+    get("/rs.json"),
+    get("/supply_history.json"),
+  ]);
+  IDX = idx; SECTOR.KOSPI = kp; SECTOR.KOSDAQ = kq; FG = fg; RS = rs; HIST = hist;
+
+  paintBrief();
+  paintStreak();
+}
+
+load();
+setInterval(load, 300000);
+</script>
+</body>
+</html>
