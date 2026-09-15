@@ -167,6 +167,17 @@
 <script>
 const UP = "#E5484D", DOWN = "#2F6FED";
 const 억 = v => (v == null ? "—" : Math.round(v).toLocaleString("ko-KR"));
+// 거래대금은 백만원 단위로 옵니다. /100 하면 억원입니다.
+const 거래대금억 = v => (v == null ? null : v / 100);
+// 억 단위가 1조를 넘으면 "14조 206억"처럼 읽기 쉽게 바꿉니다.
+function 금액(억원) {
+  if (억원 == null) return "—";
+  const a = Math.round(억원);
+  if (Math.abs(a) < 10000) return a.toLocaleString("ko-KR") + "억원";
+  const 조 = Math.floor(Math.abs(a) / 10000), 나머지 = Math.abs(a) % 10000;
+  return (a < 0 ? "−" : "") + 조.toLocaleString("ko-KR") + "조 "
+       + (나머지 ? 나머지.toLocaleString("ko-KR") + "억원" : "원");
+}
 const pct = v => (v == null ? "—" : (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2) + "%");
 const cls = v => (v >= 0 ? "u" : "d");
 const fmtD = d => (d && d.length === 8) ? `${d.slice(0,4)}.${d.slice(4,6)}.${d.slice(6,8)}` : "";
@@ -199,12 +210,14 @@ function paintBrief() {
         + `코스닥은 <span class="${cls(kq.changePct)}">${pct(kq.changePct)}</span>인 `
         + `<span class="n">${kq.value == null ? "—" : kq.value.toLocaleString("ko-KR")}</span>으로 마감했습니다.</p>`;
 
-  if (f.개인 != null || f.외국인 != null || f.기관 != null) {
-    const 주체 = [["개인", f.개인], ["외국인", f.외국인], ["기관", f.기관]]
+  const 개인 = f.individual, 외국인 = f.foreign, 기관 = f.institution;
+  if (개인 != null || 외국인 != null || 기관 != null) {
+    const 주체 = [["개인", 개인], ["외국인", 외국인], ["기관", 기관]]
       .filter(([, v]) => v != null)
       .sort((a, b) => b[1] - a[1]);
     const 산쪽 = 주체.filter(([, v]) => v > 0), 판쪽 = 주체.filter(([, v]) => v <= 0);
-    const 표기 = a => a.map(([n, v]) => `${n} <span class="${cls(v)}">${(v>=0?"+":"−")+억(Math.abs(v))}</span>억`).join(", ");
+    const 표기 = a => a.map(([n, v]) =>
+      `${n} <span class="${cls(v)}">${(v >= 0 ? "+" : "−") + 금액(Math.abs(v))}</span>`).join(", ");
     문장 += `<p><b>수급</b>은 `
           + (산쪽.length ? `${표기(산쪽)}이 순매수` : "")
           + (산쪽.length && 판쪽.length ? ", " : "")
@@ -215,7 +228,7 @@ function paintBrief() {
   if (kp.rising != null) {
     문장 += `<p><b>코스피</b>는 상승 <span class="u">${kp.rising}</span>· 하락 <span class="d">${kp.falling}</span>종목`
           + (kp.upperLimit ? ` (상한 ${kp.upperLimit})` : "")
-          + (kp.tradeValue != null ? `, 거래대금 <span class="n">${억(kp.tradeValue)}</span>억원` : "")
+          + (kp.tradeValue != null ? `, 거래대금 <span class="n">${금액(거래대금억(kp.tradeValue))}</span>` : "")
           + `입니다.</p>`;
   }
 
@@ -257,10 +270,11 @@ function paintBrief() {
          `<span style="color:${(kp.changePct??0)>=0?UP:DOWN}">${pct(kp.changePct)}</span>`) +
     cell("코스닥", kq.value == null ? "—" : kq.value.toLocaleString("ko-KR"),
          `<span style="color:${(kq.changePct??0)>=0?UP:DOWN}">${pct(kq.changePct)}</span>`) +
-    (f.외국인 != null ? cell("외국인", 억(f.외국인), "억원") : "") +
-    (f.기관 != null ? cell("기관", 억(f.기관), "억원") : "") +
-    (f.개인 != null ? cell("개인", 억(f.개인), "억원") : "") +
-    (kp.tradeValue != null ? cell("코스피 거래대금", 억(kp.tradeValue), "억원") : "");
+    (f.foreign != null ? cell("외국인", 금액(f.foreign), "순매수") : "") +
+    (f.institution != null ? cell("기관", 금액(f.institution), "순매수") : "") +
+    (f.individual != null ? cell("개인", 금액(f.individual), "순매수") : "") +
+    (kp.tradeValue != null ? cell("코스피 거래대금", 금액(거래대금억(kp.tradeValue)), "") : "") +
+    (kq.tradeValue != null ? cell("코스닥 거래대금", 금액(거래대금억(kq.tradeValue)), "") : "");
 
   document.getElementById("copyBox").value = el.innerText.trim();
 }
