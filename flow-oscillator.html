@@ -124,7 +124,7 @@
 
     <div class="card">
       <div class="pick-tabs" id="pickTabs">
-        <button class="pick-tab on" data-src="up">상승률&#10;50</button>
+        <button class="pick-tab on" data-src="up">등락률&#10;50</button>
         <button class="pick-tab" data-src="prog">프로그램&#10;50</button>
         <button class="pick-tab" data-src="orgn">잠정&#10;기관</button>
         <button class="pick-tab" data-src="samo">사모&#10;20</button>
@@ -354,7 +354,7 @@ function paintPick() {
   if (!RS_VALID) extra += " · ⚠ 신고가·정배열 계산 안 됨";
 
   const notes = {
-    up: "거래대금 상위 150 중 상승률 순",
+    up: "거래대금 상위 150 중 등락률 순 · 하락장에서는 덜 빠진 순",
     prog: "장중 · 시총대비 프로그램 순매수 순",
     orgn: "장중 잠정 · 기관합계 시총대비 순매수 순",
     samo: "마감 확정 · 시총대비 순매수 순",
@@ -364,7 +364,7 @@ function paintPick() {
 }
 
 async function loadPicks() {
-  // 1) 거래대금 상위 150 중 상승률 상위 50
+  // 1) 거래대금 상위 150 중 등락률 상위 50 (하락장이면 덜 빠진 순)
   try {
     const d = await (await fetch("/api/trade-rank", { cache: "no-store" })).json();
     PICK.up = (d.up50 || []).map(r => ({ code: r.code, name: r.name, market: r.market, value: r.changePct }));
