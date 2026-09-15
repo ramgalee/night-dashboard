@@ -42,11 +42,18 @@
              background:var(--surface2); color:var(--textPri); display:none; }
 
   /* 숫자 요약 */
-  .nums { display:grid; grid-template-columns:repeat(auto-fit,minmax(138px,1fr)); gap:8px; margin-top:16px; }
-  .num { background:var(--surface2); border-radius:10px; padding:10px 12px; }
-  .num-l { font-size:10.5px; color:var(--textTer); margin-bottom:4px; }
-  .num-v { font-family:var(--mono); font-size:16px; font-weight:700; }
-  .num-s { font-size:10px; color:var(--textTer); font-family:var(--mono); margin-top:2px; }
+  /* 칸 높이를 맞추려면 값이 한 줄에 들어가야 합니다.
+     폭을 넉넉히 주고, 그래도 넘치면 줄바꿈 대신 글자가 살짝 작아지게 합니다. */
+  .nums { display:grid; grid-template-columns:repeat(auto-fit,minmax(168px,1fr)); gap:8px; margin-top:16px; }
+  .num { background:var(--surface2); border-radius:10px; padding:10px 12px;
+         display:flex; flex-direction:column; justify-content:space-between; min-height:74px; }
+  .num-l { font-size:10.5px; color:var(--textTer); margin-bottom:4px; white-space:nowrap;
+           overflow:hidden; text-overflow:ellipsis; }
+  .num-v { font-family:var(--mono); font-size:16px; font-weight:700;
+           white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+           font-size:clamp(13px, 2.1vw, 16px); }
+  .num-s { font-size:10px; color:var(--textTer); font-family:var(--mono); margin-top:2px;
+           white-space:nowrap; }
 
   /* 연속 순매수 */
   .st-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
@@ -89,6 +96,8 @@
     h1 { font-size:18px; }
     .brief { font-size:14px; line-height:1.95; }
     .st-grid { grid-template-columns:repeat(auto-fill,minmax(155px,1fr)); }
+    .nums { grid-template-columns:repeat(auto-fit,minmax(144px,1fr)); }
+    .num-v { font-size:clamp(12px, 3.6vw, 15px); }
   }
 </style>
 </head>
@@ -170,13 +179,14 @@ const 억 = v => (v == null ? "—" : Math.round(v).toLocaleString("ko-KR"));
 // 거래대금은 백만원 단위로 옵니다. /100 하면 억원입니다.
 const 거래대금억 = v => (v == null ? null : v / 100);
 // 억 단위가 1조를 넘으면 "14조 206억"처럼 읽기 쉽게 바꿉니다.
-function 금액(억원) {
+// 짧게=true 면 "억원" 대신 "억" — 좁은 칸에서 줄바꿈을 막으려고 씁니다.
+function 금액(억원, 짧게) {
   if (억원 == null) return "—";
   const a = Math.round(억원);
-  if (Math.abs(a) < 10000) return a.toLocaleString("ko-KR") + "억원";
+  if (Math.abs(a) < 10000) return a.toLocaleString("ko-KR") + (짧게 ? "억" : "억원");
   const 조 = Math.floor(Math.abs(a) / 10000), 나머지 = Math.abs(a) % 10000;
   return (a < 0 ? "−" : "") + 조.toLocaleString("ko-KR") + "조 "
-       + (나머지 ? 나머지.toLocaleString("ko-KR") + "억원" : "원");
+       + (나머지 ? 나머지.toLocaleString("ko-KR") + (짧게 ? "억" : "억원") : "원");
 }
 const pct = v => (v == null ? "—" : (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2) + "%");
 const cls = v => (v >= 0 ? "u" : "d");
@@ -270,11 +280,11 @@ function paintBrief() {
          `<span style="color:${(kp.changePct??0)>=0?UP:DOWN}">${pct(kp.changePct)}</span>`) +
     cell("코스닥", kq.value == null ? "—" : kq.value.toLocaleString("ko-KR"),
          `<span style="color:${(kq.changePct??0)>=0?UP:DOWN}">${pct(kq.changePct)}</span>`) +
-    (f.foreign != null ? cell("외국인", 금액(f.foreign), "순매수") : "") +
-    (f.institution != null ? cell("기관", 금액(f.institution), "순매수") : "") +
-    (f.individual != null ? cell("개인", 금액(f.individual), "순매수") : "") +
-    (kp.tradeValue != null ? cell("코스피 거래대금", 금액(거래대금억(kp.tradeValue)), "") : "") +
-    (kq.tradeValue != null ? cell("코스닥 거래대금", 금액(거래대금억(kq.tradeValue)), "") : "");
+    (f.foreign != null ? cell("외국인 순매수", 금액(f.foreign, true), "") : "") +
+    (f.institution != null ? cell("기관 순매수", 금액(f.institution, true), "") : "") +
+    (f.individual != null ? cell("개인 순매수", 금액(f.individual, true), "") : "") +
+    (kp.tradeValue != null ? cell("코스피 거래대금", 금액(거래대금억(kp.tradeValue), true), "") : "") +
+    (kq.tradeValue != null ? cell("코스닥 거래대금", 금액(거래대금억(kq.tradeValue), true), "") : "");
 
   document.getElementById("copyBox").value = el.innerText.trim();
 }
