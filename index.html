@@ -573,11 +573,43 @@ function supRows(list, sign) {
     </div>`).join("");
 }
 
+// 외국인 합과 기관합계에 모두 든 종목 = 양매수(양매도).
+// 목록은 상위 50개씩만 오므로, 둘 다 50위 안에 들어야 잡힙니다.
+const 양매수탭 = "양매수";
+
+function 양매수만들기(src) {
+  const f = (src.data || {})["외국인"], o = (src.data || {})["기관합계"];
+  if (!f || !o) return null;
+
+  function 교집합(a, b, 방향) {
+    const A = {}, B = {};
+    for (const x of a || []) A[x.code] = x;
+    for (const x of b || []) B[x.code] = x;
+    const out = [];
+    for (const code of Object.keys(A)) {
+      if (!B[code]) continue;
+      const r1 = A[code].ratio || 0, r2 = B[code].ratio || 0;
+      out.push(Object.assign({}, A[code], {
+        ratio: r1 + r2, foreignRatio: r1, orgnRatio: r2,
+        net: (A[code].net || 0) + (B[code].net || 0),
+      }));
+    }
+    return out.sort((x, y) => 방향 > 0 ? y.ratio - x.ratio : x.ratio - y.ratio);
+  }
+
+  return {
+    buy: 교집합(f.buy, o.buy, 1),
+    sell: 교집합(f.sell, o.sell, -1),
+    기준: (f.buy || []).length,
+  };
+}
+
 function paintSupply() {
   if (!SUPPLY) return;
   const tabs = document.getElementById("supTabs");
   const body = document.getElementById("supBody");
-  const list = SUPPLY.investors || [];
+  const 양 = 양매수만들기(SUPPLY);
+  const list = (SUPPLY.investors || []).concat(양 ? [양매수탭] : []);
   if (!SUPPLY_TAB || list.indexOf(SUPPLY_TAB) < 0) SUPPLY_TAB = list[0];
 
   tabs.innerHTML = list.map(n =>
@@ -585,14 +617,14 @@ function paintSupply() {
   tabs.querySelectorAll(".sup-tab").forEach(b => {
     b.addEventListener("click", () => { SUPPLY_TAB = b.dataset.inv; paintSupply(); });
   });
-  const d = (SUPPLY.data || {})[SUPPLY_TAB] || { buy: [], sell: [] };
+  const d = (SUPPLY_TAB === 양매수탭 ? 양 : (SUPPLY.data || {})[SUPPLY_TAB]) || { buy: [], sell: [] };
   body.innerHTML = `<div class="sup-grid">
     <div>
-      <div class="sup-head" style="color:${T.up}">순매수 상위</div>
+      <div class="sup-head" style="color:${T.up}">${SUPPLY_TAB === 양매수탭 ? "외국인+기관 양매수" : "순매수 상위"}</div>
       <div class="sup-scroll">${supRows(d.buy, 1)}</div>
     </div>
     <div>
-      <div class="sup-head" style="color:${T.down}">순매도 상위</div>
+      <div class="sup-head" style="color:${T.down}">${SUPPLY_TAB === 양매수탭 ? "외국인+기관 양매도" : "순매도 상위"}</div>
       <div class="sup-scroll">${supRows(d.sell, -1)}</div>
     </div>
   </div>`;
@@ -604,7 +636,8 @@ function paintSupply() {
   document.getElementById("supMeta").textContent =
     snap +
     (cd.length === 8 ? `시총 ${cd.slice(4, 6)}.${cd.slice(6, 8)} 기준 · ` : "") +
-    `${Math.round((SUPPLY.minCap || 0) / 1e8).toLocaleString("ko-KR")}억 이상${stale}`;
+    `${Math.round((SUPPLY.minCap || 0) / 1e8).toLocaleString("ko-KR")}억 이상${stale}` +
+    (SUPPLY_TAB === 양매수탭 && 양 ? ` · 각 ${양.기준}위 이내 겹친 ${양.buy.length}종목` : "");
 }
 
 async function fetchSupplyRatio() {
@@ -632,7 +665,8 @@ function paintFinal() {
   if (!FINAL) return;
   const tabs = document.getElementById("finTabs");
   const body = document.getElementById("finBody");
-  const list = FINAL.investors || [];
+  const 양 = 양매수만들기(FINAL);
+  const list = (FINAL.investors || []).concat(양 ? [양매수탭] : []);
   if (!FINAL_TAB || list.indexOf(FINAL_TAB) < 0) FINAL_TAB = list[0];
 
   tabs.innerHTML = list.map(n =>
@@ -641,14 +675,14 @@ function paintFinal() {
     b.addEventListener("click", () => { FINAL_TAB = b.dataset.inv; paintFinal(); });
   });
 
-  const d = (FINAL.data || {})[FINAL_TAB] || { buy: [], sell: [] };
+  const d = (FINAL_TAB === 양매수탭 ? 양 : (FINAL.data || {})[FINAL_TAB]) || { buy: [], sell: [] };
   body.innerHTML = `<div class="sup-grid">
     <div>
-      <div class="sup-head" style="color:${T.up}">순매수 상위</div>
+      <div class="sup-head" style="color:${T.up}">${FINAL_TAB === 양매수탭 ? "외국인+기관 양매수" : "순매수 상위"}</div>
       <div class="sup-scroll">${supRows(d.buy, 1)}</div>
     </div>
     <div>
-      <div class="sup-head" style="color:${T.down}">순매도 상위</div>
+      <div class="sup-head" style="color:${T.down}">${FINAL_TAB === 양매수탭 ? "외국인+기관 양매도" : "순매도 상위"}</div>
       <div class="sup-scroll">${supRows(d.sell, -1)}</div>
     </div>
   </div>`;
@@ -656,7 +690,8 @@ function paintFinal() {
   const cd = FINAL.date || "";
   const cap = FINAL.minCap ? ` · ${Math.round(FINAL.minCap / 1e8).toLocaleString("ko-KR")}억 이상` : "";
   document.getElementById("finMeta").textContent =
-    (cd.length === 8 ? `${cd.slice(4, 6)}.${cd.slice(6, 8)} 종가 확정` : "") + cap;
+    (cd.length === 8 ? `${cd.slice(4, 6)}.${cd.slice(6, 8)} 종가 확정` : "") + cap +
+    (FINAL_TAB === 양매수탭 && 양 ? ` · 각 ${양.기준}위 이내 겹친 ${양.buy.length}종목` : "");
 }
 
 async function fetchFinalSupply() {
