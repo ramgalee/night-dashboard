@@ -578,7 +578,10 @@ function supRows(list, sign) {
 const 양매수탭 = "양매수";
 
 function 양매수만들기(src) {
-  const f = (src.data || {})["외국인"], o = (src.data || {})["기관합계"];
+  // 장중은 "외국합", 마감 확정은 "외국인" 으로 이름이 다릅니다.
+  const 고르기 = (d, 후보) => { for (const n of 후보) if (d && d[n]) return d[n]; return null; };
+  const f = 고르기(src.data, ["외국인", "외국합", "외국인합계", "외국인계"]);
+  const o = 고르기(src.data, ["기관합계", "기관계", "기관"]);
   if (!f || !o) return null;
 
   function 교집합(a, b, 방향) {
