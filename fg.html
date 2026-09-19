@@ -247,6 +247,22 @@
   </div>
 </div>
 
+<div id="modal">
+  <div class="modal-box">
+    <div class="between" style="margin-bottom:10px;">
+      <div>
+        <div style="font-size:15px;font-weight:600;" id="mName">종목</div>
+        <div class="meta" id="mMeta"></div>
+      </div>
+      <button class="modal-x" id="mClose">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--textSec);margin-bottom:6px;">캔들 차트 <span style="color:var(--textTer)">빨간 실선은 수급오실레이터</span></div>
+    <div id="mChart"></div>
+    <div style="font-size:12px;color:var(--textSec);margin:12px 0 6px;">수급오실레이터</div>
+    <div id="mOsc"></div>
+  </div>
+</div>
+
 <script>
 if (typeof LightweightCharts === "undefined") {
   document.getElementById('statusText').textContent = "차트 라이브러리를 불러오지 못했습니다. Ctrl+Shift+R을 눌러보세요.";
@@ -566,11 +582,17 @@ async function openStock(code, name) {
   }
 }
 
-function closeModal() { document.getElementById("modal").classList.remove("on"); }
-document.getElementById("mClose").addEventListener("click", closeModal);
-document.getElementById("modal").addEventListener("click", e => {
-  if (e.target.id === "modal") closeModal();
-});
+function closeModal() {
+  const el = document.getElementById("modal");
+  if (el) el.classList.remove("on");
+}
+(function 차트창연결() {
+  const 닫기 = document.getElementById("mClose");
+  const 창 = document.getElementById("modal");
+  if (!닫기 || !창) { setTimeout(차트창연결, 200); return; }   // 아직 안 그려졌으면 잠시 뒤 다시
+  닫기.addEventListener("click", closeModal);
+  창.addEventListener("click", e => { if (e.target.id === "modal") closeModal(); });
+})();
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
 
   // ── 업종을 누르면 그 아래로 종목이 펼쳐집니다 ──────
@@ -813,21 +835,6 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal()
   })();
 })();
 </script>
-<div id="modal">
-  <div class="modal-box">
-    <div class="between" style="margin-bottom:10px;">
-      <div>
-        <div style="font-size:15px;font-weight:600;" id="mName">종목</div>
-        <div class="meta" id="mMeta"></div>
-      </div>
-      <button class="modal-x" id="mClose">✕</button>
-    </div>
-    <div style="font-size:12px;color:var(--textSec);margin-bottom:6px;">캔들 차트 <span style="color:var(--textTer)">빨간 실선은 수급오실레이터</span></div>
-    <div id="mChart"></div>
-    <div style="font-size:12px;color:var(--textSec);margin:12px 0 6px;">수급오실레이터</div>
-    <div id="mOsc"></div>
-  </div>
-</div>
 
 </body>
 </html>
