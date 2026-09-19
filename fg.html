@@ -79,6 +79,39 @@
   table.tilt-tbl td.n { text-align:right; }
   table.tilt-tbl tr:last-child td { border-bottom:none; }
   .sec1 { background:#FDECEC; border-radius:6px; padding:2px 7px; }
+
+/* 종목 차트 창 */
+  #modal { position:fixed; inset:0; background:rgba(19,26,44,.45); display:none;
+           align-items:center; justify-content:center; padding:24px; z-index:50; }
+  #modal.on { display:flex; }
+  .modal-box { background:var(--surface); border-radius:16px; width:100%; max-width:960px;
+               max-height:92vh; overflow:auto; padding:18px 20px; box-shadow:0 12px 40px rgba(19,26,44,.25); }
+  .modal-x { background:transparent; border:none; font-size:20px; line-height:1; color:var(--textTer);
+             cursor:pointer; padding:2px 6px; }
+  #mChart { width:100%; height:320px; }
+  #mOsc { width:100%; height:150px; }
+
+  /* 업종 이름을 누르면 그 아래로 종목이 펼쳐집니다 */
+  .sec-btn { cursor:pointer; border-bottom:1px dotted var(--textTer); }
+  .sec-btn:hover { color:var(--signature); border-bottom-color:var(--signature); }
+  .sec-btn.open { color:var(--signature); font-weight:600; }
+  tr.stk-row > td { background:#FAFBFE; padding:0 8px 10px; white-space:normal; }
+  .stk-box { border-left:3px solid var(--signature); padding:9px 12px; margin-top:2px; }
+  .stk-ttl { font-size:11.5px; color:var(--textSec); margin-bottom:7px; }
+  .stk-ttl b { color:var(--textPri); }
+  .stk-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:5px; }
+  .stk-it { display:flex; align-items:center; gap:7px; background:var(--surface);
+            border:1px solid var(--hair); border-radius:8px; padding:6px 9px; cursor:pointer; }
+  .stk-it:hover { border-color:var(--signature); background:#F7F5FE; }
+  .stk-nm { font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .stk-cap { font-family:var(--mono); font-size:9.5px; color:var(--textTer); }
+  .stk-chg { margin-left:auto; font-family:var(--mono); font-size:11.5px; font-weight:600; }
+  .stk-rs { font-family:var(--mono); font-size:9.5px; font-weight:700;
+            padding:1px 4px; border-radius:4px; background:var(--hair); color:var(--textSec); }
+  .stk-rs.hot { background:#FDEBEC; color:#E5484D; }
+  .stk-mk { font-size:9px; font-weight:700; padding:1px 4px; border-radius:4px; }
+  .stk-hi { background:#FDEBEC; color:#E5484D; }
+  .stk-al { background:#EDE9FB; color:#6D4FE0; }
   .sec2 { background:#EDF1FC; border-radius:6px; padding:2px 7px; }
   .sec3 { background:#EDF6EE; border-radius:6px; padding:2px 7px; }
   @media (max-width: 560px) {
@@ -344,7 +377,7 @@ load();
 // lightweight-charts 는 만들어질 때의 폭을 기억합니다. 화면을 확대하거나
 // 창을 줄이면 담는 칸만 좁아지고 차트는 그대로라 옆으로 삐져나옵니다.
 (function 크기맞추기() {
-  const 대상 = [["fgChart", () => (typeof fgChart !== "undefined" ? fgChart : null)], ["oscChart", () => (typeof oscChart !== "undefined" ? oscChart : null)]];
+  const 대상 = [["fgChart", () => (typeof fgChart !== "undefined" ? fgChart : null)], ["oscChart", () => (typeof oscChart !== "undefined" ? oscChart : null)], ["mChart", () => (typeof mChart !== "undefined" ? mChart : null)], ["mOsc", () => (typeof mOsc !== "undefined" ? mOsc : null)]];
   function 맞춤() {
     for (const [id, get] of 대상) {
       const el = document.getElementById(id);
@@ -466,6 +499,134 @@ load();
       `${c === null ? '—' : c.toFixed(3)}</span></span>`;
   }
 
+// ── 종목 차트 창 ──────────────────────────────────
+let mChart = null, mOsc = null, mCandle = null, mOscBars = null, mOverlay = null;
+
+function initModal() {
+  if (mChart || typeof LightweightCharts === "undefined") return;
+  const base = {
+    layout: { background: { color: '#FFFFFF' }, textColor: '#5B6483' },
+    grid: { vertLines: { color: '#E1E5F0' }, horzLines: { color: '#E1E5F0' } },
+    timeScale: { borderColor: '#E1E5F0' },
+    rightPriceScale: { borderColor: '#E1E5F0' },
+  };
+  mChart = LightweightCharts.createChart(document.getElementById('mChart'), base);
+  mCandle = mChart.addCandlestickSeries({
+    upColor: UP, downColor: DOWN, borderUpColor: UP, borderDownColor: DOWN,
+    wickUpColor: UP, wickDownColor: DOWN,
+  });
+  // 캔들 위에 오실레이터를 겹쳐 그립니다(값 크기가 달라 별도 축을 씁니다).
+  mOverlay = mChart.addLineSeries({
+    color: UP, lineWidth: 2, priceScaleId: 'osc-overlay',
+    priceLineVisible: false, lastValueVisible: false,
+  });
+  mChart.priceScale('osc-overlay').applyOptions({
+    scaleMargins: { top: 0.1, bottom: 0.1 }, visible: false,
+  });
+  mOsc = LightweightCharts.createChart(document.getElementById('mOsc'), base);
+  mOscBars = mOsc.addHistogramSeries({ color: '#6D4FE0' });
+
+  mChart.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) mOsc.timeScale().setVisibleLogicalRange(r); });
+  mOsc.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) mChart.timeScale().setVisibleLogicalRange(r); });
+}
+
+async function openStock(code, name) {
+  const modal = document.getElementById("modal");
+  modal.classList.add("on");
+  document.getElementById("mName").textContent = `${name} (${code})`;
+  document.getElementById("mMeta").textContent = "불러오는 중...";
+  initModal();
+  if (!mChart) { document.getElementById("mMeta").textContent = "차트를 불러오지 못했습니다."; return; }
+
+  try {
+    const r = await fetch(`/api/flow-oscillator?code=${code}`, { cache: "no-store" });
+    const d = await r.json();
+    const s = d.series || [];
+    if (!s.length) throw new Error("데이터 없음");
+
+    const fd = x => x.slice(0,4) + "-" + x.slice(4,6) + "-" + x.slice(6,8);
+    mCandle.setData(s.map(x => ({
+      time: fd(x.date), open: x.open, high: x.high, low: x.low, close: x.close,
+    })));
+    mOverlay.setData(s.map(x => ({ time: fd(x.date), value: x.oscillator })));
+    mOscBars.setData(s.map(x => ({
+      time: fd(x.date), value: x.oscillator, color: x.oscillator >= 0 ? UP : DOWN,
+    })));
+
+    const SHOW = 120;
+    requestAnimationFrame(() => {
+      const range = { from: Math.max(0, s.length - SHOW), to: s.length + 2 };
+      mChart.timeScale().setVisibleLogicalRange(range);
+      mOsc.timeScale().setVisibleLogicalRange(range);
+    });
+
+    document.getElementById("mMeta").textContent = `${s.length}거래일 · 최근 6개월`;
+  } catch (e) {
+    document.getElementById("mMeta").textContent = "데이터를 불러오지 못했습니다.";
+  }
+}
+
+function closeModal() { document.getElementById("modal").classList.remove("on"); }
+document.getElementById("mClose").addEventListener("click", closeModal);
+document.getElementById("modal").addEventListener("click", e => {
+  if (e.target.id === "modal") closeModal();
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+
+  // ── 업종을 누르면 그 아래로 종목이 펼쳐집니다 ──────
+  //  sector_tilt.json 의 stocks 칸(시총 상위 10종목)을 씁니다.
+  //  쏠림지수와 같은 날 기준이라 시점이 어긋나지 않습니다.
+  function 종목펼치기연결() {
+    const 표 = document.getElementById('tiltTable');
+    if (!표) return;
+    표.querySelectorAll('.sec-btn').forEach(el => {
+      el.addEventListener('click', () => {
+        const 업 = el.dataset.sec;
+        const 줄 = document.getElementById('stk' + el.dataset.row);
+        if (!줄) return;
+
+        const 열린채 = 줄.style.display !== 'none' && 줄.dataset.sec === 업;
+        표.querySelectorAll('tr.stk-row').forEach(t => { t.style.display = 'none'; t.dataset.sec = ''; });
+        표.querySelectorAll('.sec-btn').forEach(b => b.classList.remove('open'));
+        if (열린채) return;
+
+        const 칸 = ((자료.stocks || {})[시장] || {})[업] || [];
+        const 기준 = 자료.stockDate ? 날짜(자료.stockDate) : '';
+        let 안 = `<div class="stk-box"><div class="stk-ttl">` +
+                 `<b>${업}</b> 시가총액 상위 ${칸.length}종목` +
+                 (기준 ? ` · ${기준} 기준` : '') + `</div>`;
+        if (!칸.length) {
+          안 += `<div class="stk-ttl" style="color:var(--textTer);">종목 자료가 없습니다. 칸 20을 다시 돌려주세요.</div></div>`;
+        } else {
+          안 += `<div class="stk-grid">` + 칸.map(x => {
+            const ch = (x.chg === null || x.chg === undefined) ? null : x.chg;
+            const 색 = ch === null ? 'var(--textTer)' : (ch >= 0 ? 붉음 : 푸름);
+            const 표기 = ch === null ? '—' : (ch >= 0 ? '+' : '−') + Math.abs(ch).toFixed(2) + '%';
+            const 조 = x.cap ? (x.cap / 1e12).toFixed(x.cap >= 1e13 ? 0 : 1) + '조' : '';
+            return `<div class="stk-it" data-code="${x.code}" data-name="${x.name}">` +
+                   `<span class="stk-nm">${x.name}</span>` +
+                   `<span class="stk-cap">${조}</span>` +
+                   (x.high60 ? '<span class="stk-mk stk-hi">新</span>' : '') +
+                   (x.aligned ? '<span class="stk-mk stk-al">정</span>' : '') +
+                   `<span class="stk-chg" style="color:${색}">${표기}</span>` +
+                   (x.rs ? `<span class="stk-rs${x.rs >= 90 ? ' hot' : ''}">${x.rs}</span>` : '') +
+                   `</div>`;
+          }).join('') + `</div></div>`;
+        }
+        줄.querySelector('td').innerHTML = 안;
+        줄.dataset.sec = 업;
+        줄.style.display = '';
+        el.classList.add('open');
+
+        줄.querySelectorAll('.stk-it').forEach(it => {
+          it.addEventListener('click', () => {
+            openStock(it.dataset.code, it.dataset.name);
+          });
+        });
+      });
+    });
+  }
+
   // ── 주도 업종 기록 표 ──────────────────────────
   //  최근 N거래일의 1~4위를 그대로 늘어놓고, 위에 등장 횟수를 세어 보여줍니다.
   //  같은 이름이 계속 박히면 주도가 굳는 중, 매일 바뀌면 순환매입니다.
@@ -495,20 +656,28 @@ load();
             `<span class="tilt-freq"><b>${n}</b><em>${v.회}회${v.일등 ? ' · 1위 ' + v.일등 : ''}</em></span>`).join('')
         : '<span class="tilt-freq">자료 없음</span>');
 
-    const 칠 = n => 색표[n] ? `<span class="${색표[n]}">${n}</span>` : n;
+    // 업종 이름을 눌러 종목을 펼칠 수 있게 합니다.
+    const 칠 = (n, 행) => {
+      const 안 = 색표[n] ? `<span class="${색표[n]}">${n}</span>` : n;
+      return `<span class="sec-btn" data-sec="${n}" data-row="${행}">${안}</span>`;
+    };
     const 값 = v => v === null ? '—' : (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(3);
 
     let h = `<thead><tr><th>날짜</th><th>1위</th><th>2위</th><th>3위</th><th>4위</th>` +
             `<th style="text-align:right;">오실레이터</th><th style="text-align:right;">동조화</th></tr></thead><tbody>`;
+    let 행번 = 0;
     for (const r of [...구간].reverse()) {
       const 상위 = Array.isArray(r.top) ? r.top : [];
       const o = 숫자(r.osc), c = 동조값(r);
       h += `<tr><td class="d">${날짜(r.date).slice(5)}</td>` +
-           [0, 1, 2, 3].map(i => `<td>${상위[i] ? 칠(상위[i]) : '—'}</td>`).join('') +
+           [0, 1, 2, 3].map(i => `<td>${상위[i] ? 칠(상위[i], 행번) : '—'}</td>`).join('') +
            `<td class="n" style="color:${o !== null && o >= 0 ? 붉음 : 푸름};">${값(o)}</td>` +
-           `<td class="n">${c === null ? '—' : c.toFixed(3)}</td></tr>`;
+           `<td class="n">${c === null ? '—' : c.toFixed(3)}</td></tr>` +
+           `<tr class="stk-row" id="stk${행번}" style="display:none;"><td colspan="7"></td></tr>`;
+      행번 += 1;
     }
     document.getElementById('tiltTable').innerHTML = h + '</tbody>';
+    종목펼치기연결();
   }
 
   function 그리기() {
@@ -644,5 +813,21 @@ load();
   })();
 })();
 </script>
+<div id="modal">
+  <div class="modal-box">
+    <div class="between" style="margin-bottom:10px;">
+      <div>
+        <div style="font-size:15px;font-weight:600;" id="mName">종목</div>
+        <div class="meta" id="mMeta"></div>
+      </div>
+      <button class="modal-x" id="mClose">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--textSec);margin-bottom:6px;">캔들 차트 <span style="color:var(--textTer)">빨간 실선은 수급오실레이터</span></div>
+    <div id="mChart"></div>
+    <div style="font-size:12px;color:var(--textSec);margin:12px 0 6px;">수급오실레이터</div>
+    <div id="mOsc"></div>
+  </div>
+</div>
+
 </body>
 </html>
