@@ -118,7 +118,7 @@
     <button id="tabKOSPI" class="on" data-mkt="KOSPI">코스피</button>
     <button id="tabKOSDAQ" data-mkt="KOSDAQ">코스닥</button>
     <span style="width:10px;"></span>
-    <button class="on" data-sort="osc">수급 강한 순</button>
+    <button class="on" data-sort="osc">수급 강한 순 <span style="font-size:10px;opacity:.75;">20일</span></button>
     <button data-sort="cap">시총 순</button>
     <button data-sort="chg">등락률 순</button>
     <button data-sort="frgn">외국인 20일 순</button>
@@ -137,7 +137,7 @@
             <th>등락률</th>
             <th>외국인 20일</th>
             <th>기관 20일</th>
-            <th style="width:120px;">오실레이터</th>
+            <th style="width:132px;">오실레이터 20일</th>
           </tr>
         </thead>
         <tbody id="tbody"></tbody>
@@ -162,7 +162,7 @@
     <div style="font-size:12px;color:var(--textSec);margin:14px 0 2px;">일별 시총대비 순매수 <span style="color:var(--textTer);">(%)</span></div>
     <svg id="flowSvg" viewBox="0 0 900 260" preserveAspectRatio="xMidYMid meet"></svg>
 
-    <div style="font-size:12px;color:var(--textSec);margin:16px 0 2px;">수급 오실레이터 <span style="font-size:11px;color:var(--textTer);">외국인+기관 누적의 MACD 5·10·4</span></div>
+    <div style="font-size:12px;color:var(--textSec);margin:16px 0 2px;">수급 오실레이터 <span style="font-size:11px;color:var(--textTer);">20거래일 · 외국인+기관 누적의 MACD 5·10·4</span></div>
     <svg id="oscSvg" viewBox="0 0 900 130" preserveAspectRatio="xMidYMid meet"></svg>
 
     <div class="legend">
@@ -180,8 +180,11 @@
     <b>수급 강한 순</b>은 누적 총량이 아니라 오실레이터(외국인+기관 누적의 MACD 5·10·4) 마지막 값 기준입니다.
     많이 산 종목이 아니라 최근 들어 빨라진 종목이 위로 올라옵니다.
     누적 총량으로 보시려면 <b>외국인 20일 순</b>·<b>기관 20일 순</b> 버튼을 쓰세요.
-    종목명 옆 <b>차트</b> 버튼을 누르면 최근 6개월 캔들과 수급오실레이터가 열립니다.
     오실레이터는 20거래일치라 앞쪽 며칠은 값이 덜 자리 잡습니다.
+    종목명 옆 <b>차트</b> 버튼을 누르면 최근 6개월 캔들이 열립니다.
+    <b>그 창의 오실레이터는 전체 기간으로 계산한 값</b>이라 이 표의 20일 값과 다를 수 있습니다.
+    히트맵·수급오실레이터 페이지와 같은 기준이며, 짧게 보느냐 길게 보느냐의 차이입니다.
+    최근 20일은 플러스인데 창은 마이너스라면 긴 추세는 아직 돌아서지 않았다는 뜻입니다.
     서버가 3시간마다 새로 모으므로 장중 값은 실시간이 아닙니다.
     투자 판단의 근거로 사용할 수 없습니다.
   </div>
