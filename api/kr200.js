@@ -22,6 +22,18 @@ function sessionStart(now) {
   return s;
 }
 
+// 지금이 KRX 정규 야간장 시간인지 판단합니다.
+//   평일 18:00 ~ 익일 06:00 (KST) 안에 있고, 그 세션의 시작일이 평일이어야 합니다.
+//   금요일 18시에 시작한 세션은 토요일 06시까지 이어집니다.
+//   Hyperliquid 는 주말에도 계속 돌아가므로 이 구분이 없으면
+//   주말 값도 정규 야간장처럼 보입니다.
+function 야간장여부(now, start) {
+  const 경과 = now - start;
+  if (경과 < 0 || 경과 > 12 * 3600 * 1000) return false;   // 06:00 이후
+  const 시작요일 = new Date(start + KST).getUTCDay();       // 0=일 … 6=토
+  return 시작요일 >= 1 && 시작요일 <= 5;                    // 월~금에 시작한 세션만
+}
+
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Cache-Control", "s-maxage=10, stale-while-revalidate=30");
@@ -53,9 +65,13 @@ module.exports = async (req, res) => {
       points = [];
     }
 
+    const 정규야간 = 야간장여부(now, start);
+
     res.status(200).json({
       coin: COIN,
       live: Number.isFinite(mark),
+      session: 정규야간 ? "night" : "off",     // off = 주말·휴장·장중 등 정규 야간장 밖
+      sessionLabel: 정규야간 ? "야간장" : "정규 야간장 아님",
       mark, oracle, prevDay,
       openInterest: Number(c.openInterest),
       changePts: Number.isFinite(prevDay) ? Number((mark - prevDay).toFixed(2)) : null,
