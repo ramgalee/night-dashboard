@@ -63,6 +63,24 @@
   .tilt-chip b { font-family:var(--mono); font-size:10.5px; color:var(--textTer);
                  font-weight:600; margin-right:5px; }
   .tilt-val { margin-left:auto; font-family:var(--mono); font-size:12px; color:var(--textSec); }
+  .tilt-sum { display:flex; align-items:center; gap:7px; flex-wrap:wrap; margin:14px 0 10px; }
+  .tilt-sum-l { font-size:11px; color:var(--textTer); margin-right:2px; }
+  .tilt-freq { border:1px solid var(--hair); border-radius:999px; padding:4px 10px; font-size:11.5px;
+               color:var(--textSec); background:var(--surface); }
+  .tilt-freq b { color:var(--textPri); font-weight:600; }
+  .tilt-freq em { font-style:normal; font-family:var(--mono); font-size:10.5px; color:var(--textTer);
+                  margin-left:5px; }
+  .tbl-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  table.tilt-tbl { width:100%; border-collapse:collapse; font-size:12.5px; min-width:560px; }
+  table.tilt-tbl th, table.tilt-tbl td { padding:6px 8px; border-bottom:1px solid var(--hair);
+                                         text-align:left; white-space:nowrap; }
+  table.tilt-tbl th { font-size:11px; color:var(--textTer); font-weight:600; }
+  table.tilt-tbl td.d, table.tilt-tbl td.n { font-family:var(--mono); }
+  table.tilt-tbl td.n { text-align:right; }
+  table.tilt-tbl tr:last-child td { border-bottom:none; }
+  .sec1 { background:#FDECEC; border-radius:6px; padding:2px 7px; }
+  .sec2 { background:#EDF1FC; border-radius:6px; padding:2px 7px; }
+  .sec3 { background:#EDF6EE; border-radius:6px; padding:2px 7px; }
   @media (max-width: 560px) {
     #tiltChart { height:270px; }
     #tiltOsc   { height:130px; }
@@ -172,7 +190,18 @@
 
     <div style="font-size:11px;color:var(--textTer);margin:12px 0 6px;">오실레이터 · MACD 12·26·9</div>
     <div id="tiltOsc"></div>
-    <div class="status" id="tiltStatus" style="margin-top:10px;">불러오는 중...</div>
+
+    <div class="tilt-head" style="margin:18px 0 0;">
+      <div style="font-size:13px;color:var(--textSec);">주도 업종 기록</div>
+      <div class="row" style="gap:8px;">
+        <button class="on" data-tdays="20">20일</button>
+        <button data-tdays="40">40일</button>
+      </div>
+    </div>
+    <div class="tilt-sum" id="tiltFreq"></div>
+    <div class="tbl-wrap"><table class="tilt-tbl" id="tiltTable"></table></div>
+
+    <div class="status" id="tiltStatus" style="margin-top:12px;">불러오는 중...</div>
   </div>
 
   <div class="note">
@@ -359,6 +388,7 @@ load();
   const 부호 = v => v === null ? "—" : (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(3);
 
   let 자료 = null, 종가표 = {}, 시장 = "KOSPI", 행찾기 = {}, 끝행 = null;
+  let 표일수 = 20;
 
   const 설정 = {
     layout: { background: { color: '#FFFFFF' }, textColor: '#5B6483' },
@@ -436,6 +466,51 @@ load();
       `${c === null ? '—' : c.toFixed(3)}</span></span>`;
   }
 
+  // ── 주도 업종 기록 표 ──────────────────────────
+  //  최근 N거래일의 1~4위를 그대로 늘어놓고, 위에 등장 횟수를 세어 보여줍니다.
+  //  같은 이름이 계속 박히면 주도가 굳는 중, 매일 바뀌면 순환매입니다.
+  function 표그리기(목록) {
+    const 구간 = 목록.slice(-표일수);
+    const 빈도 = new Map();
+    for (const r of 구간) {
+      const 상위 = Array.isArray(r.top) ? r.top : [];
+      상위.forEach((n, i) => {
+        const v = 빈도.get(n) || { 회: 0, 일등: 0 };
+        v.회 += 1;
+        if (i === 0) v.일등 += 1;
+        빈도.set(n, v);
+      });
+    }
+    const 순서 = [...빈도.entries()].sort((a, b) =>
+      b[1].회 - a[1].회 || b[1].일등 - a[1].일등 || a[0].localeCompare(b[0], 'ko'));
+
+    // 가장 자주 나온 세 업종에만 색을 입혀 눈에 걸리게 합니다.
+    const 색표 = {};
+    순서.slice(0, 3).forEach(([n, v], i) => { if (v.회 >= 3) 색표[n] = 'sec' + (i + 1); });
+
+    document.getElementById('tiltFreq').innerHTML =
+      `<span class="tilt-sum-l">최근 ${구간.length}거래일 등장 횟수</span>` +
+      (순서.length
+        ? 순서.slice(0, 8).map(([n, v]) =>
+            `<span class="tilt-freq"><b>${n}</b><em>${v.회}회${v.일등 ? ' · 1위 ' + v.일등 : ''}</em></span>`).join('')
+        : '<span class="tilt-freq">자료 없음</span>');
+
+    const 칠 = n => 색표[n] ? `<span class="${색표[n]}">${n}</span>` : n;
+    const 값 = v => v === null ? '—' : (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(3);
+
+    let h = `<thead><tr><th>날짜</th><th>1위</th><th>2위</th><th>3위</th><th>4위</th>` +
+            `<th style="text-align:right;">오실레이터</th><th style="text-align:right;">동조화</th></tr></thead><tbody>`;
+    for (const r of [...구간].reverse()) {
+      const 상위 = Array.isArray(r.top) ? r.top : [];
+      const o = 숫자(r.osc), c = 동조값(r);
+      h += `<tr><td class="d">${날짜(r.date).slice(5)}</td>` +
+           [0, 1, 2, 3].map(i => `<td>${상위[i] ? 칠(상위[i]) : '—'}</td>`).join('') +
+           `<td class="n" style="color:${o !== null && o >= 0 ? 붉음 : 푸름};">${값(o)}</td>` +
+           `<td class="n">${c === null ? '—' : c.toFixed(3)}</td></tr>`;
+    }
+    document.getElementById('tiltTable').innerHTML = h + '</tbody>';
+  }
+
   function 그리기() {
     if (!자료) return;
     const 목록 = (자료.data && 자료.data[시장]) || [];
@@ -481,6 +556,7 @@ load();
 
     끝행 = 목록[목록.length - 1];
     주도업종(끝행);
+    표그리기(목록);
 
     const 업종수 = ((자료.sectors && 자료.sectors[시장]) || []).length;
     document.getElementById('tiltStatus').textContent =
@@ -509,6 +585,15 @@ load();
   }
   위차트.subscribeCrosshairMove(마우스);
   아래차트.subscribeCrosshairMove(마우스);
+
+  document.querySelectorAll('[data-tdays]').forEach(b => {
+    b.addEventListener('click', () => {
+      표일수 = Number(b.dataset.tdays);
+      document.querySelectorAll('[data-tdays]').forEach(x => x.classList.toggle('on', x === b));
+      const 목록 = (자료 && 자료.data && 자료.data[시장]) || [];
+      if (목록.length) 표그리기(목록);
+    });
+  });
 
   document.querySelectorAll('[data-tilt]').forEach(b => {
     b.addEventListener('click', () => {
