@@ -45,6 +45,29 @@
 
   #fgChart { width:100%; height:380px; }
   #oscChart { width:100%; height:190px; }
+
+  /* ── 업종 쏠림지수 (맨 아래 카드) ── */
+  #tiltChart { width:100%; height:330px; }
+  #tiltOsc   { width:100%; height:150px; }
+  .tilt-head { display:flex; align-items:center; justify-content:space-between; gap:12px;
+               flex-wrap:wrap; margin-bottom:12px; }
+  .tilt-keys { display:flex; gap:14px; flex-wrap:wrap; font-size:11.5px; color:var(--textSec);
+               margin-bottom:10px; }
+  .tilt-keys span { display:inline-flex; align-items:center; gap:6px; }
+  .tilt-keys i { width:15px; height:3px; border-radius:2px; display:inline-block; }
+  .tilt-lead { display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+               background:var(--surface2); border-radius:10px; padding:10px 12px; margin-bottom:12px; }
+  .tilt-lead-l { font-size:11px; color:var(--textTer); margin-right:2px; }
+  .tilt-chip { background:var(--surface); border:1px solid var(--hair); border-radius:999px;
+               padding:5px 11px; font-size:12px; font-weight:600; color:var(--textPri); }
+  .tilt-chip b { font-family:var(--mono); font-size:10.5px; color:var(--textTer);
+                 font-weight:600; margin-right:5px; }
+  .tilt-val { margin-left:auto; font-family:var(--mono); font-size:12px; color:var(--textSec); }
+  @media (max-width: 560px) {
+    #tiltChart { height:270px; }
+    #tiltOsc   { height:130px; }
+    .tilt-val  { margin-left:0; width:100%; }
+  }
   .note { border:1px dashed var(--hair); border-radius:12px; padding:12px 16px; font-size:11.5px;
           color:var(--textTer); line-height:1.7; background:var(--surface); }
 
@@ -122,6 +145,43 @@
     오실레이터는 F&amp;G의 MACD(12·26·9) 히스토그램입니다.
     VKOSPI·옵션·국채는 장 마감 후 수동으로 갱신되므로 당일 값은 다음 날 반영됩니다.
     투자 판단의 근거로 사용할 수 없습니다.
+  </div>
+
+  <div class="card" id="tiltCard">
+    <div class="tilt-head">
+      <div>
+        <div style="font-size:13px;color:var(--textSec);">업종 쏠림지수</div>
+        <div style="font-size:11px;color:var(--textTer);margin-top:2px;">
+          쏠림이 오르면 주도 업종 집중, 내리면 순환매 · 동조화가 오르면 업종이 한 몸처럼 움직이는 장
+        </div>
+      </div>
+      <div class="row" style="gap:8px;">
+        <button class="on" data-tilt="KOSPI">코스피</button>
+        <button data-tilt="KOSDAQ">코스닥</button>
+      </div>
+    </div>
+
+    <div class="tilt-lead" id="tiltLead"></div>
+
+    <div class="tilt-keys">
+      <span><i style="background:#3E7BD6;"></i>지수 <span style="color:var(--textTer);">(왼쪽 축)</span></span>
+      <span><i style="background:#E5484D;"></i>쏠림 오실레이터 <span style="color:var(--textTer);">(오른쪽 축)</span></span>
+      <span><i style="background:#4E9A51;"></i>동조화 30일 <span style="color:var(--textTer);">(오른쪽 축)</span></span>
+    </div>
+    <div id="tiltChart"></div>
+
+    <div style="font-size:11px;color:var(--textTer);margin:12px 0 6px;">오실레이터 · MACD 12·26·9</div>
+    <div id="tiltOsc"></div>
+    <div class="status" id="tiltStatus" style="margin-top:10px;">불러오는 중...</div>
+  </div>
+
+  <div class="note">
+    매일 업종별 등락률에 순위를 매겨 <b>(상위 4개 합 − 나머지 합) ÷ 전체 업종 수</b>를 구하고,
+    그 값을 <b>지수 = 전날 + (1 + 값)</b>으로 누적한 뒤 MACD(12·26·9)를 건 히스토그램이 쏠림 오실레이터입니다.
+    동조화는 업종끼리 서로의 <b>30일 상관계수를 전부 구해 평균</b>낸 값으로,
+    높으면 업종이 다 같이 움직이는 장, 낮으면 업종끼리 따로 노는 장입니다. 두 지표는 서로 다른 축을 봅니다.
+    차트 위에 마우스를 올리면 그날의 주도 업종이 바뀝니다.
+    자체 산출 지표이며 투자 판단의 근거로 사용할 수 없습니다.
   </div>
 </div>
 
@@ -276,56 +336,6 @@ load();
   setInterval(맞춤, 1500);          // 모달이 새로 열렸을 때도 맞춥니다
 })();
 </script>
-<div class="wrap">
-  <div class="card" id="tiltCard">
-    <div class="tilt-head">
-      <div>
-        <div style="font-size:13px;color:var(--textSec);">업종 쏠림지수</div>
-        <div style="font-size:11px;color:var(--textTer);margin-top:2px;">
-          오실레이터가 오르면 특정 업종 쏠림, 내리면 순환매
-        </div>
-      </div>
-      <div class="row" style="gap:8px;">
-        <button class="on" data-tilt="KOSPI">코스피</button>
-        <button data-tilt="KOSDAQ">코스닥</button>
-      </div>
-    </div>
-
-    <div class="tilt-lead" id="tiltLead"></div>
-    <div id="tiltChart"></div>
-    <div style="font-size:11px;color:var(--textTer);margin:10px 0 6px;">오실레이터 · MACD 12·26·9</div>
-    <div id="tiltOsc"></div>
-    <div class="status" id="tiltStatus" style="margin-top:10px;">불러오는 중...</div>
-  </div>
-
-  <div class="note">
-    매일 업종별 등락률에 순위를 매겨 <b>(상위 4개 합 − 나머지 합) ÷ 전체 업종 수</b>를 구하고,
-    그 값을 <b>지수 = 전날 + (1 + 값)</b>으로 누적한 뒤 MACD(12·26·9)를 걸었습니다.
-    업종 분류는 KRX 기준입니다. 차트 위에 마우스를 올리면 그날의 주도 업종이 바뀝니다.
-    자체 산출 지표이며 투자 판단의 근거로 사용할 수 없습니다.
-  </div>
-</div>
-
-<style>
-  /* ── 업종 쏠림지수 (맨 아래 카드) ── */
-  #tiltChart { width:100%; height:300px; }
-  #tiltOsc   { width:100%; height:150px; }
-  .tilt-head { display:flex; align-items:center; justify-content:space-between; gap:12px;
-               flex-wrap:wrap; margin-bottom:12px; }
-  .tilt-lead { display:flex; align-items:center; gap:8px; flex-wrap:wrap;
-               background:var(--surface2); border-radius:10px; padding:10px 12px; margin-bottom:12px; }
-  .tilt-lead-l { font-size:11px; color:var(--textTer); margin-right:2px; }
-  .tilt-chip { background:var(--surface); border:1px solid var(--hair); border-radius:999px;
-               padding:5px 11px; font-size:12px; font-weight:600; color:var(--textPri); }
-  .tilt-chip b { font-family:var(--mono); font-size:10.5px; color:var(--textTer);
-                 font-weight:600; margin-right:5px; }
-  .tilt-val { margin-left:auto; font-family:var(--mono); font-size:12px; color:var(--textSec); }
-  @media (max-width: 560px) {
-    #tiltChart { height:250px; }
-    #tiltOsc   { height:130px; }
-    .tilt-val  { margin-left:0; width:100%; }
-  }
-</style>
 
 <!-- ═══════════════════════════════════════════════════════════
      업종 쏠림지수 (맨 아래 카드) — 위쪽 F&G 코드와 완전히 분리되어 있습니다.
@@ -335,7 +345,7 @@ load();
 (function 업종쏠림지수() {
   if (typeof LightweightCharts === "undefined") return;
 
-  const 붉음 = "#E5484D", 푸름 = "#2F6FED", 먹 = "#131A2C", 회색 = "#8B94B0";
+  const 붉음 = "#E5484D", 푸름 = "#2F6FED", 파랑 = "#3E7BD6", 초록 = "#4E9A51";
 
   const 날짜 = d => {
     const s = String(d);
@@ -357,20 +367,27 @@ load();
     rightPriceScale: { borderColor: '#E1E5F0' },
   };
 
+  // ── 위 차트: 지수(왼쪽 축) + 쏠림 오실레이터 · 동조화(오른쪽 축) ──
   const 위차트 = LightweightCharts.createChart(document.getElementById('tiltChart'), 설정);
-  const 누적선 = 위차트.addLineSeries({
-    color: 먹, lineWidth: 2, title: '쏠림지수', priceLineVisible: false,
-  });
-  // 지수 종가는 자릿수가 달라 왼쪽 별도 축에 그립니다.
-  const 종가선 = 위차트.addLineSeries({
-    color: 회색, lineWidth: 1, title: '지수', priceScaleId: 'left',
+  const 지수선 = 위차트.addLineSeries({
+    color: 파랑, lineWidth: 2, title: '지수', priceScaleId: 'left',
     priceLineVisible: false, lastValueVisible: false,
+  });
+  const 쏠림선 = 위차트.addLineSeries({
+    color: 붉음, lineWidth: 2, title: '쏠림', priceLineVisible: false,
+  });
+  const 동조선 = 위차트.addLineSeries({
+    color: 초록, lineWidth: 2, title: '동조화', priceLineVisible: false,
+  });
+  const 기준선 = 위차트.addLineSeries({
+    color: '#C3C2B7', lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
   });
   위차트.priceScale('left').applyOptions({
     scaleMargins: { top: 0.08, bottom: 0.08 }, visible: true, borderColor: '#E1E5F0',
   });
   위차트.applyOptions({ leftPriceScale: { visible: true, borderColor: '#E1E5F0' } });
 
+  // ── 아래 차트: 오실레이터 막대 ──
   const 아래차트 = LightweightCharts.createChart(document.getElementById('tiltOsc'), 설정);
   const 막대 = 아래차트.addHistogramSeries({
     priceFormat: { type: 'price', precision: 3, minMove: 0.001 },
@@ -382,32 +399,28 @@ load();
   위차트.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) 아래차트.timeScale().setVisibleLogicalRange(r); });
   아래차트.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) 위차트.timeScale().setVisibleLogicalRange(r); });
 
-  // 누적 지수 칸 이름이 무엇이든 찾아냅니다.
-  const 누적값 = r => {
-    const v = r.index !== undefined ? r.index
-            : r.cum !== undefined ? r.cum
-            : r.tiltIndex !== undefined ? r.tiltIndex : null;
-    return 숫자(v);
-  };
   // 지수 종가는 파일에 있으면 그것을, 없으면 index_history.json 에서 찾습니다.
   const 종가값 = r => {
     let v = 숫자(r.close !== undefined ? r.close : r.marketClose);
     if (v === null && 종가표[시장]) v = 숫자(종가표[시장][String(r.date)]);
     return v;
   };
+  const 동조값 = r => 숫자(r.corr !== undefined ? r.corr : r.cor);
 
   function 주도업종(r) {
     const 칸 = document.getElementById('tiltLead');
     if (!r) { 칸.innerHTML = ''; return; }
     const 상위 = Array.isArray(r.top) ? r.top : [];
-    const t = 숫자(r.tilt), o = 숫자(r.osc);
+    const o = 숫자(r.osc), c = 동조값(r);
     칸.innerHTML =
       `<span class="tilt-lead-l">${날짜(r.date)} 주도 업종</span>` +
       (상위.length
         ? 상위.map((n, i) => `<span class="tilt-chip"><b>${i + 1}</b>${n}</span>`).join('')
         : `<span class="tilt-chip">자료 없음</span>`) +
-      `<span class="tilt-val">쏠림 ${부호(t)} · 오실레이터 ` +
-      `<span style="color:${o !== null && o >= 0 ? 붉음 : 푸름};font-weight:600;">${부호(o)}</span></span>`;
+      `<span class="tilt-val">쏠림 ` +
+      `<span style="color:${o !== null && o >= 0 ? 붉음 : 푸름};font-weight:600;">${부호(o)}</span>` +
+      ` · 동조화 <span style="color:${초록};font-weight:600;">` +
+      `${c === null ? '—' : c.toFixed(3)}</span></span>`;
   }
 
   function 그리기() {
@@ -419,18 +432,24 @@ load();
     }
 
     행찾기 = {};
-    const 누적 = [], 종가 = [], 오실 = [], 영 = [];
+    const 지수 = [], 쏠림 = [], 동조 = [], 기준 = [], 오실 = [], 영 = [];
     for (const r of 목록) {
       const t = 날짜(r.date);
       행찾기[t] = r;
-      const c = 누적값(r); if (c !== null) 누적.push({ time: t, value: c });
-      const p = 종가값(r);  if (p !== null) 종가.push({ time: t, value: p });
+      const p = 종가값(r); if (p !== null) 지수.push({ time: t, value: p });
+      const c = 동조값(r); if (c !== null) 동조.push({ time: t, value: c });
       const o = 숫자(r.osc);
-      if (o !== null) 오실.push({ time: t, value: o, color: o >= 0 ? 붉음 : 푸름 });
+      if (o !== null) {
+        쏠림.push({ time: t, value: o });
+        오실.push({ time: t, value: o, color: o >= 0 ? 붉음 : 푸름 });
+      }
+      기준.push({ time: t, value: 0 });
       영.push({ time: t, value: 0 });
     }
-    누적선.setData(누적);
-    종가선.setData(종가);
+    지수선.setData(지수);
+    쏠림선.setData(쏠림);
+    동조선.setData(동조);
+    기준선.setData(기준);
     막대.setData(오실);
     영선.setData(영);
 
@@ -454,7 +473,8 @@ load();
     document.getElementById('tiltStatus').textContent =
       `${시장} · ${목록.length}거래일 · 최종 ${날짜(끝행.date)}` +
       (업종수 ? ` · 업종 ${업종수}개` : '') +
-      (종가.length ? '' : ' · 지수 종가 없음');
+      (지수.length ? '' : ' · 지수 종가 없음') +
+      (동조.length ? '' : ' · 동조화 없음 (칸 20을 다시 돌리세요)');
   }
 
   // 차트 위에 마우스를 올리면 그날의 주도 업종으로 바뀝니다.
@@ -525,6 +545,6 @@ load();
     setInterval(맞춤, 1500);
   })();
 })();
-</script>        
+</script>
 </body>
 </html>
