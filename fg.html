@@ -387,6 +387,11 @@ load();
   });
   위차트.applyOptions({ leftPriceScale: { visible: true, borderColor: '#E1E5F0' } });
 
+  // 위아래 차트의 시간축을 맞춥니다.
+  // 위는 왼쪽에 지수 축이 있고 아래는 없어서, 그냥 두면 그림이 좌우로 어긋납니다.
+  // 아래 차트에도 같은 폭의 빈 왼쪽 축을 두어 시작점을 맞춥니다.
+  const 왼쪽폭 = 68, 오른쪽폭 = 58;
+
   // ── 아래 차트: 오실레이터 막대 ──
   const 아래차트 = LightweightCharts.createChart(document.getElementById('tiltOsc'), 설정);
   const 막대 = 아래차트.addHistogramSeries({
@@ -395,6 +400,14 @@ load();
   const 영선 = 아래차트.addLineSeries({
     color: '#C3C2B7', lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
   });
+
+  try {
+    아래차트.applyOptions({ leftPriceScale: { visible: true, borderColor: '#E1E5F0' } });
+    위차트.priceScale('left').applyOptions({ minimumWidth: 왼쪽폭 });
+    아래차트.priceScale('left').applyOptions({ minimumWidth: 왼쪽폭 });
+    위차트.priceScale('right').applyOptions({ minimumWidth: 오른쪽폭 });
+    아래차트.priceScale('right').applyOptions({ minimumWidth: 오른쪽폭 });
+  } catch (e) {}
 
   위차트.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) 아래차트.timeScale().setVisibleLogicalRange(r); });
   아래차트.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) 위차트.timeScale().setVisibleLogicalRange(r); });
@@ -411,13 +424,13 @@ load();
     const 칸 = document.getElementById('tiltLead');
     if (!r) { 칸.innerHTML = ''; return; }
     const 상위 = Array.isArray(r.top) ? r.top : [];
-    const o = 숫자(r.osc), c = 동조값(r);
+    const t = 숫자(r.tilt), o = 숫자(r.osc), c = 동조값(r);
     칸.innerHTML =
       `<span class="tilt-lead-l">${날짜(r.date)} 주도 업종</span>` +
       (상위.length
         ? 상위.map((n, i) => `<span class="tilt-chip"><b>${i + 1}</b>${n}</span>`).join('')
         : `<span class="tilt-chip">자료 없음</span>`) +
-      `<span class="tilt-val">쏠림 ` +
+      `<span class="tilt-val">롱숏 ${부호(t)} · 오실레이터 ` +
       `<span style="color:${o !== null && o >= 0 ? 붉음 : 푸름};font-weight:600;">${부호(o)}</span>` +
       ` · 동조화 <span style="color:${초록};font-weight:600;">` +
       `${c === null ? '—' : c.toFixed(3)}</span></span>`;
