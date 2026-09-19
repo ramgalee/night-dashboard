@@ -28,8 +28,12 @@
   .status { font-size:12px; color:var(--textTer); }
   .warning { border:1px dashed var(--up); border-radius:12px; padding:10px 14px; font-size:12px; color:var(--up); margin-bottom:16px; }
   .notice { border:1px dashed var(--hair); border-radius:12px; padding:10px 14px; font-size:12px; color:var(--textTer); margin-bottom:16px; }
-  .split { display:grid; grid-template-columns: minmax(0,1fr) 320px; gap:16px; align-items:start; }
-  @media (max-width: 1100px) { .split { grid-template-columns: 1fr; } }
+  /* 두 칸 유지에 필요한 최소폭 = 차트 420 + 목록 300 + 간격 16 ≈ 736.
+     .wrap 이 980px 라 그 아래로 내려가면 차트가 눌려 겹쳐 보였습니다.
+     화면 폭이 아니라 '이 상자가 실제로 넓은가'를 기준으로 바꿉니다. */
+  .split { display:grid; grid-template-columns: minmax(420px,1fr) minmax(280px,300px);
+           gap:16px; align-items:start; }
+  @media (max-width: 780px) { .split { grid-template-columns: minmax(0,1fr); } }
 
   .pick-tabs { display:flex; gap:6px; margin-bottom:12px; }
   .pick-tab { flex:1; border:1px solid var(--hair); background:var(--surface); color:var(--textSec);
@@ -445,6 +449,31 @@ document.querySelectorAll("[data-rsf]").forEach(b => {
     paintPick();
   });
 });
+
+// ── 차트 크기 따라가기 ────────────────────────────
+// lightweight-charts 는 만들어질 때의 폭을 기억합니다.
+// 화면을 확대하거나 창을 줄이면 칸은 좁아지는데 차트는 그대로라
+// 오른쪽 목록 위로 삐져나옵니다. 칸 크기를 지켜보다 맞춰줍니다.
+(function 크기맞추기() {
+  const 짝 = [
+    [document.getElementById('chart'), chart],
+    [document.getElementById('oscChart'), oscChart],
+  ].filter(([el, c]) => el && c);
+
+  function 맞춤() {
+    for (const [el, c] of 짝) {
+      const w = Math.floor(el.clientWidth);
+      if (w > 0) c.applyOptions({ width: w });
+    }
+  }
+
+  if (typeof ResizeObserver !== "undefined") {
+    const ro = new ResizeObserver(() => requestAnimationFrame(맞춤));
+    for (const [el] of 짝) ro.observe(el);
+  }
+  window.addEventListener("resize", () => requestAnimationFrame(맞춤));
+  requestAnimationFrame(맞춤);
+})();
 </script>
 </body>
 </html>

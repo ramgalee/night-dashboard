@@ -466,6 +466,31 @@ async function load() {
 
 load();
 setInterval(load, 300000);
+
+// ── 차트 크기 따라가기 ────────────────────────────
+// lightweight-charts 는 만들어질 때의 폭을 기억합니다. 화면을 확대하거나
+// 창을 줄이면 담는 칸만 좁아지고 차트는 그대로라 옆으로 삐져나옵니다.
+(function 크기맞추기() {
+  const 대상 = [["mChart", () => (typeof mChart !== "undefined" ? mChart : null)], ["mOsc", () => (typeof mOsc !== "undefined" ? mOsc : null)]];
+  function 맞춤() {
+    for (const [id, get] of 대상) {
+      const el = document.getElementById(id);
+      const c = get();
+      if (!el || !c) continue;
+      const w = Math.floor(el.clientWidth);
+      if (w > 0) { try { c.applyOptions({ width: w }); } catch (e) {} }
+    }
+  }
+  if (typeof ResizeObserver !== "undefined") {
+    const ro = new ResizeObserver(() => requestAnimationFrame(맞춤));
+    for (const [id] of 대상) {
+      const el = document.getElementById(id);
+      if (el) ro.observe(el);
+    }
+  }
+  window.addEventListener("resize", () => requestAnimationFrame(맞춤));
+  setInterval(맞춤, 1500);          // 모달이 새로 열렸을 때도 맞춥니다
+})();
 </script>
 </body>
 </html>

@@ -147,6 +147,8 @@
       <div class="disclaimer">
         ⚠ 위 가격은 실제 KRX 공식 시세가 아니라, 해외 파생상품 시장(Hyperliquid)에서 형성된 가격을 원화로 환산한 참고값입니다.
         다음 날 시가를 보장하지 않으며, 유동성이 낮을 때는 괴리가 커질 수 있습니다.
+        등락률은 <b>정규장 종가 대비</b>로 표시합니다(HTS 야간선물과 같은 기준). 24시간 전 대비 값은 아래에 따로 있습니다.
+        해외 거래소는 24시간 돌아가므로 <b>주말·휴장에도 값이 움직입니다.</b> 그때는 '장 마감'으로 표시됩니다.
       </div>
     </div>
 
@@ -657,11 +659,24 @@ function fetchKr200Repaint() {
 }
 
 function renderKr200(d) {
-  const up = (d.changePts ?? 0) >= 0;
+  // 큰 숫자는 '정규장 종가 대비'로 보여줍니다. HTS 야간선물과 같은 기준입니다.
+  // Hyperliquid 가 주는 changePct 는 24시간 전 가격 대비라 기준이 다릅니다.
+  const 종가기준 = KOSPI200_CLOSE
+    ? { pts: d.mark - KOSPI200_CLOSE, pct: (d.mark / KOSPI200_CLOSE - 1) * 100 }
+    : null;
+  const 주 = 종가기준 || { pts: d.changePts, pct: d.changePct };
+
+  const up = (주.pts ?? 0) >= 0;
   const color = up ? T.up : T.down;
   const sign = up ? "+" : "−";
-  const pts = d.changePts == null ? "—" : sign + Math.abs(d.changePts).toFixed(2);
-  const pct = d.changePct == null ? "" : ` (${sign}${Math.abs(d.changePct).toFixed(2)}%)`;
+  const pts = 주.pts == null ? "—" : sign + Math.abs(주.pts).toFixed(2);
+  const pct = 주.pct == null ? "" : ` (${sign}${Math.abs(주.pct).toFixed(2)}%)`;
+  const 기준표 = 종가기준 ? "정규장 종가 대비" : "24시간 전 대비";
+
+  // 서버가 정규 야간장(평일 18:00~익일 06:00)인지 알려줍니다.
+  // Hyperliquid 는 주말에도 돌아가므로 이 구분이 없으면
+  // 주말 값이 실제 야간장처럼 보입니다.
+  const 정규야간 = d.session ? d.session === "night" : true;
 
   const W = 700, H = 110, PAD = 8;
   let svg = "";
@@ -682,29 +697,26 @@ function renderKr200(d) {
     </svg>`;
   }
 
-  // 정규장 종가 대비 갭 — 다음 날 시초가 방향을 가늠하는 지표
+  // 아래에는 참고값들을 모아 둡니다.
   let gapBlock = "";
+  const 칸 = (라벨, 값, 색) =>
+    `<div class="idx-fl">
+       <div class="idx-fl-l">${라벨}</div>
+       <div class="idx-fl-v" style="color:${색 || "var(--textPri)"}">${값}</div>
+     </div>`;
+  const 부호 = v => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2);
+  const 색 = v => (v >= 0 ? T.up : T.down);
+
+  let 칸들 = "";
   if (KOSPI200_CLOSE) {
-    const gapPts = d.mark - KOSPI200_CLOSE;
-    const gapPct = (gapPts / KOSPI200_CLOSE) * 100;
-    const gUp = gapPts >= 0;
-    const gc = gUp ? T.up : T.down;
-    const gs = gUp ? "+" : "−";
-    gapBlock = `<div class="idx-flow" style="margin-top:12px;">
-      <div class="idx-fl">
-        <div class="idx-fl-l">정규장 종가</div>
-        <div class="idx-fl-v" style="color:var(--textPri)">${KOSPI200_CLOSE.toFixed(2)}</div>
-      </div>
-      <div class="idx-fl">
-        <div class="idx-fl-l">종가 대비 갭</div>
-        <div class="idx-fl-v" style="color:${gc}">${gs}${Math.abs(gapPct).toFixed(2)}%</div>
-      </div>
-      <div class="idx-fl">
-        <div class="idx-fl-l">포인트 차</div>
-        <div class="idx-fl-v" style="color:${gc}">${gs}${Math.abs(gapPts).toFixed(2)}</div>
-      </div>
-    </div>`;
+    칸들 += 칸("정규장 종가", KOSPI200_CLOSE.toFixed(2));
+    칸들 += 칸("종가 대비 포인트", 부호(d.mark - KOSPI200_CLOSE), 색(d.mark - KOSPI200_CLOSE));
   }
+  if (d.changePct != null) {
+    // Hyperliquid 원본값. 24시간 전 가격 대비라 HTS 와 다릅니다.
+    칸들 += 칸("24시간 전 대비", 부호(d.changePct) + "%", 색(d.changePct));
+  }
+  if (칸들) gapBlock = `<div class="idx-flow" style="margin-top:12px;">${칸들}</div>`;
 
   const hhmm = ms => {
     const dt = new Date(ms);
@@ -714,11 +726,21 @@ function renderKr200(d) {
   const endTxt = d.sessionStart && d.points && d.points.length
     ? hhmm(Math.min(Date.now(), d.sessionStart + (d.points.length - 1) * 300000)) : "";
 
-  return `
+  const 휴장안내 = 정규야간 ? "" : `
+    <div style="background:#FFF6F6;border:1px solid #F6C9CB;border-radius:9px;
+                padding:8px 11px;margin-bottom:10px;font-size:11.5px;color:var(--textSec);line-height:1.6;">
+      <b style="color:${T.down};">정규 야간장이 아닙니다.</b>
+      해외 거래소(Hyperliquid)는 24시간 돌아가므로 주말·휴장에도 값이 움직입니다.
+      거래가 얕은 상태라 다음 거래일 시초가와 관계가 적습니다.
+    </div>`;
+
+  return 휴장안내 + `
     <div class="kr2-top">
       <div class="kr2-value" style="color:${color}">${d.mark.toLocaleString("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
       <div class="kr2-chg" style="color:${color}">${pts}${pct}</div>
-      <div class="dot" style="margin-left:auto;padding-bottom:4px;color:var(--textTer);"><span class="dotcircle" style="background:${T.teal}"></span>LIVE</div>
+      <div style="font-size:10px;color:var(--textTer);font-family:var(--mono);padding-bottom:5px;">${기준표}</div>
+      <div class="dot" style="margin-left:auto;padding-bottom:4px;color:${정규야간 ? "var(--textTer)" : T.down};">
+        <span class="dotcircle" style="background:${정규야간 ? T.teal : "var(--textTer)"}"></span>${정규야간 ? "LIVE" : "장 마감"}</div>
     </div>
     ${svg}
     <div class="kr2-meta">
