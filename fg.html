@@ -276,5 +276,255 @@ load();
   setInterval(맞춤, 1500);          // 모달이 새로 열렸을 때도 맞춥니다
 })();
 </script>
+<div class="wrap">
+  <div class="card" id="tiltCard">
+    <div class="tilt-head">
+      <div>
+        <div style="font-size:13px;color:var(--textSec);">업종 쏠림지수</div>
+        <div style="font-size:11px;color:var(--textTer);margin-top:2px;">
+          오실레이터가 오르면 특정 업종 쏠림, 내리면 순환매
+        </div>
+      </div>
+      <div class="row" style="gap:8px;">
+        <button class="on" data-tilt="KOSPI">코스피</button>
+        <button data-tilt="KOSDAQ">코스닥</button>
+      </div>
+    </div>
+
+    <div class="tilt-lead" id="tiltLead"></div>
+    <div id="tiltChart"></div>
+    <div style="font-size:11px;color:var(--textTer);margin:10px 0 6px;">오실레이터 · MACD 12·26·9</div>
+    <div id="tiltOsc"></div>
+    <div class="status" id="tiltStatus" style="margin-top:10px;">불러오는 중...</div>
+  </div>
+
+  <div class="note">
+    매일 업종별 등락률에 순위를 매겨 <b>(상위 4개 합 − 나머지 합) ÷ 전체 업종 수</b>를 구하고,
+    그 값을 <b>지수 = 전날 + (1 + 값)</b>으로 누적한 뒤 MACD(12·26·9)를 걸었습니다.
+    업종 분류는 KRX 기준입니다. 차트 위에 마우스를 올리면 그날의 주도 업종이 바뀝니다.
+    자체 산출 지표이며 투자 판단의 근거로 사용할 수 없습니다.
+  </div>
+</div>
+
+<style>
+  /* ── 업종 쏠림지수 (맨 아래 카드) ── */
+  #tiltChart { width:100%; height:300px; }
+  #tiltOsc   { width:100%; height:150px; }
+  .tilt-head { display:flex; align-items:center; justify-content:space-between; gap:12px;
+               flex-wrap:wrap; margin-bottom:12px; }
+  .tilt-lead { display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+               background:var(--surface2); border-radius:10px; padding:10px 12px; margin-bottom:12px; }
+  .tilt-lead-l { font-size:11px; color:var(--textTer); margin-right:2px; }
+  .tilt-chip { background:var(--surface); border:1px solid var(--hair); border-radius:999px;
+               padding:5px 11px; font-size:12px; font-weight:600; color:var(--textPri); }
+  .tilt-chip b { font-family:var(--mono); font-size:10.5px; color:var(--textTer);
+                 font-weight:600; margin-right:5px; }
+  .tilt-val { margin-left:auto; font-family:var(--mono); font-size:12px; color:var(--textSec); }
+  @media (max-width: 560px) {
+    #tiltChart { height:250px; }
+    #tiltOsc   { height:130px; }
+    .tilt-val  { margin-left:0; width:100%; }
+  }
+</style>
+
+<!-- ═══════════════════════════════════════════════════════════
+     업종 쏠림지수 (맨 아래 카드) — 위쪽 F&G 코드와 완전히 분리되어 있습니다.
+     자료: /sector_tilt.json   (지수 종가가 없으면 /index_history.json 에서 채웁니다)
+     ═══════════════════════════════════════════════════════════ -->
+<script>
+(function 업종쏠림지수() {
+  if (typeof LightweightCharts === "undefined") return;
+
+  const 붉음 = "#E5484D", 푸름 = "#2F6FED", 먹 = "#131A2C", 회색 = "#8B94B0";
+
+  const 날짜 = d => {
+    const s = String(d);
+    return s.length === 8 ? s.slice(0,4) + "-" + s.slice(4,6) + "-" + s.slice(6,8) : s;
+  };
+  const 숫자 = v => {
+    if (v === null || v === undefined || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  const 부호 = v => v === null ? "—" : (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(3);
+
+  let 자료 = null, 종가표 = {}, 시장 = "KOSPI", 행찾기 = {}, 끝행 = null;
+
+  const 설정 = {
+    layout: { background: { color: '#FFFFFF' }, textColor: '#5B6483' },
+    grid:   { vertLines: { color: '#E1E5F0' }, horzLines: { color: '#E1E5F0' } },
+    timeScale: { borderColor: '#E1E5F0' },
+    rightPriceScale: { borderColor: '#E1E5F0' },
+  };
+
+  const 위차트 = LightweightCharts.createChart(document.getElementById('tiltChart'), 설정);
+  const 누적선 = 위차트.addLineSeries({
+    color: 먹, lineWidth: 2, title: '쏠림지수', priceLineVisible: false,
+  });
+  // 지수 종가는 자릿수가 달라 왼쪽 별도 축에 그립니다.
+  const 종가선 = 위차트.addLineSeries({
+    color: 회색, lineWidth: 1, title: '지수', priceScaleId: 'left',
+    priceLineVisible: false, lastValueVisible: false,
+  });
+  위차트.priceScale('left').applyOptions({
+    scaleMargins: { top: 0.08, bottom: 0.08 }, visible: true, borderColor: '#E1E5F0',
+  });
+  위차트.applyOptions({ leftPriceScale: { visible: true, borderColor: '#E1E5F0' } });
+
+  const 아래차트 = LightweightCharts.createChart(document.getElementById('tiltOsc'), 설정);
+  const 막대 = 아래차트.addHistogramSeries({
+    priceFormat: { type: 'price', precision: 3, minMove: 0.001 },
+  });
+  const 영선 = 아래차트.addLineSeries({
+    color: '#C3C2B7', lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
+  });
+
+  위차트.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) 아래차트.timeScale().setVisibleLogicalRange(r); });
+  아래차트.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) 위차트.timeScale().setVisibleLogicalRange(r); });
+
+  // 누적 지수 칸 이름이 무엇이든 찾아냅니다.
+  const 누적값 = r => {
+    const v = r.index !== undefined ? r.index
+            : r.cum !== undefined ? r.cum
+            : r.tiltIndex !== undefined ? r.tiltIndex : null;
+    return 숫자(v);
+  };
+  // 지수 종가는 파일에 있으면 그것을, 없으면 index_history.json 에서 찾습니다.
+  const 종가값 = r => {
+    let v = 숫자(r.close !== undefined ? r.close : r.marketClose);
+    if (v === null && 종가표[시장]) v = 숫자(종가표[시장][String(r.date)]);
+    return v;
+  };
+
+  function 주도업종(r) {
+    const 칸 = document.getElementById('tiltLead');
+    if (!r) { 칸.innerHTML = ''; return; }
+    const 상위 = Array.isArray(r.top) ? r.top : [];
+    const t = 숫자(r.tilt), o = 숫자(r.osc);
+    칸.innerHTML =
+      `<span class="tilt-lead-l">${날짜(r.date)} 주도 업종</span>` +
+      (상위.length
+        ? 상위.map((n, i) => `<span class="tilt-chip"><b>${i + 1}</b>${n}</span>`).join('')
+        : `<span class="tilt-chip">자료 없음</span>`) +
+      `<span class="tilt-val">쏠림 ${부호(t)} · 오실레이터 ` +
+      `<span style="color:${o !== null && o >= 0 ? 붉음 : 푸름};font-weight:600;">${부호(o)}</span></span>`;
+  }
+
+  function 그리기() {
+    if (!자료) return;
+    const 목록 = (자료.data && 자료.data[시장]) || [];
+    if (!목록.length) {
+      document.getElementById('tiltStatus').textContent = `${시장} 자료가 비어 있습니다.`;
+      return;
+    }
+
+    행찾기 = {};
+    const 누적 = [], 종가 = [], 오실 = [], 영 = [];
+    for (const r of 목록) {
+      const t = 날짜(r.date);
+      행찾기[t] = r;
+      const c = 누적값(r); if (c !== null) 누적.push({ time: t, value: c });
+      const p = 종가값(r);  if (p !== null) 종가.push({ time: t, value: p });
+      const o = 숫자(r.osc);
+      if (o !== null) 오실.push({ time: t, value: o, color: o >= 0 ? 붉음 : 푸름 });
+      영.push({ time: t, value: 0 });
+    }
+    누적선.setData(누적);
+    종가선.setData(종가);
+    막대.setData(오실);
+    영선.setData(영);
+
+    // 처음에는 최근 6개월(약 120거래일)만 보여줍니다.
+    const 보일칸 = 120;
+    requestAnimationFrame(() => {
+      if (목록.length > 보일칸) {
+        const 범위 = { from: 목록.length - 보일칸, to: 목록.length + 2 };
+        위차트.timeScale().setVisibleLogicalRange(범위);
+        아래차트.timeScale().setVisibleLogicalRange(범위);
+      } else {
+        위차트.timeScale().fitContent();
+        아래차트.timeScale().fitContent();
+      }
+    });
+
+    끝행 = 목록[목록.length - 1];
+    주도업종(끝행);
+
+    const 업종수 = ((자료.sectors && 자료.sectors[시장]) || []).length;
+    document.getElementById('tiltStatus').textContent =
+      `${시장} · ${목록.length}거래일 · 최종 ${날짜(끝행.date)}` +
+      (업종수 ? ` · 업종 ${업종수}개` : '') +
+      (종가.length ? '' : ' · 지수 종가 없음');
+  }
+
+  // 차트 위에 마우스를 올리면 그날의 주도 업종으로 바뀝니다.
+  // 라이브러리 판에 따라 시각이 문자열일 수도, {year,month,day} 꾸러미일 수도 있습니다.
+  function 시각을날짜로(t) {
+    if (t === null || t === undefined) return null;
+    if (typeof t === 'string') return t;
+    if (typeof t === 'object' && t.year) {
+      const 두자리 = n => String(n).padStart(2, '0');
+      return `${t.year}-${두자리(t.month)}-${두자리(t.day)}`;
+    }
+    if (typeof t === 'number') return new Date(t * 1000).toISOString().slice(0, 10);
+    return null;
+  }
+  function 마우스(p) {
+    if (!p || !p.time) { 주도업종(끝행); return; }
+    const 키 = 시각을날짜로(p.time);
+    주도업종((키 && 행찾기[키]) || 끝행);
+  }
+  위차트.subscribeCrosshairMove(마우스);
+  아래차트.subscribeCrosshairMove(마우스);
+
+  document.querySelectorAll('[data-tilt]').forEach(b => {
+    b.addEventListener('click', () => {
+      시장 = b.dataset.tilt;
+      document.querySelectorAll('[data-tilt]').forEach(x => x.classList.toggle('on', x === b));
+      그리기();
+    });
+  });
+
+  (async function 불러오기() {
+    try {
+      const r = await fetch('/sector_tilt.json', { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      자료 = await r.json();
+    } catch (e) {
+      document.getElementById('tiltStatus').textContent =
+        'sector_tilt.json 을 불러오지 못했습니다. 저장소 맨 바깥에 파일이 있는지 확인하세요.';
+      return;
+    }
+    // 지수 종가 보충용 (없어도 차트는 그려집니다)
+    try {
+      const h = await (await fetch('/index_history.json', { cache: 'no-store' })).json();
+      for (const m of ['KOSPI', 'KOSDAQ']) {
+        종가표[m] = {};
+        for (const x of ((h.data && h.data[m]) || [])) 종가표[m][String(x.date)] = x.close;
+      }
+    } catch (e) {}
+    그리기();
+  })();
+
+  // ── 차트 크기 따라가기 ──
+  (function 크기맞추기() {
+    const 대상 = [["tiltChart", 위차트], ["tiltOsc", 아래차트]];
+    function 맞춤() {
+      for (const [id, c] of 대상) {
+        const el = document.getElementById(id);
+        if (!el || !c) continue;
+        const w = Math.floor(el.clientWidth);
+        if (w > 0) { try { c.applyOptions({ width: w }); } catch (e) {} }
+      }
+    }
+    if (typeof ResizeObserver !== "undefined") {
+      const ro = new ResizeObserver(() => requestAnimationFrame(맞춤));
+      for (const [id] of 대상) { const el = document.getElementById(id); if (el) ro.observe(el); }
+    }
+    window.addEventListener("resize", () => requestAnimationFrame(맞춤));
+    setInterval(맞춤, 1500);
+  })();
+})();
+</script>        
 </body>
 </html>
