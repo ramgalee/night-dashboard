@@ -59,28 +59,18 @@
   .th-tabs button { background:var(--surface2); border:1px solid var(--hair); color:var(--textSec);
                     padding:6px 12px; border-radius:9px; font-size:11.5px; cursor:pointer; font-family:var(--sans); }
   .th-tabs button.on { background:var(--signature); border-color:var(--signature); color:#fff; font-weight:600; }
-  .th-wrap { display:flex; flex-wrap:wrap; gap:4px; align-items:stretch; }
-  .th { border-radius:7px; padding:6px 9px; cursor:pointer;
-        display:flex; flex-direction:column; justify-content:center; overflow:hidden;
-        transition:transform .08s; }
-  .th:hover { transform:scale(1.04); z-index:2; }
-  .th.on { outline:2px solid var(--textPri); outline-offset:1px; }
-  .th-r { font-family:var(--mono); font-size:8.5px; opacity:.7; font-weight:700; }
-  .th-n { font-weight:600; line-height:1.2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* 트리맵 — 큰 사각형이 차곡차곡 채워집니다 */
+  .th-wrap { position:relative; width:100%; }
+  .th { position:absolute; border-radius:4px; padding:4px 6px; cursor:pointer;
+        display:flex; flex-direction:column; justify-content:center; align-items:center;
+        overflow:hidden; text-align:center; border:1.5px solid #fff;
+        transition:filter .1s; }
+  .th:hover { filter:brightness(1.08); z-index:3; }
+  .th.on { outline:2.5px solid var(--textPri); outline-offset:-2px; z-index:4; }
+  .th-n { font-weight:700; line-height:1.15; overflow:hidden;
+          display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
   .th-v { font-family:var(--mono); line-height:1.3; font-weight:700; }
-  .th-c { font-family:var(--mono); font-size:8.5px; opacity:.72; }
-  /* 상위는 크게, 아래로 갈수록 작게 — 오늘의 주인공이 한눈에 */
-  .th.big { width:224px; height:88px; }
-  .th.mid { width:168px; height:62px; }
-  .th.sml { width:124px; height:46px; }
-  .th.big .th-n { font-size:14px; }   .th.big .th-v { font-size:17px; }
-  .th.mid .th-n { font-size:12px; }   .th.mid .th-v { font-size:13.5px; }
-  .th.sml .th-n { font-size:10.5px; } .th.sml .th-v { font-size:11px; }
-  @media (max-width: 560px) {
-    .th.big { width:calc(50% - 2px); height:76px; }
-    .th.mid { width:calc(50% - 2px); height:58px; }
-    .th.sml { width:calc(33.33% - 3px); height:44px; }
-  }
+  .th-c { font-family:var(--mono); opacity:.8; line-height:1.2; }
   .th-note { font-size:11px; color:var(--textTer); font-family:var(--mono); margin:0 0 8px; }
 
   .th-box { border-left:3px solid var(--signature); padding:10px 12px; margin-top:10px;
@@ -541,27 +531,70 @@ document.querySelectorAll("[data-trm]").forEach(b => {
 loadTrend();
 
 
-// ── 테마 히트맵 ──────────────────────────────────
-//  인포스탁 분류(키움 ka90001). 업종과 달리 한 종목이 여러 테마에 들어갈 수 있어
-//  시장 전체를 빈틈없이 나누지는 않습니다. "오늘 뭐가 움직였나"를 보는 화면입니다.
+// ── 테마 히트맵 (인포스탁 분류) ───────────────────
+//  분류는 theme_map.json, 등락률은 키움 업종 시세로 우리가 계산합니다.
+//  한 종목이 여러 테마에 들어갈 수 있어 시장 전체를 나누지는 않습니다.
 let TH_ROWS = [];
 let TH_SORT = "chg";
 let TH_OPEN = null;
 
-// 그날 분포에 맞춰 색을 잡습니다.
-// 업종용 tone() 은 ±3% 고정이라, 테마가 한쪽으로 몰린 날 구분이 안 됐습니다.
+// 그날 분포에 맞춰 색을 잡습니다 (±3% 고정이면 몰린 날 구분이 안 됩니다)
 function th색만들기(rows) {
   const vals = rows.map(x => x.changePct).filter(v => v != null);
   const hi = Math.max(...vals, 0.01), lo = Math.min(...vals, -0.01);
   return v => {
-    if (v == null) return { bg: "#E8EBF2", fg: "var(--textSec)" };
+    if (v == null) return { bg: "#E8EBF2", fg: "#5B6483" };
     const t = v >= 0 ? Math.min(1, v / hi) : Math.min(1, v / lo);
-    const a = 0.16 + Math.pow(t, 0.7) * 0.84;        // 낮은 쪽도 갈리게
+    const a = 0.18 + Math.pow(t, 0.65) * 0.82;
     return {
       bg: v >= 0 ? `rgba(229,72,77,${a.toFixed(3)})` : `rgba(47,111,237,${a.toFixed(3)})`,
-      fg: a > 0.55 ? "#fff" : "#131A2C",             // 연하면 검은 글자
+      fg: a > 0.5 ? "#fff" : "#131A2C",
     };
   };
+}
+
+// 트리맵 — 넓이를 값에 비례시켜 사각형을 차례로 잘라 채웁니다.
+function 트리맵(값들, W, H) {
+  const 총 = 값들.reduce((a, b) => a + b, 0) || 1;
+  const 칸 = 값들.map(v => v / 총 * W * H);
+  const out = [];
+  let x = 0, y = 0, w = W, h = H, i = 0;
+
+  while (i < 칸.length) {
+    const 가로 = w >= h;
+    const 남은 = 칸.slice(i).reduce((a, b) => a + b, 0);
+    const 길이 = 가로 ? h : w;
+    let 줄 = [], 줄합 = 0, 최선 = Infinity;
+
+    // 정사각형에 가까워질 때까지 한 줄에 담습니다
+    while (i + 줄.length < 칸.length) {
+      const v = 칸[i + 줄.length];
+      const 새합 = 줄합 + v;
+      const 두께 = 새합 / 길이;
+      const 후보 = [...줄, v];
+      const 비 = Math.max(...후보.map(c => {
+        const 변 = c / 두께;
+        return Math.max(두께 / 변, 변 / 두께);
+      }));
+      if (후보.length > 1 && 비 > 최선) break;
+      줄 = 후보; 줄합 = 새합; 최선 = 비;
+    }
+
+    const 두께 = 줄합 / 길이;
+    let 자리 = 가로 ? y : x;
+    for (const c of 줄) {
+      const 변 = c / 두께;
+      if (가로) { out.push({ x, y: 자리, w: 두께, h: 변 }); 자리 += 변; }
+      else { out.push({ x: 자리, y, w: 변, h: 두께 }); 자리 += 변; }
+    }
+    if (가로) { x += 두께; w -= 두께; } else { y += 두께; h -= 두께; }
+    i += 줄.length;
+    if (w < 1 || h < 1) {                       // 남은 자리가 없으면 나머지는 버립니다
+      for (let k = i; k < 칸.length; k++) out.push(null);
+      break;
+    }
+  }
+  return out;
 }
 
 function thPaint() {
@@ -570,71 +603,79 @@ function thPaint() {
     body.innerHTML = `<div class="empty">테마를 불러오지 못했습니다.</div>`;
     return;
   }
-  const a = TH_ROWS.slice();
-  if (TH_SORT === "chg") a.sort((x, y) => (y.changePct ?? -99) - (x.changePct ?? -99));
-  else if (TH_SORT === "down") a.sort((x, y) => (x.changePct ?? 99) - (y.changePct ?? 99));
+  const a = TH_ROWS.filter(x => x.changePct != null);
+  if (TH_SORT === "chg") a.sort((x, y) => y.changePct - x.changePct);
+  else if (TH_SORT === "down") a.sort((x, y) => x.changePct - y.changePct);
   else a.sort((x, y) => (y.count || 0) - (x.count || 0));
 
-  const 보임 = a.slice(0, 60);
+  const 보임 = a.slice(0, 40);
   const 색 = th색만들기(보임);
   const 퍼 = v => v == null ? "—" : (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2) + "%";
 
+  // 넓이는 순위에 따라. 뒤쪽도 글자가 들어가도록 바닥값을 둡니다.
+  const N = 보임.length;
+  const 무게 = 보임.map((x, i) => Math.pow(N - i, 0.7) + 5);
+  const W = Math.max(body.clientWidth || 980, 320);
+  const H = Math.min(Math.max(W * 0.46, 300), 460);
+  const 칸 = 트리맵(무게, W, H);
+
   const 눈금 = (() => {
-    const vs = 보임.map(x => x.changePct).filter(v => v != null);
-    if (!vs.length) return "";
+    const vs = 보임.map(x => x.changePct);
     const hi = Math.max(...vs), lo = Math.min(...vs);
     return [lo, (lo + hi) / 2, hi].map(v => {
       const c = 색(v);
-      return `<i style="display:inline-block;width:22px;height:10px;border-radius:3px;`
+      return `<i style="display:inline-block;width:20px;height:9px;border-radius:2px;`
            + `background:${c.bg};vertical-align:-1px;margin:0 3px 0 7px;"></i>${퍼(v)}`;
     }).join("");
   })();
 
-  body.innerHTML =
-    `<div class="th-note">전체 ${TH_ROWS.length}개 테마 중 ${보임.length}개 · `
-    + `크기는 순위(1~6위 크게) · 색 ${눈금}</div>`
-    + `<div class="th-wrap">` + 보임.map((x, i) => {
-      const c = 색(x.changePct);
-      const 크기 = i < 6 ? "big" : (i < 20 ? "mid" : "sml");
-      return `<div class="th ${크기}${TH_OPEN === x.code ? " on" : ""}"
-                   data-code="${x.code}" data-name="${x.name}"
-                   title="${i + 1}위 ${x.name} ${퍼(x.changePct)} · ${x.count}종목 (상승 ${x.rising} / 하락 ${x.falling})"
-                   style="background:${c.bg};color:${c.fg};">
-        <div class="th-r">${i + 1}</div>
-        <div class="th-n">${x.name}</div>
-        <div class="th-v">${퍼(x.changePct)}</div>
-        ${크기 !== "sml" ? `<div class="th-c">${x.count}종목 ${x.rising}↑${x.falling}↓</div>` : ""}
-      </div>`;
-    }).join("") + `</div>`;
+  let h = `<div class="th-note">전체 ${TH_ROWS.length}개 테마 중 ${보임.length}개 · `
+        + `넓이는 순위 · 색 ${눈금}</div>`
+        + `<div class="th-wrap" style="height:${Math.round(H)}px;">`;
+
+  보임.forEach((x, i) => {
+    const r = 칸[i];
+    if (!r) return;
+    const c = 색(x.changePct);
+    const 작 = r.w < 92 || r.h < 44;
+    const 아주작 = r.w < 60 || r.h < 30;
+    const fs = Math.max(9, Math.min(16, Math.round(Math.sqrt(r.w * r.h) / 8)));
+    h += `<div class="th${TH_OPEN === x.name ? " on" : ""}" data-name="${x.name}"
+              title="${i + 1}위 ${x.name} ${퍼(x.changePct)} · ${x.matched}/${x.count}종목 (상승 ${x.rising} / 하락 ${x.falling})${x.lead && x.lead.length ? " · " + x.lead.join(", ") : ""}"
+              style="left:${r.x.toFixed(1)}px;top:${r.y.toFixed(1)}px;
+                     width:${r.w.toFixed(1)}px;height:${r.h.toFixed(1)}px;
+                     background:${c.bg};color:${c.fg};">
+      <div class="th-n" style="font-size:${fs}px">${x.name}</div>
+      ${아주작 ? "" : `<div class="th-v" style="font-size:${Math.round(fs * 1.02)}px">${퍼(x.changePct)}</div>`}
+      ${작 ? "" : `<div class="th-c" style="font-size:${Math.max(8.5, fs - 4)}px">${x.matched}종목 ${x.rising}↑${x.falling}↓</div>`}
+    </div>`;
+  });
+  body.innerHTML = h + `</div>`;
 
   body.querySelectorAll(".th").forEach(el => {
-    el.addEventListener("click", () => thOpen(el.dataset.code, el.dataset.name));
+    el.addEventListener("click", () => thOpen(el.dataset.name));
   });
 }
 
-async function thOpen(code, name) {
+async function thOpen(name) {
   const box = document.getElementById("thStocks");
-  if (TH_OPEN === code) {            // 같은 것을 다시 누르면 닫습니다
-    TH_OPEN = null; box.innerHTML = ""; thPaint(); return;
-  }
-  TH_OPEN = code;
+  if (TH_OPEN === name) { TH_OPEN = null; box.innerHTML = ""; thPaint(); return; }
+  TH_OPEN = name;
   thPaint();
   box.innerHTML = `<div class="th-box"><div class="th-ttl"><b>${name}</b> 구성종목 불러오는 중...</div></div>`;
   try {
-    const r = await fetch(`/api/theme-map?code=${encodeURIComponent(code)}`, { cache: "no-store" });
+    const r = await fetch(`/api/infra-theme?code=${encodeURIComponent(name)}`, { cache: "no-store" });
     const d = await r.json();
-    const list = d.stocks || [];
+    const list = (d.stocks || []).filter(x => x.changePct != null);
     if (!list.length) {
       box.innerHTML = `<div class="th-box"><div class="th-ttl"><b>${name}</b> 구성종목이 없습니다.</div></div>`;
       return;
     }
-    list.sort((a, b) => (b.changePct ?? -99) - (a.changePct ?? -99));
     box.innerHTML = `<div class="th-box">`
       + `<div class="th-ttl"><b>${name}</b> ${list.length}종목 · 등락률 순</div>`
       + `<div class="th-grid">` + list.map(x => {
-        const c = x.changePct == null ? "var(--textTer)" : (x.changePct >= 0 ? UP : DOWN);
-        const t = x.changePct == null ? "—"
-          : (x.changePct >= 0 ? "+" : "−") + Math.abs(x.changePct).toFixed(2) + "%";
+        const c = x.changePct >= 0 ? UP : DOWN;
+        const t = (x.changePct >= 0 ? "+" : "−") + Math.abs(x.changePct).toFixed(2) + "%";
         return `<div class="th-it" data-code="${x.code}" data-name="${x.name}">
           <span class="th-nm">${x.name}</span>
           <span class="th-pr">${x.price ? x.price.toLocaleString("ko-KR") : ""}</span>
@@ -651,13 +692,13 @@ async function thOpen(code, name) {
 
 async function loadTheme() {
   try {
-    const r = await fetch("/api/theme-map", { cache: "no-store" });
+    const r = await fetch("/api/infra-theme", { cache: "no-store" });
     const d = await r.json();
-    TH_ROWS = d.themes || [];
-    const 오름 = TH_ROWS.filter(x => (x.changePct ?? 0) > 0).length;
-    const 내림 = TH_ROWS.filter(x => (x.changePct ?? 0) < 0).length;
+    TH_ROWS = (d.themes || []);
+    const 값 = TH_ROWS.filter(x => x.changePct != null);
     document.getElementById("thMeta").textContent =
-      `${TH_ROWS.length}개 테마 · 상승 ${오름} · 하락 ${내림}`;
+      `${값.length}개 테마 · 상승 ${값.filter(x => x.changePct > 0).length}`
+      + ` · 하락 ${값.filter(x => x.changePct < 0).length}`;
   } catch (e) {
     TH_ROWS = [];
     document.getElementById("thMeta").textContent = "";
@@ -672,6 +713,10 @@ document.querySelectorAll("[data-ths]").forEach(b => {
     thPaint();
   });
 });
+window.addEventListener("resize", () => { if (TH_ROWS.length) thPaint(); });
+
+loadTheme();
+setInterval(loadTheme, 120000);
 
 // ── 신고가·정배열 접기 ───────────────────────────
 (function 접기() {
