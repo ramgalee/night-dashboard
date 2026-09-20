@@ -538,18 +538,37 @@ let TH_ROWS = [];
 let TH_SORT = "chg";
 let TH_OPEN = null;
 
-// 그날 분포에 맞춰 색을 잡습니다 (±3% 고정이면 몰린 날 구분이 안 됩니다)
+// 색은 농도만이 아니라 색상까지 움직입니다.
+// 한 가지 빨강의 농도만 쓰면 +8% 와 +3% 가 잘 안 갈립니다.
+//   오름  진한빨강 → 빨강 → 주황 → 연분홍
+//   내림  진한파랑 → 파랑 → 하늘 → 연하늘
+const 색단계 = {
+  up: [[0.00,[250,208,208]], [0.35,[247,160, 90]], [0.62,[244, 95, 85]],
+       [0.85,[225, 40, 45]], [1.00,[188,  0,  5]]],
+  dn: [[0.00,[208,222,250]], [0.35,[110,175,240]], [0.62,[ 70,130,235]],
+       [0.85,[ 35, 85,215]], [1.00,[ 10, 45,175]]],
+};
+
+function 섞기(점들, s) {
+  let i = 0;
+  while (i < 점들.length - 2 && s > 점들[i + 1][0]) i++;
+  const [a, ca] = 점들[i], [b, cb] = 점들[i + 1];
+  const k = (b - a) === 0 ? 0 : (s - a) / (b - a);
+  return ca.map((v, j) => Math.round(v + (cb[j] - v) * k));
+}
+
+// 그날 분포에 맞춰 잡습니다 (±3% 고정이면 한쪽으로 몰린 날 구분이 안 됩니다)
 function th색만들기(rows) {
   const vals = rows.map(x => x.changePct).filter(v => v != null);
   const hi = Math.max(...vals, 0.01), lo = Math.min(...vals, -0.01);
   return v => {
     if (v == null) return { bg: "#E8EBF2", fg: "#5B6483" };
-    const t = v >= 0 ? Math.min(1, v / hi) : Math.min(1, v / lo);
-    const a = 0.18 + Math.pow(t, 0.65) * 0.82;
-    return {
-      bg: v >= 0 ? `rgba(229,72,77,${a.toFixed(3)})` : `rgba(47,111,237,${a.toFixed(3)})`,
-      fg: a > 0.5 ? "#fff" : "#131A2C",
-    };
+    const 오름 = v >= 0;
+    const t = 오름 ? Math.min(1, v / hi) : Math.min(1, v / lo);
+    const rgb = 섞기(오름 ? 색단계.up : 색단계.dn, Math.pow(t, 0.75));
+    // 밝기로 글자색을 정합니다 (사람 눈 기준 가중)
+    const 밝기 = (rgb[0] * 0.299 + rgb[1] * 0.587 + rgb[2] * 0.114) / 255;
+    return { bg: `rgb(${rgb.join(",")})`, fg: 밝기 > 0.62 ? "#131A2C" : "#fff" };
   };
 }
 
@@ -612,9 +631,9 @@ function thPaint() {
   const 색 = th색만들기(보임);
   const 퍼 = v => v == null ? "—" : (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2) + "%";
 
-  // 넓이는 순위에 따라. 뒤쪽도 글자가 들어가도록 바닥값을 둡니다.
+  // 넓이는 순위에 따라. 상위는 확실히 크고, 뒤쪽도 글자가 들어가게 바닥값을 둡니다.
   const N = 보임.length;
-  const 무게 = 보임.map((x, i) => Math.pow(N - i, 0.7) + 5);
+  const 무게 = 보임.map((x, i) => Math.pow(N - i, 1.0) + 8);
   const W = Math.max(body.clientWidth || 980, 320);
   const H = Math.min(Math.max(W * 0.46, 300), 460);
   const 칸 = 트리맵(무게, W, H);
