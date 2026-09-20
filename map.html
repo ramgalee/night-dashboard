@@ -216,9 +216,9 @@
       <span id="thMeta" class="meta"></span>
     </div>
     <div class="th-tabs" id="thTabs" style="margin-bottom:10px;">
-      <button class="on" data-ths="chg">등락률 순</button>
+      <button class="on" data-ths="up">▲ 오른 테마</button>
+      <button data-ths="down">▼ 내린 테마</button>
       <button data-ths="count">종목수 순</button>
-      <button data-ths="down">하락률 순</button>
     </div>
     <div id="thBody"><div class="empty">불러오는 중...</div></div>
     <div id="thStocks"></div>
@@ -535,7 +535,7 @@ loadTrend();
 //  분류는 theme_map.json, 등락률은 키움 업종 시세로 우리가 계산합니다.
 //  한 종목이 여러 테마에 들어갈 수 있어 시장 전체를 나누지는 않습니다.
 let TH_ROWS = [];
-let TH_SORT = "chg";
+let TH_SORT = "up";
 let TH_OPEN = null;
 
 // 색은 농도만이 아니라 색상까지 움직입니다.
@@ -622,10 +622,18 @@ function thPaint() {
     body.innerHTML = `<div class="empty">테마를 불러오지 못했습니다.</div>`;
     return;
   }
-  const a = TH_ROWS.filter(x => x.changePct != null);
-  if (TH_SORT === "chg") a.sort((x, y) => y.changePct - x.changePct);
-  else if (TH_SORT === "down") a.sort((x, y) => x.changePct - y.changePct);
-  else a.sort((x, y) => (y.count || 0) - (x.count || 0));
+  const 값있음 = TH_ROWS.filter(x => x.changePct != null);
+  let a;
+  if (TH_SORT === "down") {
+    // 내린 것만 모읍니다. 없으면 덜 오른 순으로 보여줍니다.
+    const 내림 = 값있음.filter(x => x.changePct < 0);
+    a = (내림.length ? 내림 : 값있음).slice().sort((x, y) => x.changePct - y.changePct);
+  } else if (TH_SORT === "count") {
+    a = 값있음.slice().sort((x, y) => (y.count || 0) - (x.count || 0));
+  } else {
+    const 오름 = 값있음.filter(x => x.changePct > 0);
+    a = (오름.length ? 오름 : 값있음).slice().sort((x, y) => y.changePct - x.changePct);
+  }
 
   const 보임 = a.slice(0, 40);
   const 색 = th색만들기(보임);
@@ -648,7 +656,13 @@ function thPaint() {
     }).join("");
   })();
 
-  let h = `<div class="th-note">전체 ${TH_ROWS.length}개 테마 중 ${보임.length}개 · `
+  const 오름수 = 값있음.filter(x => x.changePct > 0).length;
+  const 내림수 = 값있음.filter(x => x.changePct < 0).length;
+  const 머리 = TH_SORT === "down" ? `내린 ${내림수}개 중 ${보임.length}개`
+             : TH_SORT === "count" ? `${보임.length}개 (종목수 순)`
+             : `오른 ${오름수}개 중 ${보임.length}개`;
+
+  let h = `<div class="th-note">전체 ${값있음.length}개 테마 · ${머리} · `
         + `넓이는 순위 · 색 ${눈금}</div>`
         + `<div class="th-wrap" style="height:${Math.round(H)}px;">`;
 
