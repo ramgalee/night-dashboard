@@ -9,10 +9,22 @@ const path = require('path');
 
 const 안 = 'http://127.0.0.1:3000';
 
-async function 내부(경로) {
-  const r = await fetch(안 + 경로);
-  if (!r.ok) throw new Error(경로 + ' → ' + r.status);
-  return await r.json();
+async function 내부(경로, 시도 = 3) {
+  let 마지막;
+  for (let i = 0; i < 시도; i++) {
+    try {
+      const ac = new AbortController();
+      const 시계 = setTimeout(() => ac.abort(), 15000);
+      const r = await fetch(안 + 경로, { signal: ac.signal });
+      clearTimeout(시계);
+      if (!r.ok) throw new Error(경로 + ' → ' + r.status);
+      return await r.json();
+    } catch (e) {
+      마지막 = e;
+      if (i < 시도 - 1) await new Promise(r => setTimeout(r, 400 * (i + 1)));
+    }
+  }
+  throw 마지막;
 }
 
 // ── 매핑표 ───────────────────────────────────────
@@ -30,13 +42,15 @@ function 매핑() {
 }
 
 // ── 전 종목 시세 모으기 ──────────────────────────
-const 시세캐시 = { data: null, at: 0, 업종수: 0 };
+const 시세캐시 = { data: null, at: 0, 업종수: 0, 실패: [] };
+const 최소종목 = 1800;      // 이보다 적게 모이면 부실한 것으로 봅니다
 
 async function 전종목() {
   if (시세캐시.data && Date.now() - 시세캐시.at < 120 * 1000) return 시세캐시.data;
 
   const 표 = new Map();
   let 업종수 = 0;
+  const 실패 = [];
 
   for (const 시장 of ['KOSPI', 'KOSDAQ']) {
     let 목록 = [];
@@ -45,12 +59,14 @@ async function 전종목() {
       목록 = (m.sectors || m.items || m.data || [])
         .map(x => String(x.code || x.inds_cd || '').trim())
         .filter(Boolean);
-    } catch (e) { 목록 = []; }
+    } catch (e) { 실패.push(`${시장} 업종목록`); 목록 = []; }
 
     for (const 코드 of 목록) {
       try {
         const d = await 내부(`/sector-stocks?market=${시장}&code=${encodeURIComponent(코드)}`);
-        for (const x of (d.items || d.stocks || [])) {
+        const rows = d.items || d.stocks || [];
+        if (!rows.length) 실패.push(`${시장}/${코드}(빈값)`);
+        for (const x of rows) {
           const c = String(x.code || '').replace(/_AL$/, '').trim();
           if (!c || 표.has(c)) continue;
           표.set(c, {
@@ -63,12 +79,25 @@ async function 전종목() {
           });
         }
         업종수 += 1;
-      } catch (e) {}
+      } catch (e) {
+        실패.push(`${시장}/${코드}`);
+      }
       await new Promise(r => setTimeout(r, 80));
     }
   }
 
-  시세캐시.data = 표; 시세캐시.at = Date.now(); 시세캐시.업종수 = 업종수;
+  // 지난번보다 줄었으면 지난 결과를 그대로 씁니다.
+  // 업종 몇 개가 실패한 채로 2분간 부실한 값이 나가지 않게 합니다.
+  // 상장·폐지로 하루에 5% 넘게 줄 일은 없으므로 그보다 적으면 실패로 봅니다.
+  const 지난 = 시세캐시.data;
+  if (지난 && 지난.size >= 최소종목 && 표.size < 지난.size * 0.95) {
+    시세캐시.at = Date.now() - 90 * 1000;      // 30초 뒤 다시 시도
+    시세캐시.실패 = 실패;
+    return 지난;
+  }
+
+  시세캐시.data = 표; 시세캐시.at = Date.now();
+  시세캐시.업종수 = 업종수; 시세캐시.실패 = 실패;
   return 표;
 }
 
@@ -119,6 +148,8 @@ async function 테마집계() {
     count: rows.length,
     priced: 시세.size,
     sectors: 시세캐시.업종수,
+    failed: 시세캐시.실패.length,
+    failedList: 시세캐시.실패.slice(0, 10),
     themes: rows,
   };
   집계캐시.data = out; 집계캐시.at = Date.now();
