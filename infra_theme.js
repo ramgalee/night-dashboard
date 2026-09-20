@@ -42,12 +42,14 @@ function 매핑() {
 }
 
 // ── 전 종목 시세 모으기 ──────────────────────────
-const 시세캐시 = { data: null, at: 0, 업종수: 0, 실패: [] };
+const 시세캐시 = { data: null, at: 0, 업종수: 0, 실패: [], 도는중: null };
 const 최소종목 = 1800;      // 이보다 적게 모이면 부실한 것으로 봅니다
 
 async function 전종목() {
-  if (시세캐시.data && Date.now() - 시세캐시.at < 120 * 1000) return 시세캐시.data;
-
+  if (시세캐시.data && Date.now() - 시세캐시.at < 180 * 1000) return 시세캐시.data;
+  // 한 바퀴에 25초쯤 걸리므로, 도는 중에 또 부르면 그 결과를 같이 기다립니다.
+  if (시세캐시.도는중) return await 시세캐시.도는중;
+  시세캐시.도는중 = (async () => {
   const 표 = new Map();
   let 업종수 = 0;
   const 실패 = [];
@@ -56,7 +58,9 @@ async function 전종목() {
     let 목록 = [];
     try {
       const m = await 내부(`/sector-map?market=${시장}`);
+      // 종목이 0인 것(변동성지수·선물지수 등)은 불러도 빈값이라 건너뜁니다.
       목록 = (m.sectors || m.items || m.data || [])
+        .filter(x => (x.stocks == null) || x.stocks > 0)
         .map(x => String(x.code || x.inds_cd || '').trim())
         .filter(Boolean);
     } catch (e) { 실패.push(`${시장} 업종목록`); 목록 = []; }
@@ -82,7 +86,7 @@ async function 전종목() {
       } catch (e) {
         실패.push(`${시장}/${코드}`);
       }
-      await new Promise(r => setTimeout(r, 80));
+      await new Promise(r => setTimeout(r, 400));   // 키움 호출 제한에 걸리지 않게
     }
   }
 
@@ -91,7 +95,7 @@ async function 전종목() {
   // 상장·폐지로 하루에 5% 넘게 줄 일은 없으므로 그보다 적으면 실패로 봅니다.
   const 지난 = 시세캐시.data;
   if (지난 && 지난.size >= 최소종목 && 표.size < 지난.size * 0.95) {
-    시세캐시.at = Date.now() - 90 * 1000;      // 30초 뒤 다시 시도
+    시세캐시.at = Date.now() - 150 * 1000;     // 30초 뒤 다시 시도
     시세캐시.실패 = 실패;
     return 지난;
   }
@@ -99,13 +103,17 @@ async function 전종목() {
   시세캐시.data = 표; 시세캐시.at = Date.now();
   시세캐시.업종수 = 업종수; 시세캐시.실패 = 실패;
   return 표;
+  })();
+  try { return await 시세캐시.도는중; }
+  finally { 시세캐시.도는중 = null; }
 }
 
 // ── 테마별 집계 ──────────────────────────────────
 const 집계캐시 = { data: null, at: 0 };
+const 집계주기 = 180 * 1000;   // 시세 캐시와 맞춥니다
 
 async function 테마집계() {
-  if (집계캐시.data && Date.now() - 집계캐시.at < 120 * 1000) return 집계캐시.data;
+  if (집계캐시.data && Date.now() - 집계캐시.at < 집계주기) return 집계캐시.data;
 
   const m = 매핑();
   const 시세 = await 전종목();

@@ -716,7 +716,7 @@ document.querySelectorAll("[data-ths]").forEach(b => {
 window.addEventListener("resize", () => { if (TH_ROWS.length) thPaint(); });
 
 loadTheme();
-setInterval(loadTheme, 120000);
+setInterval(loadTheme, 180000);   // 서버 캐시(3분)와 맞춥니다
 
 // ── 신고가·정배열 접기 ───────────────────────────
 (function 접기() {
