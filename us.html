@@ -48,6 +48,35 @@
   .ls-item b { font-family:var(--mono); font-weight:600; margin-left:4px; }
   .ls-tk { font-family:var(--mono); font-size:9.5px; color:var(--textTer); margin-left:3px; }
 
+  .tile[data-tv] { cursor:pointer; transition:transform .08s; }
+  .tile[data-tv]:hover { transform:scale(1.04); }
+
+  /* 차트 모아보기 */
+  .ct-tabs { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:12px; }
+  .ct-tabs button { padding:6px 11px; font-size:11.5px; }
+  .ct-tabs button.on { background:var(--signature); border-color:var(--signature); color:#fff; font-weight:600; }
+  .ct-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(380px,1fr)); gap:10px; }
+  .fv { border:1px solid var(--hair); border-radius:10px; padding:7px; background:var(--surface); cursor:zoom-in; }
+  .fv:hover { border-color:var(--signature); }
+  .fv-t { display:flex; justify-content:space-between; align-items:baseline; font-size:12px; font-weight:600; margin-bottom:5px; }
+  .fv-t span { font-family:var(--mono); font-size:11.5px; }
+  .fv img { width:100%; height:auto; display:block; min-height:80px; background:var(--surface2); border-radius:4px; }
+  .fv-miss { font-size:11px; color:var(--textTer); padding:26px 0; text-align:center; }
+  .ct-note { font-size:11px; color:var(--textTer); margin-top:10px; line-height:1.6; }
+
+  /* TradingView 큰 차트 창 */
+  .veil { position:fixed; inset:0; background:rgba(19,26,44,.5); display:none;
+          align-items:center; justify-content:center; padding:16px; z-index:50; }
+  .veil.on { display:flex; }
+  .pop { background:var(--surface); border-radius:14px; width:min(1120px,100%); height:min(700px,90vh);
+         display:flex; flex-direction:column; overflow:hidden; }
+  .pop-h { display:flex; align-items:center; justify-content:space-between; gap:10px;
+           padding:10px 14px; border-bottom:1px solid var(--hair); }
+  .pop-h b { font-size:14px; } .pop-h small { color:var(--textTer); font-size:11px; margin-left:6px; }
+  .pop-x { border:none; background:none; font-size:20px; color:var(--textSec); padding:2px 8px; }
+  .pop-b { flex:1; min-height:0; }
+  @media (max-width: 560px) { .ct-grid { grid-template-columns:1fr; } .pop { height:86vh; } }
+
   #copyBox { width:100%; height:260px; margin-top:12px; border:1px solid var(--hair); border-radius:10px;
              padding:12px; font-family:var(--mono); font-size:11.5px; line-height:1.6; resize:vertical;
              background:var(--surface2); color:var(--textPri); display:none; }
@@ -98,6 +127,16 @@
   </div>
 
   <div class="card">
+    <div class="between" style="margin-bottom:10px;">
+      <div style="font-size:13px;color:var(--textSec);">차트 모아보기
+        <span style="font-size:11px;color:var(--textTer);">Finviz 일봉 · 누르면 TradingView 큰 차트</span></div>
+    </div>
+    <div class="ct-tabs" id="ctTabs"></div>
+    <div class="ct-grid" id="ctGrid"><div class="empty">불러오는 중...</div></div>
+    <div class="ct-note">Finviz 차트는 무료 기준 15~20분 지연입니다. 추세선·지지저항선은 Finviz 가 자동으로 그린 것입니다.</div>
+  </div>
+
+  <div class="card">
     <div class="between" style="margin-bottom:6px;">
       <div style="font-size:13px;color:var(--textSec);">전체 목록</div>
       <button id="toggleList">펼치기</button>
@@ -111,6 +150,12 @@
     미국 장중에는 3분, 장이 닫혀 있을 때는 30분 간격으로 갱신됩니다.
   </div>
 </div>
+
+<div class="veil" id="veil"><div class="pop">
+  <div class="pop-h"><div><b id="popT"></b><small id="popS"></small></div>
+    <button class="pop-x" id="popX" aria-label="닫기">✕</button></div>
+  <div class="pop-b" id="popB"></div>
+</div></div>
 
 <script>
 const UP = "#E5484D", DOWN = "#2F6FED";
@@ -146,7 +191,7 @@ function renderHeat(groups) {
         ${g.items.map(it => {
           const c = tileColor(it.changePct);
           return c
-            ? `<div class="tile" style="background:${c}" title="${it.symbol}">
+            ? `<div class="tile" style="background:${c}" title="${it.symbol}"${tv기호(it.symbol) ? ` data-tv="${it.symbol}" data-nm="${it.name}"` : ""}>
                  <div class="tile-name">${it.name}</div>
                  <div class="tile-pct">${fmtPct(it.changePct)}</div>
                </div>`
@@ -195,6 +240,95 @@ function buildText(d) {
   return lines.join("\n");
 }
 
+// ── 기호 바꾸기 ─────────────────────────────────
+// 야후 기호를 TradingView · Finviz 기호로 바꿉니다.
+// 지수·선물·환율은 TradingView 에만 있고, Finviz 는 미국 주식·ETF 만 됩니다.
+const TV표 = {
+  "^DJI": "DJ:DJI", "^GSPC": "SP:SPX", "^IXIC": "NASDAQ:IXIC", "^NDX": "NASDAQ:NDX",
+  "^RUT": "TVC:RUT", "^SOX": "NASDAQ:SOX", "^VIX": "TVC:VIX",
+  "^TNX": "TVC:US10Y", "^TYX": "TVC:US30Y", "^FVX": "TVC:US05Y", "^IRX": "TVC:US03MY",
+  "CL=F": "NYMEX:CL1!", "GC=F": "COMEX:GC1!", "SI=F": "COMEX:SI1!", "HG=F": "COMEX:HG1!",
+  "NG=F": "NYMEX:NG1!", "ES=F": "CME_MINI:ES1!", "NQ=F": "CME_MINI:NQ1!",
+  "YM=F": "CBOT_MINI:YM1!", "RTY=F": "CME_MINI:RTY1!",
+  "DX-Y.NYB": "TVC:DXY", "KRW=X": "FX_IDC:USDKRW", "JPY=X": "FX:USDJPY",
+  "BTC-USD": "BITSTAMP:BTCUSD", "ETH-USD": "BITSTAMP:ETHUSD",
+};
+const 주식꼴 = s => /^[A-Z]{1,5}([.-][A-Z])?$/.test(s);
+function tv기호(s) {
+  if (!s) return null;
+  if (TV표[s]) return TV표[s];
+  return 주식꼴(s) ? s.replace("-", ".") : null;
+}
+const fv기호 = s => 주식꼴(s) ? s.replace(".", "-") : null;
+
+// ── TradingView 큰 차트 창 ───────────────────────
+function 큰차트(sym, name) {
+  const tv = tv기호(sym);
+  if (!tv) return;
+  document.getElementById("popT").textContent = name || sym;
+  document.getElementById("popS").textContent = sym;
+  const b = document.getElementById("popB");
+  b.innerHTML = '<div class="tradingview-widget-container" style="height:100%;width:100%">'
+              + '<div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div></div>';
+  const sc = document.createElement("script");
+  sc.type = "text/javascript"; sc.async = true;
+  sc.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
+  sc.text = JSON.stringify({
+    autosize: true, symbol: tv, interval: "D", timezone: "Asia/Seoul", theme: "light",
+    style: "1", locale: "kr", allow_symbol_change: true, studies: ["STD;SMA"],
+    support_host: "https://www.tradingview.com",
+  });
+  b.firstChild.appendChild(sc);
+  document.getElementById("veil").classList.add("on");
+}
+function 창닫기() {
+  document.getElementById("veil").classList.remove("on");
+  document.getElementById("popB").innerHTML = "";          // 닫을 때 위젯을 치워 가볍게
+}
+document.getElementById("popX").onclick = 창닫기;
+document.getElementById("veil").onclick = e => { if (e.target.id === "veil") 창닫기(); };
+document.addEventListener("keydown", e => { if (e.key === "Escape") 창닫기(); });
+document.getElementById("heat").addEventListener("click", e => {
+  const t = e.target.closest("[data-tv]");
+  if (t) 큰차트(t.dataset.tv, t.dataset.nm);
+});
+
+// ── 차트 모아보기 (Finviz) ───────────────────────
+// 묶음 탭을 누를 때만 그림을 불러옵니다. 3분마다 오는 새 값으로는 다시 그리지 않아
+// 그림이 깜빡이지 않습니다.
+let 차트탭 = null, 탭목록 = [];
+const 탭이름 = g => g.sub ? `${g.name} · ${g.sub}` : g.name;
+
+function 차트탭그리기() {
+  if (!DATA) return;
+  탭목록 = DATA.groups.filter(g => g.items.some(it => fv기호(it.symbol)));
+  if (!탭목록.length) { document.getElementById("ctGrid").innerHTML = `<div class="empty">차트로 볼 종목이 없습니다.</div>`; return; }
+  if (!탭목록.some(g => 탭이름(g) === 차트탭)) 차트탭 = 탭이름(탭목록[0]);
+  document.getElementById("ctTabs").innerHTML = 탭목록.map(g =>
+    `<button data-tab="${탭이름(g)}" class="${탭이름(g) === 차트탭 ? "on" : ""}">${탭이름(g)}</button>`).join("");
+  document.querySelectorAll("#ctTabs button").forEach(b => b.onclick = () => {
+    차트탭 = b.dataset.tab; 차트탭그리기(); 차트격자();
+  });
+}
+
+function 차트격자() {
+  const g = 탭목록.find(x => 탭이름(x) === 차트탭);
+  const grid = document.getElementById("ctGrid");
+  if (!g) { grid.innerHTML = ""; return; }
+  const 틱 = Math.floor(Date.now() / 600000);              // 10분마다 새 그림
+  grid.innerHTML = g.items.filter(it => fv기호(it.symbol)).map(it => {
+    const f = fv기호(it.symbol);
+    const c = (it.changePct ?? 0) >= 0 ? UP : DOWN;
+    return `<div class="fv" data-sym="${it.symbol}" data-nm="${it.name}">
+      <div class="fv-t">${it.name} <span style="color:${c}">${it.symbol} ${fmtPct(it.changePct)}</span></div>
+      <img loading="lazy" referrerpolicy="no-referrer" alt="${it.name} 차트"
+           src="https://charts2.finviz.com/chart.ashx?t=${f}&ty=c&ta=1&p=d&s=l&_=${틱}"
+           onerror="this.outerHTML='<div class=&quot;fv-miss&quot;>차트를 불러오지 못했습니다</div>'">
+    </div>`;
+  }).join("");
+  grid.querySelectorAll(".fv").forEach(el => el.onclick = () => 큰차트(el.dataset.sym, el.dataset.nm));
+}
+
 function paint() {
   if (!DATA) return;
   document.getElementById("heat").innerHTML = renderHeat(DATA.groups);
@@ -212,8 +346,10 @@ async function load() {
     const r = await fetch("/api/us-stocks", { cache: "no-store" });
     const d = await r.json();
     if (d.error || !d.groups) throw new Error(d.error || "no data");
+    const 처음 = !DATA;
     DATA = d;
     paint();
+    if (처음) { 차트탭그리기(); 차트격자(); }
   } catch (e) {
     if (!DATA) document.getElementById("heat").innerHTML = `<div class="empty">데이터를 불러오지 못했습니다.</div>`;
   }
