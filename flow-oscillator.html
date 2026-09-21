@@ -475,5 +475,40 @@ document.querySelectorAll("[data-rsf]").forEach(b => {
   requestAnimationFrame(맞춤);
 })();
 </script>
+<script>
+// ── 위아래 차트 맞추기 (가격 축 폭 + 오실레이터 숫자 자릿수) ──
+//  위 캔들 차트는 오른쪽 축에 가격(198800.00)이 있고 아래는 작은 값(-0.00)이라
+//  축 폭이 달라 그림이 좌우로 어긋납니다. 두 축 중 넓은 쪽 폭에 맞춥니다.
+(function () {
+  try {
+    if (typeof chart === 'undefined' || typeof oscChart === 'undefined') return;
+  } catch (e) { return; }
+
+  const 표시 = v => {
+    const a = Math.abs(v);
+    if (a === 0) return '0';
+    if (a >= 100) return v.toFixed(0);
+    if (a >= 1) return v.toFixed(2);
+    if (a >= 0.01) return v.toFixed(4);
+    return v.toPrecision(3);
+  };
+  const 형식 = { type: 'custom', formatter: 표시, minMove: 0.000001 };
+  try { oscSeries.applyOptions({ priceFormat: 형식 }); } catch (e) {}
+  try { oscLine.applyOptions({ priceFormat: 형식 }); } catch (e) {}
+  try { oscOverlay.applyOptions({ priceFormat: 형식 }); } catch (e) {}
+
+  function 축맞춤() {
+    try {
+      const 위 = chart.priceScale('right').width();
+      const 아래 = oscChart.priceScale('right').width();
+      const 폭 = Math.max(위, 아래, 60);
+      chart.priceScale('right').applyOptions({ minimumWidth: 폭 });
+      oscChart.priceScale('right').applyOptions({ minimumWidth: 폭 });
+    } catch (e) {}
+  }
+  setInterval(축맞춤, 800);
+  window.addEventListener('resize', () => requestAnimationFrame(축맞춤));
+})();
+</script>
 </body>
 </html>
