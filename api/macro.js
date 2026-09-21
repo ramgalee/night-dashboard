@@ -67,6 +67,47 @@ async function fetchCnbcYield(inst) {
   };
 }
 
+// ── 선물 월물 고정 (롤오버 때 등락률 부풀림 막기) ─────────────
+// 야후 YM=F 같은 연속 선물은 만기 뒤 다음 월물로 갈아타는데, 일봉의 '어제' 칸에는
+// 옛 월물 종가가 남아 등락률이 부풀려집니다(9월→12월물이면 금리 몇 달치만큼).
+// 그래서 선물은 12월물처럼 월물을 콕 집어 받고, 안 되면 원래 기호로 물러섭니다.
+const 월코드 = ["F","G","H","J","K","M","N","Q","U","V","X","Z"];
+function 셋째금요일(y, m) {
+  const d = new Date(Date.UTC(y, m - 1, 1));
+  return new Date(Date.UTC(y, m - 1, 1 + ((5 - d.getUTCDay() + 7) % 7) + 14));
+}
+function 영업일빼기(d, n) {
+  const x = new Date(d);
+  while (n > 0) { x.setUTCDate(x.getUTCDate() - 1); const w = x.getUTCDay(); if (w && w !== 6) n--; }
+  return x;
+}
+function 영업일로(d) {
+  const x = new Date(d);
+  while (x.getUTCDay() === 0 || x.getUTCDay() === 6) x.setUTCDate(x.getUTCDate() - 1);
+  return x;
+}
+const 날더하기 = (d, n) => { const x = new Date(d); x.setUTCDate(x.getUTCDate() + n); return x; };
+const 지수넘김 = (y, m) => 날더하기(셋째금요일(y, m), -8);
+const 선물표 = {
+  "ES=F":  { 앞: "ES",  뒤: ".CME", 달: [3, 6, 9, 12], 넘김: 지수넘김 },
+  "NQ=F":  { 앞: "NQ",  뒤: ".CME", 달: [3, 6, 9, 12], 넘김: 지수넘김 },
+  "YM=F":  { 앞: "YM",  뒤: ".CBT", 달: [3, 6, 9, 12], 넘김: 지수넘김 },
+  "RTY=F": { 앞: "RTY", 뒤: ".CME", 달: [3, 6, 9, 12], 넘김: 지수넘김 },
+  "CL=F":  { 앞: "CL",  뒤: ".NYM", 달: [1,2,3,4,5,6,7,8,9,10,11,12],
+             넘김: (y, m) => 날더하기(영업일빼기(영업일로(new Date(Date.UTC(y, m - 2, 25))), 3), -2) },
+  "GC=F":  { 앞: "GC",  뒤: ".CMX", 달: [2, 4, 6, 8, 12],
+             넘김: (y, m) => 날더하기(영업일로(new Date(Date.UTC(y, m - 1, 0))), -3) },
+};
+function 월물기호(sym, 지금 = new Date()) {
+  const t = 선물표[sym];
+  if (!t) return null;
+  const 오늘 = new Date(Date.UTC(지금.getUTCFullYear(), 지금.getUTCMonth(), 지금.getUTCDate()));
+  for (let y = 오늘.getUTCFullYear(); y <= 오늘.getUTCFullYear() + 1; y++)
+    for (const m of t.달)
+      if (t.넘김(y, m) > 오늘) return `${t.앞}${월코드[m - 1]}${String(y).slice(2)}${t.뒤}`;
+  return null;
+}
+
 async function fetchOne(inst) {
   // 미10년물은 CNBC를 먼저 시도하고, 실패하면 아래 Yahoo 로직으로 내려갑니다.
   if (inst.type === "yield" && inst.cnbc) {
@@ -77,6 +118,16 @@ async function fetchOne(inst) {
     }
   }
 
+  // 선물은 월물을 콕 집어 먼저 받고, 안 되면 원래 기호(YM=F 등)로 받습니다.
+  const 월물 = 월물기호(inst.symbol);
+  if (월물) {
+    const q = await yahooOne({ ...inst, symbol: 월물 });
+    if (q.live) return { ...q, symbol: inst.symbol, contract: 월물 };
+  }
+  return yahooOne(inst);
+}
+
+async function yahooOne(inst) {
   try {
     // 일봉 5일치를 받아 전일 종가를 직접 계산합니다.
     // 야후가 요약으로 주는 previousClose / chartPreviousClose 는
