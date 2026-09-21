@@ -492,5 +492,76 @@ setInterval(load, 300000);
   setInterval(맞춤, 1500);          // 모달이 새로 열렸을 때도 맞춥니다
 })();
 </script>
+<script>
+// ── 위아래 차트 좌우 맞추기 ────────────────────────
+// 위 캔들은 가격(198,800)이, 아래 오실레이터는 작은 값(-0.00)이 축에 적혀
+// 축 폭이 달라 그림이 좌우로 어긋납니다. 짝지은 두 차트의 왼쪽·오른쪽 축 폭을
+// 넓은 쪽에 맞춥니다. 한쪽에만 축이 있으면 다른 쪽에도 같은 폭의 빈 축을 둡니다.
+(function 차트맞추기() {
+  const 전역 = 이름 => {
+    try { return new Function(`return typeof ${이름} !== "undefined" ? ${이름} : null`)(); }
+    catch (e) { return null; }
+  };
+
+  // 아래 차트의 작은 숫자를 짧게 적어 축 폭을 줄입니다.
+  const 짧게 = v => {
+    const a = Math.abs(v);
+    if (a === 0) return "0";
+    if (a >= 100) return v.toFixed(0);
+    if (a >= 1) return v.toFixed(2);
+    if (a >= 0.01) return v.toFixed(3);
+    return v.toPrecision(2);
+  };
+  const 형식 = { type: "custom", formatter: 짧게, minMove: 0.000001 };
+  const 손본것 = new WeakSet();
+  function 숫자손보기() {
+    for (const 이름 of ["mOscBars"]) {
+      const s = 전역(이름);
+      if (s && !손본것.has(s)) {
+        try { s.applyOptions({ priceFormat: 형식 }); 손본것.add(s); } catch (e) {}
+      }
+    }
+  }
+
+  function 짝들() {
+    const 목록 = [];
+    const 넣기 = (a, b) => { if (a && b) 목록.push([a, b]); };
+    넣기(전역("mChart"), 전역("mOsc"));        // 종목 차트 창
+    넣기(전역("fgChart"), 전역("oscChart"));   // 공포·탐욕 지수
+    for (const 짝 of (window.__차트짝 || [])) 넣기(짝[0], 짝[1]);
+    return 목록;
+  }
+
+  function 폭(차트, 쪽) {
+    try {
+      const s = 차트.priceScale(쪽);
+      return s.options().visible === false ? 0 : s.width();
+    } catch (e) { return 0; }
+  }
+
+  function 맞춤() {
+    숫자손보기();
+    for (const [위, 아래] of 짝들()) {
+      for (const 쪽 of ["left", "right"]) {
+        const a = 폭(위, 쪽), b = 폭(아래, 쪽);
+        if (!a && !b) continue;
+        const 넓 = Math.max(a, b);
+        for (const [차트, 지금] of [[위, a], [아래, b]]) {
+          try {
+            const s = 차트.priceScale(쪽);
+            if (!지금) s.applyOptions({ visible: true, borderVisible: false, ticksVisible: false });
+            if (s.options().minimumWidth !== 넓) s.applyOptions({ minimumWidth: 넓 });
+          } catch (e) {}
+        }
+      }
+    }
+  }
+
+  setInterval(맞춤, 800);                       // 차트 창을 나중에 열어도 맞춥니다
+  window.addEventListener("resize", () => requestAnimationFrame(맞춤));
+  requestAnimationFrame(맞춤);
+})();
+</script>
+
 </body>
 </html>
