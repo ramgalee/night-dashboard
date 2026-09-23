@@ -62,12 +62,12 @@ function loginPage(message) {
 </style>
 </head><body>
   <form class="box" method="POST">
-    <div class="eyebrow">SUBSCRIBER ONLY</div>
+    <div class="eyebrow">VIP MEMBERSHIP ONLY</div>
     <h1>이가람 증시 모니터</h1>
     <input type="password" name="password" placeholder="비밀번호" autofocus autocomplete="current-password" />
     <button type="submit">들어가기</button>
     <div class="msg">${message || ''}</div>
-    <div class="note">구독자 전용 페이지입니다. 비밀번호는 매주 일요일에 변경됩니다.</div>
+    <div class="note">VIP회원 전용 페이지입니다. 비밀번호는 매주 일요일에 변경됩니다.</div>
   </form>
 </body></html>`;
 }
