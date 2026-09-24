@@ -139,7 +139,8 @@
       <div style="font-size:13px;color:var(--textSec);">시장 요약</div>
       <span id="briefMeta" class="meta"></span>
     </div>
-    <div class="brief" id="brief"><div class="empty">불러오는 중...</div>
+    <div class="brief" id="brief"><div class="empty">불러오는 중...</div></div>
+
   <div class="ai-card" id="aiCard">
     <div class="ai-head">
       <span class="ai-badge">AI 작성</span>
@@ -152,7 +153,7 @@
     <div class="ai-text wait" id="aiText">자료를 모으는 중입니다...</div>
     <div class="ai-note">화면에 보이는 수치만으로 자동 작성된 문장입니다.</div>
   </div>
-</div>
+
     <div class="nums" id="nums"></div>
     <textarea id="copyBox" readonly></textarea>
   </div>
@@ -591,6 +592,40 @@ setInterval(load, 300000);
 
 const 요약시장 = "kr";
 let 요약했나 = false;
+let 쏠림 = null, 테마 = null;
+
+// 쏠림지수와 테마는 다른 페이지 자료라 따로 받아옵니다.
+async function 추가자료() {
+  const 받기 = async (주소, 없을때) => {
+    try {
+      const r = await fetch(주소, { cache: "no-store" });
+      return r.ok ? await r.json() : 없을때;
+    } catch (e) { return 없을때; }
+  };
+  const [t, m] = await Promise.all([
+    받기("/sector_tilt.json", null),
+    받기("/api/infra-theme", null),
+  ]);
+  if (t && t.data) {
+    const 뽑기 = 시장 => {
+      const a = t.data[시장] || [];
+      const x = a[a.length - 1];
+      if (!x) return null;
+      const 전 = a[a.length - 2];
+      return { top: x.top || [], osc: x.osc, 전osc: 전 ? 전.osc : null, corr: x.corr, date: x.date };
+    };
+    쏠림 = { KOSPI: 뽑기("KOSPI"), KOSDAQ: 뽑기("KOSDAQ"), topN: t.topN };
+  }
+  if (m && m.themes) {
+    const a = (m.themes || []).filter(x => x.changePct != null)
+      .sort((x, y) => y.changePct - x.changePct);
+    테마 = {
+      오름: a.slice(0, 5).map(x => ({ name: x.name, changePct: x.changePct })),
+      내림: a.slice(-3).reverse().map(x => ({ name: x.name, changePct: x.changePct })),
+      전체: a.length,
+    };
+  }
+}
 function 요약자료() {
   if (!IDX || !IDX.kospi) return null;
   const 업종 = m => (SECTOR[m] && SECTOR[m].sectors || [])
@@ -602,12 +637,14 @@ function 요약자료() {
     kospi: IDX.kospi, kosdaq: IDX.kosdaq,
     sectors: { KOSPI: 업종("KOSPI"), KOSDAQ: 업종("KOSDAQ") },
     fg: 끝 ? { value: 끝.value ?? 끝.fg, prev: 전 ? (전.value ?? 전.fg) : null } : null,
+    tilt: 쏠림, theme: 테마,
   };
 }
 
 // ── 시장 요약 (자동 작성) ─────────────────────────
 async function 요약쓰기(다시) {
   const 글 = document.getElementById("aiText");
+  if (!쏠림 && !테마) await 추가자료();
   const 자료 = 요약자료();
   if (!자료) { 글.textContent = "요약할 자료가 없습니다."; return; }
   글.className = "ai-text wait";
