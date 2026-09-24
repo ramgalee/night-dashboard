@@ -9,6 +9,7 @@
 // 미국 시각(동부)을 한국 시각으로 바꿔 넣습니다. 서머타임은 자동으로 가립니다.
 const BLS_ICS = "https://www.bls.gov/schedule/news_release/bls.ics";
 const 내일정 = "https://raw.githubusercontent.com/ramgalee/night-dashboard/main/calendar.json";
+const 미국파일 = "https://raw.githubusercontent.com/ramgalee/night-dashboard/main/us_calendar.json";
 
 // BLS 발표 중 증시에 쓰이는 것만 골라 한글 이름을 붙입니다.
 const 골라쓰기 = [
@@ -145,9 +146,41 @@ async function 내일정가져오기() {
   }
 }
 
+// BLS 가 막혀 있을 때 쓰는 파일 — 공식 일정을 받아 적어 둔 것입니다.
+// 미국 동부 시각으로 들어 있어 여기서 한국 시각으로 바꿉니다.
+let 미국캐시 = { at: 0, items: null, through: null };
+async function 미국파일가져오기() {
+  if (미국캐시.items && Date.now() - 미국캐시.at < 30 * 60e3) return 미국캐시;
+  try {
+    const r = await fetch(미국파일, { headers: { "Cache-Control": "no-cache" } });
+    if (!r.ok) throw new Error("us_calendar " + r.status);
+    const j = await r.json();
+    const 결과 = [];
+    for (const x of (j.events || [])) {
+      const 날 = String(x.date || "").replace(/[^0-9]/g, "").slice(0, 8);
+      const et = String(x.et || "08:30");
+      if (날.length !== 8) continue;
+      const k = 동부를한국으로(+날.slice(0, 4), +날.slice(4, 6), +날.slice(6, 8), +et.slice(0, 2), +et.slice(3, 5));
+      if (!k) continue;
+      결과.push({
+        date: k.date, time: k.time, title: x.title, importance: x.importance || "보통",
+        market: "US", source: "BLS",
+      });
+    }
+    미국캐시 = { at: Date.now(), items: 결과, through: j.through || null };
+    return 미국캐시;
+  } catch (e) {
+    return 미국캐시.items ? 미국캐시 : { items: [], through: null };
+  }
+}
+
 export default async function handler(req, res) {
   try {
-    const [us, mine] = await Promise.all([bls가져오기(), 내일정가져오기()]);
+    const [받은것, mine, 파일] = await Promise.all([
+      bls가져오기(), 내일정가져오기(), 미국파일가져오기(),
+    ]);
+    // 직접 받아온 것이 있으면 그것을, 없으면 적어둔 파일을 씁니다.
+    const us = (받은것 && 받은것.length) ? 받은것 : (파일.items || []);
     let 모두 = [...mine, ...us];
 
     const from = /^\d{6}$/.test(String(req.query.from || "")) ? String(req.query.from) : null;
@@ -166,7 +199,11 @@ export default async function handler(req, res) {
       generatedAt: new Date().toISOString(),
       count: 모두.length,
       counts: { 직접: mine.length, BLS: us.length },
-      bls: { 방법: BLS캐시.방법, 오류: BLS캐시.오류 },
+      bls: {
+        방법: (받은것 && 받은것.length) ? BLS캐시.방법 : (us.length ? "적어둔 파일" : null),
+        마지막일정: 파일.through || null,
+        오류: (받은것 && 받은것.length) ? null : BLS캐시.오류,
+      },
       byDate: 날짜별,
     });
   } catch (e) {
