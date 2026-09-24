@@ -14,7 +14,7 @@ const fs = require('fs');
 const 안 = 'http://127.0.0.1:3000';
 const 신선 = 60 * 1000;
 const 이력파일 = '/root/app/breadth_history.json';
-const 이력일수 = 80;
+const 이력일수 = 400;   // 차트에 180일을 그리려면 넉넉히 둡니다
 
 // 업종 목록에는 규모별(대형주·중형주·소형주)과 대분류(제조), 지수(KOSDAQ 150 등)가 섞여 있습니다.
 // 그대로 더하면 같은 종목이 두세 번 세어지므로 빼야 합니다.
@@ -156,12 +156,29 @@ async function 재기() {
     시장.KOSPI.adr20 = a1.adr; 시장.KOSDAQ.adr20 = a2.adr;
     const 쌓인날 = Math.max(a1.days, a2.days);
 
+    // ── 차트용 — 날짜마다 20일 누적 ADR 을 구해 둡니다 ──
+    const 전체날 = Object.keys(이력).sort();
+    const 흐름 = { KOSPI: [], KOSDAQ: [] };
+    for (const 이름 of ['KOSPI', 'KOSDAQ']) {
+      for (let i = 0; i < 전체날.length; i++) {
+        if (i < 19) continue;                       // 20일이 모여야 값이 나옵니다
+        let r = 0, f = 0;
+        for (let k = i - 19; k <= i; k++) {
+          const x = (이력[전체날[k]] || {})[이름];
+          if (x) { r += x.r || 0; f += x.f || 0; }
+        }
+        if (f) 흐름[이름].push({ date: 전체날[i], adr: Math.round(r / f * 1000) / 10 });
+      }
+      흐름[이름] = 흐름[이름].slice(-180);
+    }
+
     const out = {
       generatedAt: new Date().toISOString(),
       date: 오늘,
       markets: 시장,          // 시장마다 adr20(20일 누적) 과 adr(당일 비율)
       total: 합,
       adrDays: 쌓인날,
+      series: 흐름,            // 차트용 · 날짜별 20일 누적 ADR (최근 180일)
       high60: 신고가, aligned: 정배열, rsCount: 종목, rsDate: (rs && rs.date) || null,
     };
     캐시.data = out; 캐시.at = Date.now();

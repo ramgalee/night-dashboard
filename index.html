@@ -129,6 +129,13 @@
   .bd-sec-bar i { display:block; height:100%; }
   .bd-sec-v { width:52px; text-align:right; font-family:var(--mono); font-size:11.5px; flex:none; }
   .bd-sec-p { width:54px; text-align:right; font-family:var(--mono); font-size:11.5px; flex:none; }
+  .bd-chart { margin-top:14px; }
+  .bd-chart-h { display:flex; align-items:center; gap:8px; font-size:11px; color:var(--textTer); margin-bottom:6px; }
+  .bd-chart-h .on { color:var(--textPri); font-weight:700; }
+  .bd-chart-h button { background:none; border:none; padding:0 2px; font-size:11px;
+                       color:var(--textTer); cursor:pointer; font-family:var(--sans); }
+  .bd-chart-h button.on { color:var(--signature); font-weight:700; }
+  .bd-svg { width:100%; height:120px; display:block; }
   .bd-note { font-size:10.5px; color:var(--textTer); margin-top:10px; line-height:1.7; }
   @media (max-width:560px) { .bd-sec-nm { width:70px; } .bd-v { font-size:15px; } }
 </style>
@@ -1124,7 +1131,7 @@ document.addEventListener("click", e => {
 
 // ── 시장 폭 ─────────────────────────────────────
 // 지수는 큰 종목 몇 개로도 움직이지만, 실제로 몇 종목이 올랐는지는 따로 봐야 합니다.
-let BD = null;
+let BD = null, BD_MKT = "KOSPI";
 
 function bd그리기() {
   const 몸 = document.getElementById("bdBody");
@@ -1137,8 +1144,12 @@ function bd그리기() {
 
   // ADR 은 20일 동안의 상승종목수 합계 ÷ 하락종목수 합계입니다.
   // 80 아래면 과매도, 120 위면 과매수로 보는 것이 증권사 공통 기준입니다.
-  const adr색 = v => v == null ? "var(--textTer)" : v >= 120 ? T.up : v <= 80 ? T.down : "var(--textPri)";
-  const 구간 = v => v == null ? "" : v >= 120 ? "과열권" : v <= 80 ? "침체권" : "중립";
+  // 20일이 다 쌓이기 전에는 구간을 말하지 않습니다. 하루치로 '과열'이라 하면 오해를 부릅니다.
+  const 다찼나 = (BD.adrDays || 0) >= 20;
+  const adr색 = v => (!다찼나 || v == null) ? "var(--textPri)"
+    : v >= 120 ? T.up : v <= 80 ? T.down : "var(--textPri)";
+  const 구간 = v => !다찼나 ? `자료 ${BD.adrDays || 0}일 쌓는 중`
+    : v == null ? "" : v >= 120 ? "과열권" : v <= 80 ? "침체권" : "중립";
 
   const 칸 = [
     ["코스피 ADR (20일)", `${kp.adr20 ?? "—"}`, adr색(kp.adr20),
@@ -1175,11 +1186,50 @@ function bd그리기() {
         </div>`).join("") + `</div>`;
   }
 
+  // ── ADR 흐름 차트 ─────────────────────────────
+  // 80·120 기준선과 함께 그려, 지금이 어느 구간인지 한눈에 보이게 합니다.
+  const 흐름 = (BD.series || {})[BD_MKT] || [];
+  if (흐름.length > 5) {
+    const W = 520, H = 120, 여백 = { 위: 8, 아래: 16, 왼: 0, 오: 30 };
+    const 값 = 흐름.map(x => x.adr);
+    const 위값 = Math.max(130, Math.ceil(Math.max(...값) / 10) * 10);
+    const 아래값 = Math.min(70, Math.floor(Math.min(...값) / 10) * 10);
+    const x = i => 여백.왼 + i / (흐름.length - 1) * (W - 여백.왼 - 여백.오);
+    const y = v => 여백.위 + (위값 - v) / (위값 - 아래값) * (H - 여백.위 - 여백.아래);
+    const 선 = 흐름.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.adr).toFixed(1)}`).join("");
+    const 기준 = (v, c, 글) => `
+      <line x1="0" y1="${y(v)}" x2="${W - 여백.오}" y2="${y(v)}" stroke="${c}"
+            stroke-width="1" stroke-dasharray="3 3" opacity=".7"/>
+      <text x="${W - 여백.오 + 3}" y="${y(v) + 3.5}" font-size="9" fill="${c}"
+            font-family="var(--mono)">${글}</text>`;
+    const 끝 = 흐름[흐름.length - 1];
+    const 날 = d => `${d.slice(4, 6)}.${d.slice(6, 8)}`;
+    h += `<div class="bd-chart">
+      <div class="bd-chart-h">
+        <span>ADR 흐름 ${흐름.length}일</span>
+        <button data-bdm="KOSPI" class="${BD_MKT === "KOSPI" ? "on" : ""}">코스피</button>
+        <button data-bdm="KOSDAQ" class="${BD_MKT === "KOSDAQ" ? "on" : ""}">코스닥</button>
+        <span style="margin-left:auto">${날(흐름[0].date)} ~ ${날(끝.date)}</span>
+      </div>
+      <svg class="bd-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+        ${기준(120, T.up, "120")}
+        ${기준(100, "var(--textTer)", "100")}
+        ${기준(80, T.down, "80")}
+        <path d="${선}" fill="none" stroke="${T.textPri}" stroke-width="1.6"
+              stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+        <circle cx="${x(흐름.length - 1)}" cy="${y(끝.adr)}" r="2.6"
+                fill="${끝.adr >= 120 ? T.up : 끝.adr <= 80 ? T.down : T.textPri}"/>
+      </svg>
+    </div>`;
+  }
+
   h += `<div class="bd-note">ADR 은 최근 20일 동안 오른 종목 수를 내린 종목 수로 나눈 값입니다` +
        (BD.adrDays && BD.adrDays < 20 ? ` (지금은 ${BD.adrDays}일치만 쌓여 있습니다)` : "") +
        `. 80 아래면 침체권, 120 위면 과열권으로 봅니다. ` +
        `거래대금 가중 등락률이 지수보다 높으면 대형주가 장을 끌었다는 뜻입니다.</div>`;
   몸.innerHTML = h;
+  몸.querySelectorAll("[data-bdm]").forEach(b =>
+    b.onclick = () => { BD_MKT = b.dataset.bdm; bd그리기(); });
 
   const 시각 = BD.generatedAt
     ? new Date(BD.generatedAt).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false })
