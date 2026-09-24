@@ -61,6 +61,10 @@ const 규칙 = `당신은 한국 경제지 증권부 기자입니다. 주어진 
   동조화는 업종들이 얼마나 같이 움직였는지다. 높으면 시장 전체가 한 방향, 낮으면 업종별로 따로 움직였다는 뜻이다.
   주도 업종 이름과 함께 한 문장으로 적는다.
 - 테마: 인포스탁 분류 기준으로 오른 테마와 내린 테마다. 상위 2~3개를 등락률과 함께 적는다.
+- 시장 폭: 지수가 아니라 종목이 어땠는지다.
+  ADR 이 100 보다 크면 오른 종목이 더 많았다는 뜻이고, 20일 평균보다 높으면 최근 흐름보다 나았다는 뜻이다.
+  거래대금 가중 등락률이 지수 등락률보다 높으면 큰 종목이 장을 끌었고, 낮으면 큰 종목이 부진했다는 뜻이다.
+  거래대금이 한 업종에 절반 넘게 몰렸다면 그 사실을 적는다.
 - 공포탐욕지수: 0에 가까울수록 공포, 100에 가까울수록 탐욕이다. 전일과 비교해 한 구절로 적는다.`;
 
 function 짧게(n, 자리 = 2) {
@@ -107,6 +111,16 @@ function 국내정리(d) {
     const 적기 = a => a.map(x => `${x.name} ${짧게(x.changePct)}%`).join(", ");
     줄.push(`테마 상승 상위: ${적기(d.theme.오름)}`);
     if ((d.theme.내림 || []).length) 줄.push(`테마 하락 상위: ${적기(d.theme.내림)}`);
+  }
+  if (d.breadth) {
+    const b = d.breadth;
+    if (b.adr != null) 줄.push(`ADR(오른 종목 ÷ 내린 종목 × 100): ${짧게(b.adr, 1)}` +
+      (b.adr20 != null ? ` · 20일 평균 ${짧게(b.adr20, 1)}` : "") +
+      (b.rising != null ? ` · 오른 ${b.rising}종목 내린 ${b.falling}종목` : ""));
+    if (b.weightedChangePct != null) 줄.push(`코스피 거래대금 가중 등락률: ${짧게(b.weightedChangePct)}%`);
+    if ((b.sectors || []).length) 줄.push(`거래대금 비중: ` +
+      b.sectors.slice(0, 3).map(x => `${x.name} ${짧게(x.share, 1)}%`).join(", "));
+    if (b.high60 != null) 줄.push(`60일 신고가 ${b.high60}종목 · 정배열 ${b.aligned}종목`);
   }
   if (d.streak && d.streak.length) 줄.push(`연속 순매수 종목: ${d.streak.slice(0, 5).join(", ")}`);
   return 줄.join("\n");
