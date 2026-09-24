@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>증시 일정</title>
+<style>
+  :root {
+    --void:#F2F4F9; --surface:#FFFFFF; --surface2:#F0F2F8; --hair:#E1E5F0;
+    --textPri:#131A2C; --textSec:#5B6483; --textTer:#8B94B0;
+    --up:#E5484D; --down:#2F6FED; --signature:#6D4FE0; --amber:#B8790A;
+    --mono: ui-monospace,'SF Mono','Roboto Mono',Menlo,Consolas,monospace;
+    --sans: -apple-system,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--void); color:var(--textPri); font-family:var(--sans); margin:0; padding:24px 16px; }
+  .wrap { max-width:1180px; margin:0 auto; }
+  .between { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .card { background:var(--surface); border:1px solid var(--hair); border-radius:16px; padding:18px;
+          margin-bottom:16px; box-shadow:0 1px 3px rgba(19,26,44,.06); }
+  .eyebrow { font-size:11px; letter-spacing:2px; color:var(--textTer); font-family:var(--mono); }
+  h1 { font-size:22px; margin:2px 0 0; }
+  button { background:var(--surface2); border:1px solid var(--hair); color:var(--textSec);
+           padding:8px 14px; border-radius:10px; font-size:12px; cursor:pointer; font-family:var(--sans); }
+  button.primary { background:var(--signature); border-color:var(--signature); color:#fff; font-weight:600; }
+
+  /* 달력 */
+  .cal-head { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .cal-title { font-size:17px; font-weight:700; font-family:var(--mono); }
+  .cal-nav { display:flex; gap:6px; margin-left:auto; }
+  .cal-nav button { padding:6px 12px; }
+  .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+  .cal-dow { text-align:center; font-size:11px; color:var(--textTer); padding:4px 0 8px; }
+  .cal-dow.sun { color:var(--up); } .cal-dow.sat { color:var(--down); }
+  .cal-day { background:var(--surface2); border:1px solid transparent; border-radius:10px;
+             min-height:76px; padding:6px 7px; cursor:pointer; display:flex; flex-direction:column; gap:3px; }
+  .cal-day.blank { background:transparent; cursor:default; }
+  .cal-day:hover { border-color:var(--signature); }
+  .cal-day.on { border-color:var(--signature); background:#F1EEFC; }
+  .cal-day.today .num { color:var(--signature); font-weight:800; }
+  .cal-day .num { font-family:var(--mono); font-size:12px; color:var(--textSec); }
+  .cal-day.sun .num { color:var(--up); } .cal-day.sat .num { color:var(--down); }
+  .cal-ev { font-size:10.5px; line-height:1.35; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+            padding:1px 4px; border-radius:4px; }
+  .ev-hi { background:#FDEBEC; color:#C0303A; font-weight:600; }
+  .ev-mid { background:#FEF3E6; color:#9A6210; }
+  .ev-low { background:var(--surface); color:var(--textTer); }
+  .cal-more { font-size:10px; color:var(--textTer); font-family:var(--mono); }
+
+  /* 고른 날 */
+  .day-head { display:flex; align-items:baseline; gap:10px; margin-bottom:10px; }
+  .day-date { font-size:16px; font-weight:700; }
+  .day-sub { font-size:11.5px; color:var(--textTer); }
+  .ev-row { display:flex; gap:12px; padding:11px 0; border-bottom:1px solid var(--surface2); }
+  .ev-row:last-child { border-bottom:none; }
+  .ev-time { flex:none; width:48px; font-family:var(--mono); font-size:12px; color:var(--textTer); padding-top:2px; }
+  .ev-main { flex:1; min-width:0; }
+  .ev-title { font-size:13.5px; font-weight:600; }
+  .ev-memo { font-size:12px; color:var(--textSec); margin-top:3px; line-height:1.6; }
+  .tag { font-size:9.5px; padding:1px 6px; border-radius:5px; margin-left:6px; font-family:var(--mono); }
+  .tag-kr { background:#EDE9FB; color:var(--signature); }
+  .tag-us { background:#EEF3FE; color:var(--down); }
+  .tag-src { background:var(--surface2); color:var(--textTer); }
+  .empty { font-size:12px; color:var(--textTer); padding:10px 0; }
+
+  /* 다가오는 일정 */
+  .up-row { display:flex; gap:10px; align-items:baseline; padding:8px 0; border-bottom:1px solid var(--surface2); }
+  .up-row:last-child { border-bottom:none; }
+  .up-d { flex:none; width:64px; font-family:var(--mono); font-size:11.5px; color:var(--textTer); }
+  .up-t { font-size:12.5px; }
+  .dday { font-family:var(--mono); font-size:10.5px; color:var(--signature); margin-left:6px; }
+
+  @media (max-width:640px) {
+    .cal-day { min-height:60px; padding:4px 5px; }
+    .cal-ev { font-size:9.5px; }
+    .cal-day .num { font-size:11px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="between" style="margin-bottom:16px;">
+    <div>
+      <div class="eyebrow">MARKET CALENDAR</div>
+      <h1>증시 일정</h1>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <a href="/index.html" style="text-decoration:none;"><button>← 주간 증시</button></a>
+      <a href="/brief.html" style="text-decoration:none;"><button>오늘의 브리핑 →</button></a>
+      <a href="/us.html" style="text-decoration:none;"><button>미국 증시 →</button></a>
+      <a href="/flow-oscillator.html" style="text-decoration:none;"><button>수급오실레이터 →</button></a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="cal-head">
+      <span class="cal-title" id="calTitle">—</span>
+      <span class="day-sub" id="calMeta"></span>
+      <span class="cal-nav">
+        <button id="calPrev">◀</button>
+        <button id="calToday">오늘</button>
+        <button id="calNext">▶</button>
+      </span>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+  </div>
+
+  <div class="card" id="dayCard">
+    <div class="day-head">
+      <span class="day-date" id="dayDate">날짜를 누르세요</span>
+      <span class="day-sub" id="dayCount"></span>
+    </div>
+    <div id="dayBody"><div class="empty">달력에서 날짜를 누르면 그날 일정이 나옵니다.</div></div>
+  </div>
+
+  <div class="card">
+    <div class="between" style="margin-bottom:10px;">
+      <div style="font-size:13px;color:var(--textSec);">다가오는 일정 <span class="day-sub">앞으로 14일</span></div>
+    </div>
+    <div id="upBody"><div class="empty">불러오는 중...</div></div>
+  </div>
+
+  <div style="border:1px dashed var(--hair);border-radius:12px;padding:12px 16px;font-size:11.5px;
+              color:var(--textTer);line-height:1.7;background:var(--surface);">
+    미국 지표는 <b>미국 노동부(BLS) 공식 발표 일정</b>을 그대로 받아 한국 시각으로 바꾼 것입니다.
+    국내 일정과 실적 발표는 직접 적은 것입니다.
+    발표 시각은 바뀔 수 있으니 중요한 일정은 원문을 함께 확인하세요.
+  </div>
+</div>
+
+<script>
+let CAL = null;                      // { byDate: {20260925:[...]} }
+let 보는달 = null;                    // Date (그 달 1일)
+let 고른날 = null;                    // "20260925"
+
+const 오늘 = () => {
+  const t = new Date(Date.now() + 9 * 3600e3);   // 한국 날짜
+  return `${t.getUTCFullYear()}${String(t.getUTCMonth() + 1).padStart(2, "0")}${String(t.getUTCDate()).padStart(2, "0")}`;
+};
+const 보기좋게 = d => `${d.slice(0, 4)}. ${d.slice(4, 6)}. ${d.slice(6, 8)}`;
+const 요일이름 = ["일", "월", "화", "수", "목", "금", "토"];
+const 중요도색 = v => v === "높음" ? "ev-hi" : v === "낮음" ? "ev-low" : "ev-mid";
+
+function 달력그리기() {
+  if (!보는달) 보는달 = (() => { const t = new Date(Date.now() + 9 * 3600e3); return new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), 1)); })();
+  const y = 보는달.getUTCFullYear(), m = 보는달.getUTCMonth();
+  document.getElementById("calTitle").textContent = `${y}년 ${m + 1}월`;
+
+  const 첫요일 = new Date(Date.UTC(y, m, 1)).getUTCDay();
+  const 날수 = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  const 그날 = 오늘();
+
+  let h = 요일이름.map((n, i) =>
+    `<div class="cal-dow ${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${n}</div>`).join("");
+  for (let i = 0; i < 첫요일; i++) h += `<div class="cal-day blank"></div>`;
+
+  for (let d = 1; d <= 날수; d++) {
+    const 열쇠 = `${y}${String(m + 1).padStart(2, "0")}${String(d).padStart(2, "0")}`;
+    const 요일 = new Date(Date.UTC(y, m, d)).getUTCDay();
+    const 목록 = ((CAL && CAL.byDate) || {})[열쇠] || [];
+    const 보일것 = 목록.slice(0, 2).map(x =>
+      `<span class="cal-ev ${중요도색(x.importance)}">${x.title}</span>`).join("");
+    h += `<div class="cal-day ${요일 === 0 ? "sun" : 요일 === 6 ? "sat" : ""}${열쇠 === 그날 ? " today" : ""}${열쇠 === 고른날 ? " on" : ""}" data-d="${열쇠}">
+            <span class="num">${d}</span>${보일것}
+            ${목록.length > 2 ? `<span class="cal-more">+${목록.length - 2}건</span>` : ""}
+          </div>`;
+  }
+  document.getElementById("calGrid").innerHTML = h;
+  document.querySelectorAll("[data-d]").forEach(el =>
+    el.onclick = () => { 고른날 = el.dataset.d; 달력그리기(); 하루그리기(); });
+}
+
+function 하루그리기() {
+  const 몸 = document.getElementById("dayBody");
+  if (!고른날) return;
+  const 목록 = ((CAL && CAL.byDate) || {})[고른날] || [];
+  const dt = new Date(Date.UTC(+고른날.slice(0, 4), +고른날.slice(4, 6) - 1, +고른날.slice(6, 8)));
+  document.getElementById("dayDate").textContent = `${보기좋게(고른날)} (${요일이름[dt.getUTCDay()]})`;
+  document.getElementById("dayCount").textContent = 목록.length ? `${목록.length}건` : "";
+  if (!목록.length) { 몸.innerHTML = `<div class="empty">이 날은 등록된 일정이 없습니다.</div>`; return; }
+  몸.innerHTML = 목록.map(x => `
+    <div class="ev-row">
+      <div class="ev-time">${x.time || "—"}</div>
+      <div class="ev-main">
+        <div class="ev-title">${x.title}
+          <span class="tag ${x.market === "US" ? "tag-us" : "tag-kr"}">${x.market === "US" ? "미국" : "국내"}</span>
+          <span class="tag tag-src">${x.source}</span>
+        </div>
+        ${x.memo ? `<div class="ev-memo">${x.memo}</div>` : ""}
+      </div>
+    </div>`).join("");
+}
+
+function 다가오는것() {
+  const 몸 = document.getElementById("upBody");
+  if (!CAL) { 몸.innerHTML = `<div class="empty">불러오지 못했습니다.</div>`; return; }
+  const 그날 = 오늘();
+  const 끝 = (() => {
+    const t = new Date(Date.UTC(+그날.slice(0, 4), +그날.slice(4, 6) - 1, +그날.slice(6, 8) + 14));
+    return `${t.getUTCFullYear()}${String(t.getUTCMonth() + 1).padStart(2, "0")}${String(t.getUTCDate()).padStart(2, "0")}`;
+  })();
+  const 줄 = [];
+  for (const [날, 목록] of Object.entries(CAL.byDate || {})) {
+    if (날 < 그날 || 날 > 끝) continue;
+    for (const x of 목록) if (x.importance !== "낮음") 줄.push({ ...x, date: 날 });
+  }
+  줄.sort((a, b) => a.date.localeCompare(b.date) || String(a.time).localeCompare(String(b.time)));
+  if (!줄.length) { 몸.innerHTML = `<div class="empty">앞으로 2주간 등록된 일정이 없습니다.</div>`; return; }
+
+  const 날수차 = d => Math.round(
+    (Date.UTC(+d.slice(0, 4), +d.slice(4, 6) - 1, +d.slice(6, 8)) -
+     Date.UTC(+그날.slice(0, 4), +그날.slice(4, 6) - 1, +그날.slice(6, 8))) / 86400000);
+  몸.innerHTML = 줄.slice(0, 12).map(x => {
+    const n = 날수차(x.date);
+    return `<div class="up-row">
+      <span class="up-d">${x.date.slice(4, 6)}.${x.date.slice(6, 8)} ${요일이름[new Date(Date.UTC(+x.date.slice(0,4), +x.date.slice(4,6)-1, +x.date.slice(6,8))).getUTCDay()]}</span>
+      <span class="up-t"><span class="cal-ev ${중요도색(x.importance)}">${x.title}</span>
+        ${x.time ? `<span class="day-sub" style="margin-left:6px">${x.time}</span>` : ""}
+        <span class="dday">${n === 0 ? "오늘" : `D-${n}`}</span></span>
+    </div>`;
+  }).join("");
+}
+
+async function 받기() {
+  try {
+    const r = await fetch("/api/calendar", { cache: "no-store" });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    CAL = d;
+    document.getElementById("calMeta").textContent =
+      `일정 ${d.count}건 · 직접 ${d.counts.직접} · BLS ${d.counts.BLS}`;
+  } catch (e) {
+    CAL = { byDate: {} };
+    document.getElementById("calMeta").textContent = "일정을 불러오지 못했습니다";
+  }
+  if (!고른날) 고른날 = 오늘();
+  달력그리기(); 하루그리기(); 다가오는것();
+}
+
+document.getElementById("calPrev").onclick = () => {
+  보는달 = new Date(Date.UTC(보는달.getUTCFullYear(), 보는달.getUTCMonth() - 1, 1)); 달력그리기();
+};
+document.getElementById("calNext").onclick = () => {
+  보는달 = new Date(Date.UTC(보는달.getUTCFullYear(), 보는달.getUTCMonth() + 1, 1)); 달력그리기();
+};
+document.getElementById("calToday").onclick = () => {
+  const t = new Date(Date.now() + 9 * 3600e3);
+  보는달 = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), 1));
+  고른날 = 오늘(); 달력그리기(); 하루그리기();
+};
+
+받기();
+setInterval(받기, 30 * 60 * 1000);
+</script>
+</body>
+</html>
