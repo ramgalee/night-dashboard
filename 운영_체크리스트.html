@@ -109,7 +109,7 @@
     <ul>
       <li><span class="txt"><b>장중에는 노트북을 돌리지 않습니다.</b> 종가 자리에 현재가가 저장되면 그 날짜는 채워진 것으로 간주돼 다시 받아오지 않습니다. 16시 이후에 시작하세요.</span></li>
       <li><span class="txt"><b>쌓아가는 파일은 지우지 않습니다.</b>
-        <small><span class="k">price_cache.csv</span> · <span class="k">supply_history.json</span> · <span class="k">fg_extra.json</span> · <span class="k">sector_tilt.json</span> · <span class="k">index_history.json</span></small></span></li>
+        <small><span class="k">price_cache.csv</span> · <span class="k">supply_history.json</span> · <span class="k">fg_extra.json</span> · <span class="k">index_history.json</span> · <span class="k">sector_flow_cache.json.gz</span> · <span class="k">breadth_history.json</span><br>서버에도 — <span class="k">breadth_history.json</span> · <span class="k">portfolio.json</span><br>sector_tilt.json 은 칸 22 가 매번 새로 만듭니다 (지워져도 복구)</small></span></li>
       <li><span class="txt"><b>탐색기의 '수정한 날짜'는 믿지 않습니다.</b> 구글 드라이브가 늦게 갱신합니다. 파일 안의 <span class="k">date</span> 값으로 확인하세요 — 칸 6이 표로 찍어줍니다.</span></li>
       <li><span class="txt"><b>노트북은 이름 끝에 <span class="k">(1)</span> 붙은 쪽입니다.</b> 칸 4 → 6 → 8 순서를 지켜야 <span class="k">NameError</span>가 나지 않습니다.</span></li>
     </ul>
@@ -120,8 +120,8 @@
     <p class="lead">만들 것은 없습니다. 서버가 밤사이 알아서 돌았습니다. 보기만 하면 됩니다.</p>
     <ul>
       <li><span class="rank">1</span><span class="box" data-box></span><span class="txt"><code>Ctrl</code>+<code>Shift</code>+<code>R</code> 로 holagaram.com 열기 — 지수·수급 칸에 숫자가 차 있는지</span></li>
-      <li><span class="rank r2">2</span><span class="box" data-box></span><span class="txt">야간 증시 · 미국 증시 정리 — 밤사이 결과 확인, 텍스트 복사 버튼으로 방송 자료에 붙여넣기</span></li>
-      <li><span class="rank r2">2</span><span class="box" data-box></span><span class="txt">오늘의 브리핑 — 어제 마감 기준 요약 문장 + 3거래일 연속 순매수</span></li>
+      <li><span class="rank r2">2</span><span class="box" data-box></span><span class="txt"><b>미국 증시 정리</b> — 맨 위 <b>간밤의 흐름</b>(30분마다 + 마감 정리) → AI 요약 → 히트맵 · Finviz 차트</span></li>
+      <li><span class="rank r2">2</span><span class="box" data-box></span><span class="txt"><b>오늘의 브리핑</b> — AI 시황 요약 · <b>오늘의 흐름</b> · 3거래일 연속 순매수</span></li>
       <li><span class="rank r3">3</span><span class="box" data-box></span><span class="txt">공포·탐욕 지수 맨 아래 <b>업종 쏠림지수</b> — 오르면 주도 업종 쏠림, 내리면 순환매 · 업종 이름을 누르면 시총 상위 10종목</span></li>
     </ul>
   </section>
@@ -129,6 +129,8 @@
   <section>
     <h2>장중 <span class="when">09:00 – 15:30</span></h2>
     <ul>
+      <li><span class="rank r2">2</span><span class="box" data-box></span><span class="txt"><b>주간 증시 모니터</b> — <b>시장 폭</b>: ADR(20일) 80 아래 침체·120 위 과열 · 거래대금이 어느 업종에 몰렸나</span></li>
+      <li><span class="rank r2">2</span><span class="box" data-box></span><span class="txt"><b>수급오실레이터</b> — <b>오늘의 주도주</b>: 기본 탭 <b>양수 전환</b>(오실레이터가 0 위로 올라선 첫날)</span></li>
       <li><span class="rank">1</span><span class="box" data-box></span><span class="txt">노트북은 열지 않습니다. 화면만 봅니다.</span></li>
       <li><span class="rank r2">2</span><span class="box" data-box></span><span class="txt"><b>테마 히트맵</b> (히트맵 페이지 가운데) — 오늘 어떤 테마가 움직였나 · 3분마다 갱신
         <small>타일 클릭 → 구성종목 · 종목 클릭 → 차트 창 · <b>▲오른 / ▼내린</b> 탭으로 양쪽 다 보기</small></span></li>
@@ -148,14 +150,17 @@
       <li><span class="rank">1</span><span class="box" data-box></span><span class="txt"><b>칸 10</b> supply_final.json + supply_history.json</span></li>
       <li><span class="rank">1</span><span class="box" data-box></span><span class="txt"><b>칸 12</b> fg_extra.json <small>엑셀 우선, 없으면 KRX로 채웁니다</small></span></li>
       <li><span class="rank">1</span><span class="box" data-box></span><span class="txt"><b>칸 9</b> marketcap.json</span></li>
-      <li><span class="rank">1</span><span class="box" data-box></span><span class="txt"><b>칸 15</b> rs.json <small>매일 돌려도 10초</small></span></li>
-      <li><span class="rank">1</span><span class="box" data-box></span><span class="txt"><b>칸 20</b> sector_tilt.json <small>업종 쏠림지수 — 매번 전 구간을 새로 받아 2~3분 · <b>엑셀은 닫고</b></small></span></li>
+      <li><span class="rank">1</span><span class="box" data-box></span><span class="txt"><b>칸 16</b> rs.json + price_cache.csv <small>매일 돌려도 10초</small></span></li>
+      <li><span class="rank">1</span><span class="box" data-box></span><span class="txt"><b>칸 21</b> 쏠림지수 — 코스피 받기</span></li>
+      <li><span class="rank">1</span><span class="box" data-box></span><span class="txt"><b>칸 22</b> sector_tilt.json <small>엑셀(특정업종 쏠림지수 국내)을 <b>닫고</b> 실행 · 지수 종가·종목 10개 포함</small></span></li>
       <li><span class="rank r2">2</span><span class="box" data-box></span><span class="txt"><b>여섯 파일을 GitHub 저장소 맨 바깥에 업로드</b>
         <small><span class="k">marketcap.json</span> · <span class="k">supply_final.json</span> · <span class="k">supply_history.json</span> · <span class="k">fg_extra.json</span> · <span class="k">rs.json</span> · <span class="k">sector_tilt.json</span></small>
         <small><span class="k">theme_map.json</span> 은 테마맵.xlsx 를 고친 날만 · 올린 뒤 서버에도 받아가기</small>
         <small>올리지 않는 것 — <span class="k">supply_history_bak.json</span> · <span class="k">sector_tilt_bak.json</span> · <span class="k">price_cache.csv</span> · <span class="k">테마맵.xlsx</span></small></span></li>
       <li><span class="rank r3">3</span><span class="box" data-box></span><span class="txt">배포가 끝나면 <code>Ctrl</code>+<code>Shift</code>+<code>R</code> 로 화면에 오늘 날짜가 들어왔는지 확인</span></li>
-    </ul>
+          <li><span class="rank r3">3</span><span class="box" data-box></span><span class="txt"><small>가끔</small> <b>칸 23</b> 업종 수급 오실레이터 엑셀 <small>WI26·코스피·코스닥·KRX·테마 5시트</small></span></li>
+      <li><span class="rank r3">3</span><span class="box" data-box></span><span class="txt"><small>가끔</small> <b>칸 24</b> ADR 이력 → <span class="k">breadth_history.json</span> 올리고 <b>서버도 받아가기</b></span></li>
+      </ul>
   </section>
 
   <section>
@@ -211,20 +216,20 @@
     <table>
       <thead><tr><th>주소</th><th>페이지</th><th>여기서 보는 것</th></tr></thead>
       <tbody>
-        <tr><td class="p">/</td><td>주간 증시 모니터</td><td>지수·아시아·미국, 거래대금 상위, 장중/확정 수급, 양매수</td></tr>
-        <tr><td class="p">/brief.html</td><td>오늘의 브리핑</td><td>요약 문장 + 3거래일 연속 순매수 · 텍스트 복사</td></tr>
+        <tr><td class="p">/</td><td>주간 증시 모니터</td><td>지수·아시아·참고 지표, <b>시장 폭(ADR·거래대금 비중·90일 차트)</b>, 수급, 순매수 상위</td></tr>
+        <tr><td class="p">/brief.html</td><td>오늘의 브리핑</td><td><b>AI 요약</b> · <b>오늘의 흐름</b>(장중 30분마다) · 연속 순매수</td></tr>
         <tr><td class="p">/night.html</td><td>야간 증시 모니터</td><td>코스피200 야간, SK하이닉스·삼성전자 추정가</td></tr>
-        <tr><td class="p">/us.html</td><td>미국 증시 정리</td><td>129종목 섹터 히트맵 · 텍스트 복사</td></tr>
+        <tr><td class="p">/us.html</td><td>미국 증시 정리</td><td><b>간밤의 흐름</b> · AI 요약 · 히트맵 · <b>Finviz 차트 + TradingView</b></td></tr>
         <tr><td class="p">/map.html</td><td>국내 히트맵</td><td>업종 → 종목 히트맵 · <b>테마 히트맵</b>(인포스탁 90개) · 신고가·정배열(접힘)</td></tr>
-        <tr><td class="p">/fg.html</td><td>공포·탐욕 지수</td><td>F&amp;G·EMA20·MACD, <b>업종 쏠림지수</b>(업종 눌러 종목 10개)</td></tr>
-        <tr><td class="p">/flow-oscillator.html</td><td>수급오실레이터</td><td>종목 캔들 + 수급 MACD, 탭 5개 · 거르기 4개</td></tr>
+        <tr><td class="p">/fg.html</td><td>공포·탐욕 지수</td><td>F&amp;G·EMA20·MACD + <b>AI 해석</b> · 업종 쏠림지수 + <b>AI 해석</b></td></tr>
+        <tr><td class="p">/flow-oscillator.html</td><td>수급오실레이터</td><td><b>오늘의 주도주</b>(상태 6가지) · 종목 캔들 + 수급 MACD · 탭 5개</td></tr>
         <tr><td class="p">/leader.html</td><td>대형주 수급</td><td>시총 상위 30의 20일 시총대비 수급</td></tr>
       </tbody>
     </table>
   </section>
 
   <footer>
-    <span>칸 4 → 6 → 8 → 10 → 12 → 9 → 15 → 20 · 매일 올리는 파일 여섯 개</span>
+    <span>칸 4 → 6 → 8 → 10 → 12 → 9 → 16 → 21 → 22 · 매일 올리는 파일 여섯 개</span>
     <span>자세한 설명은 저장소의 운영안내서.md</span>
   </footer>
 </div>
