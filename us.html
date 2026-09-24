@@ -23,6 +23,20 @@
   button.primary { background: var(--signature); border-color: var(--signature); color:#fff; font-weight:600; }
   .empty { font-size:12px; color:var(--textTer); line-height:1.6; }
 
+  /* 간밤의 흐름 */
+  .tl-row { display:flex; gap:12px; padding:11px 0; border-bottom:1px solid var(--surface2); }
+  .tl-row:last-child { border-bottom:none; }
+  .tl-time { flex:none; width:44px; font-family:var(--mono); font-size:11.5px; color:var(--textTer); padding-top:2px; }
+  .tl-body { flex:1; min-width:0; }
+  .tl-title { font-size:13px; font-weight:600; margin-bottom:3px; }
+  .tl-text { font-size:12.5px; line-height:1.75; color:var(--textSec); white-space:pre-wrap; }
+  .tl-close { font-size:10px; color:var(--signature); border:1px solid var(--signature);
+              border-radius:5px; padding:1px 5px; margin-left:6px; font-family:var(--mono); }
+  .tl-more { width:100%; margin-top:10px; padding:7px; font-size:11.5px;
+             background:var(--surface2); border:1px solid var(--hair); border-radius:9px;
+             color:var(--textSec); cursor:pointer; font-family:var(--sans); }
+  .tl-more:hover { border-color:var(--signature); color:var(--signature); }
+
   /* 시장 요약 (자동 작성) */
   .ai-card { border-left:3px solid var(--signature); background:var(--surface2);
              border-radius:0 12px 12px 0; padding:14px 16px; margin-top:12px; }
@@ -138,13 +152,8 @@
     </div>
   </div>
 
-  <div class="card">
-    <div class="between" style="margin-bottom:14px;">
-      <div style="font-size:13px;color:var(--textSec);">섹터 히트맵</div>
-      <span id="meta" style="font-size:10.5px;color:var(--textTer);font-family:var(--mono);"></span>
-    </div>
-    <div id="heat"><div class="empty">불러오는 중...</div></div>
-  <div class="ai-card" id="aiCard">
+  <div class="card" style="padding-top:16px;">
+  <div class="ai-card" style="margin-top:0" id="aiCard">
     <div class="ai-head">
       <span class="ai-badge">AI 작성</span>
       <span class="ai-time" id="aiTime"></span>
@@ -160,6 +169,14 @@
       <ul id="aiNewsList"></ul>
     </details>
   </div>
+  </div>
+
+  <div class="card">
+    <div class="between" style="margin-bottom:14px;">
+      <div style="font-size:13px;color:var(--textSec);">섹터 히트맵</div>
+      <span id="meta" style="font-size:10.5px;color:var(--textTer);font-family:var(--mono);"></span>
+    </div>
+    <div id="heat"><div class="empty">불러오는 중...</div></div>
 
   </div>
 
@@ -171,6 +188,15 @@
     <div class="ct-tabs" id="ctTabs"></div>
     <div class="ct-grid" id="ctGrid"><div class="empty">불러오는 중...</div></div>
     <div class="ct-note">Finviz 차트는 무료 기준 15~20분 지연입니다. 추세선·지지저항선은 Finviz 가 자동으로 그린 것입니다.</div>
+  </div>
+
+  <div class="card">
+    <div class="between" style="margin-bottom:10px;">
+      <div style="font-size:13px;color:var(--textSec);">간밤의 흐름
+        <span class="ai-badge">AI 작성</span></div>
+      <span id="tlMeta" style="font-size:10.5px;color:var(--textTer);font-family:var(--mono);"></span>
+    </div>
+    <div id="tlBody"><div class="empty">불러오는 중...</div></div>
   </div>
 
   <div class="card">
@@ -498,6 +524,49 @@ document.getElementById("aiCopy").onclick = async () => {
     b.textContent = "복사됨!"; setTimeout(() => { b.textContent = "복사"; }, 1500);
   } catch (e) { b.textContent = "복사 실패"; }
 };
+
+
+// ── 간밤의 흐름 (미국 장중 30분마다 + 마감 정리) ────
+let TL = null, TL_전부 = false;
+const TL_기본 = 4;
+
+function tl그리기() {
+  const 몸 = document.getElementById("tlBody");
+  if (!TL || !(TL.items || []).length) {
+    몸.innerHTML = `<div class="empty">아직 기록이 없습니다. 미국 장중 30분마다 쌓입니다.</div>`;
+    document.getElementById("tlMeta").textContent = "";
+    return;
+  }
+  const 줄 = TL_전부 ? TL.items : TL.items.slice(0, TL_기본);
+  몸.innerHTML = 줄.map(x => `
+    <div class="tl-row">
+      <div class="tl-time">${x.time}</div>
+      <div class="tl-body">
+        <div class="tl-title">${x.title}${x.kind === "close" ? `<span class="tl-close">마감</span>` : ""}</div>
+        <div class="tl-text">${x.body}</div>
+      </div>
+    </div>`).join("") +
+    (TL.items.length > TL_기본
+      ? `<button class="tl-more" id="tlMore">${TL_전부 ? "접기" : `기록 ${TL.items.length}건 모두 보기`}</button>`
+      : "");
+  const 더 = document.getElementById("tlMore");
+  if (더) 더.onclick = () => { TL_전부 = !TL_전부; tl그리기(); };
+  const d = TL.date || "";
+  document.getElementById("tlMeta").textContent =
+    (d.length === 8 ? `${d.slice(4, 6)}.${d.slice(6, 8)} 장 · ` : "") + `${TL.items.length}건`;
+}
+
+async function tl받기() {
+  try {
+    const r = await fetch("/api/timeline?market=us", { cache: "no-store" });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    TL = d;
+  } catch (e) { TL = null; }
+  tl그리기();
+}
+tl받기();
+setInterval(tl받기, 180000);
 
 </script>
 </body>
