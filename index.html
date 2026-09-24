@@ -112,6 +112,25 @@
   /* 목록의 종목명을 누를 수 있게 */
   .sup-name, .rank-name { cursor:pointer; }
   .sup-row:hover .sup-name, .rank-row:hover .rank-name { color:var(--signature); text-decoration:underline; }
+  /* 시장 폭 */
+  .bd-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1px;
+             background:var(--hair); border:1px solid var(--hair); border-radius:11px; overflow:hidden; }
+  .bd-cell { background:var(--surface); padding:10px 12px; }
+  .bd-k { font-size:10.5px; color:var(--textTer); margin-bottom:4px; }
+  .bd-v { font-family:var(--mono); font-size:17px; font-weight:700; line-height:1.2; }
+  .bd-s { font-size:10.5px; color:var(--textTer); font-family:var(--mono); margin-top:3px; }
+  .bd-bar { height:6px; border-radius:4px; background:var(--surface2); overflow:hidden; display:flex; margin-top:7px; }
+  .bd-bar i { display:block; height:100%; }
+  .bd-sec { margin-top:14px; }
+  .bd-sec-h { font-size:11px; color:var(--textTer); margin-bottom:7px; }
+  .bd-sec-row { display:flex; align-items:center; gap:8px; margin-bottom:5px; font-size:12px; }
+  .bd-sec-nm { width:86px; flex:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .bd-sec-bar { flex:1; height:12px; background:var(--surface2); border-radius:4px; overflow:hidden; }
+  .bd-sec-bar i { display:block; height:100%; }
+  .bd-sec-v { width:52px; text-align:right; font-family:var(--mono); font-size:11.5px; flex:none; }
+  .bd-sec-p { width:54px; text-align:right; font-family:var(--mono); font-size:11.5px; flex:none; }
+  .bd-note { font-size:10.5px; color:var(--textTer); margin-top:10px; line-height:1.7; }
+  @media (max-width:560px) { .bd-sec-nm { width:70px; } .bd-v { font-size:15px; } }
 </style>
 </head>
 <body data-page="day">
@@ -141,6 +160,15 @@
     <div class="idx-grid" id="idxGrid">
       <div class="news-empty">불러오는 중...</div>
     </div>
+  </div>
+
+  <div class="card">
+    <div class="between" style="margin-bottom:12px;">
+      <div style="font-size:13px;color:var(--textSec);">시장 폭
+        <span style="font-size:11px;color:var(--textTer);">지수가 아니라 종목이 어땠는지</span></div>
+      <span id="bdMeta" style="font-size:10.5px;color:var(--textTer);font-family:var(--mono);"></span>
+    </div>
+    <div id="bdBody"><div class="news-empty">불러오는 중...</div></div>
   </div>
 
   <div class="layout">
@@ -1119,6 +1147,81 @@ document.addEventListener("click", e => {
   if (!el || !el.dataset.stk) return;
   openStock(el.dataset.stk, el.dataset.nm || "");
 });
+
+// ── 시장 폭 ─────────────────────────────────────
+// 지수는 큰 종목 몇 개로도 움직이지만, 실제로 몇 종목이 올랐는지는 따로 봐야 합니다.
+let BD = null;
+
+function bd그리기() {
+  const 몸 = document.getElementById("bdBody");
+  if (!BD) { 몸.innerHTML = `<div class="news-empty">불러오지 못했습니다.</div>`; return; }
+
+  const 돈 = n => n == null ? "—" : Math.round(n).toLocaleString("ko-KR");
+  const 퍼 = v => v == null ? "—" : (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2) + "%";
+  const t = BD.total || {};
+  const kp = (BD.markets || {}).KOSPI || {}, kq = (BD.markets || {}).KOSDAQ || {};
+
+  // ADR 100 이 넘으면 오른 종목이 더 많다는 뜻입니다.
+  const adr색 = v => v == null ? "var(--textTer)" : v >= 100 ? T.up : T.down;
+  const 대비 = (BD.adr20 != null && t.adr != null) ? t.adr - BD.adr20 : null;
+
+  const 칸 = [
+    ["ADR (오른 종목 ÷ 내린 종목)", `${t.adr ?? "—"}`, adr색(t.adr),
+     BD.adr20 != null ? `20일 평균 ${BD.adr20}${대비 != null ? ` · ${대비 >= 0 ? "+" : "−"}${Math.abs(대비).toFixed(1)}` : ""}` : `쌓이는 중 (${BD.adrDays || 0}일)`],
+    ["오른 종목", 돈(t.rising), T.up, `내린 종목 ${돈(t.falling)} · 보합 ${돈(t.flat)}`],
+    ["코스피 ADR", `${kp.adr ?? "—"}`, adr색(kp.adr), `${돈(kp.rising)} 대 ${돈(kp.falling)}`],
+    ["코스닥 ADR", `${kq.adr ?? "—"}`, adr색(kq.adr), `${돈(kq.rising)} 대 ${돈(kq.falling)}`],
+    ["거래대금 가중 등락률", 퍼(kp.weightedChangePct), (kp.weightedChangePct ?? 0) >= 0 ? T.up : T.down,
+     `코스피 지수 ${퍼(kp.changePct)}`],
+    ["60일 신고가", `${BD.high60 ?? "—"}`, T.up, `정배열 ${BD.aligned ?? "—"} · ${BD.rsDate || ""} 기준`],
+  ];
+
+  const 총 = (t.rising || 0) + (t.falling || 0) + (t.flat || 0) || 1;
+  let h = `<div class="bd-grid">` + 칸.map(([k, v, c, s]) =>
+    `<div class="bd-cell"><div class="bd-k">${k}</div>
+       <div class="bd-v" style="color:${c}">${v}</div>
+       <div class="bd-s">${s}</div></div>`).join("") + `</div>
+    <div class="bd-bar">
+      <i style="width:${(t.rising || 0) / 총 * 100}%;background:${T.up}"></i>
+      <i style="width:${(t.flat || 0) / 총 * 100}%;background:var(--hair)"></i>
+      <i style="width:${(t.falling || 0) / 총 * 100}%;background:${T.down}"></i>
+    </div>`;
+
+  // 거래대금이 어느 업종에 몰렸는지 — 겹치는 업종(대형주·제조 등)은 서버가 빼고 셉니다.
+  for (const [이름, m] of [["코스피", kp], ["코스닥", kq]]) {
+    if (!m.믿을만 || !(m.sectors || []).length) continue;
+    h += `<div class="bd-sec"><div class="bd-sec-h">${이름} 거래대금 비중</div>` +
+      m.sectors.slice(0, 5).map(x => `
+        <div class="bd-sec-row">
+          <span class="bd-sec-nm">${x.name}</span>
+          <span class="bd-sec-bar"><i style="width:${Math.min(100, x.share).toFixed(1)}%;background:${(x.changePct ?? 0) >= 0 ? T.up : T.down}"></i></span>
+          <span class="bd-sec-v">${x.share.toFixed(1)}%</span>
+          <span class="bd-sec-p" style="color:${(x.changePct ?? 0) >= 0 ? T.up : T.down}">${퍼(x.changePct)}</span>
+        </div>`).join("") + `</div>`;
+  }
+
+  h += `<div class="bd-note">ADR 이 100 보다 크면 오른 종목이 더 많다는 뜻입니다. ` +
+       `거래대금 가중 등락률은 큰 종목에 무게를 둔 값이라, 지수보다 높으면 대형주가 장을 끌었다는 의미입니다.</div>`;
+  몸.innerHTML = h;
+
+  const 시각 = BD.generatedAt
+    ? new Date(BD.generatedAt).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false })
+    : "";
+  document.getElementById("bdMeta").textContent = `${시각} 기준` + (BD.stale ? " · 지난 값" : "");
+}
+
+async function bd받기() {
+  try {
+    const r = await fetch("/api/market-breadth", { cache: "no-store" });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    BD = d;
+  } catch (e) { BD = null; }
+  bd그리기();
+}
+bd받기();
+setInterval(bd받기, 60000);
+
 </script>
 </body>
 </html>
