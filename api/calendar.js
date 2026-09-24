@@ -164,7 +164,7 @@ async function 미국파일가져오기() {
       if (!k) continue;
       결과.push({
         date: k.date, time: k.time, title: x.title, importance: x.importance || "보통",
-        market: "US", source: "BLS",
+        market: "US", source: x.title.includes("FOMC") ? "연준" : "BLS", memo: x.memo || "",
       });
     }
     미국캐시 = { at: Date.now(), items: 결과, through: j.through || null };
