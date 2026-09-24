@@ -60,18 +60,48 @@ function ics풀기(글) {
   return 결과;
 }
 
-let BLS캐시 = { at: 0, items: null };
-async function bls가져오기() {
-  if (BLS캐시.items && Date.now() - BLS캐시.at < 12 * 3600e3) return BLS캐시.items;
+let BLS캐시 = { at: 0, items: null, 방법: null, 오류: null };
+
+// 미국 노동부가 클라우드 서버의 접속을 막는 경우가 있어, 세 가지 길을 차례로 시도합니다.
+const 길들 = [
+  { 이름: "직접", url: BLS_ICS },
+  { 이름: "www 없이", url: "https://bls.gov/schedule/news_release/bls.ics" },
+  { 이름: "중계서버", url: "http://141.164.40.229:3000/bls-ics" },
+];
+
+async function 한길(주소) {
   const ac = new AbortController();
-  const 시계 = setTimeout(() => ac.abort(), 15000);
+  const 시계 = setTimeout(() => ac.abort(), 12000);
   try {
-    const r = await fetch(BLS_ICS, {
+    const r = await fetch(주소, {
       signal: ac.signal,
-      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36",
+        "Accept": "text/calendar,text/plain,*/*",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
     });
-    if (!r.ok) throw new Error("bls " + r.status);
-    const 원본 = ics풀기(await r.text());
+    if (!r.ok) throw new Error(r.status + " " + r.statusText);
+    const 글 = await r.text();
+    if (!글.includes("BEGIN:VEVENT")) throw new Error("달력 형식이 아님 (" + 글.length + "자)");
+    return 글;
+  } finally { clearTimeout(시계); }
+}
+
+async function bls가져오기() {
+  if (BLS캐시.items && BLS캐시.items.length && Date.now() - BLS캐시.at < 12 * 3600e3) return BLS캐시.items;
+  const 실패 = [];
+  let 글 = null, 쓴길 = null;
+  for (const 길 of 길들) {
+    try { 글 = await 한길(길.url); 쓴길 = 길.이름; break; }
+    catch (e) { 실패.push(`${길.이름}: ${String((e && e.message) || e).slice(0, 60)}`); }
+  }
+  if (!글) {
+    BLS캐시.오류 = 실패.join(" | ");
+    return BLS캐시.items || [];
+  }
+  try {
+    const 원본 = ics풀기(글);
     const 결과 = [];
     for (const x of 원본) {
       const 짝 = 골라쓰기.find(([re]) => re.test(x.summary));
@@ -83,11 +113,12 @@ async function bls가져오기() {
         market: "US", source: "BLS", original: x.summary,
       });
     }
-    BLS캐시 = { at: Date.now(), items: 결과 };
+    BLS캐시 = { at: Date.now(), items: 결과, 방법: 쓴길, 오류: null };
     return 결과;
   } catch (e) {
-    return BLS캐시.items || [];                 // 실패하면 지난 것이라도
-  } finally { clearTimeout(시계); }
+    BLS캐시.오류 = "읽기 실패: " + String((e && e.message) || e);
+    return BLS캐시.items || [];
+  }
 }
 
 // ── 직접 적은 일정 ───────────────────────────────
@@ -135,6 +166,7 @@ export default async function handler(req, res) {
       generatedAt: new Date().toISOString(),
       count: 모두.length,
       counts: { 직접: mine.length, BLS: us.length },
+      bls: { 방법: BLS캐시.방법, 오류: BLS캐시.오류 },
       byDate: 날짜별,
     });
   } catch (e) {
