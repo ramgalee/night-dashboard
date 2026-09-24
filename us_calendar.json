@@ -1,29 +1,204 @@
 {
-  "note": "미국 노동부(BLS) 공식 발표 일정. 시각은 미국 동부 기준이며 화면이 한국 시각으로 바꿔 보여줍니다.",
-  "source": "https://www.bls.gov/schedule/news_release/bls.ics",
+  "note": "미국 노동부(BLS) 공식 발표 일정과 연준(Fed) FOMC 일정. 시각은 미국 동부 기준이며 화면이 한국 시각으로 바꿔 보여줍니다.",
+  "source": "BLS https://www.bls.gov/schedule/news_release/bls.ics · FOMC https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
   "updatedAt": "2026-09-24",
-  "through": "20261231",
+  "through": "20271208",
   "events": [
-    { "date": "20260929", "et": "10:00", "title": "미국 구인·이직 JOLTS", "importance": "보통" },
-    { "date": "20261002", "et": "08:30", "title": "미국 고용보고서", "importance": "높음" },
-    { "date": "20261014", "et": "08:30", "title": "미국 소비자물가 CPI", "importance": "높음" },
-    { "date": "20261014", "et": "08:30", "title": "미국 실질임금", "importance": "낮음" },
-    { "date": "20261015", "et": "08:30", "title": "미국 생산자물가 PPI", "importance": "보통" },
-    { "date": "20261016", "et": "08:30", "title": "미국 수출입물가", "importance": "낮음" },
-    { "date": "20261030", "et": "08:30", "title": "미국 고용비용지수 ECI", "importance": "보통" },
-    { "date": "20261103", "et": "10:00", "title": "미국 구인·이직 JOLTS", "importance": "보통" },
-    { "date": "20261105", "et": "08:30", "title": "미국 생산성·단위노동비용", "importance": "낮음" },
-    { "date": "20261106", "et": "08:30", "title": "미국 고용보고서", "importance": "높음" },
-    { "date": "20261110", "et": "08:30", "title": "미국 소비자물가 CPI", "importance": "높음" },
-    { "date": "20261110", "et": "08:30", "title": "미국 실질임금", "importance": "낮음" },
-    { "date": "20261113", "et": "08:30", "title": "미국 생산자물가 PPI", "importance": "보통" },
-    { "date": "20261117", "et": "08:30", "title": "미국 수출입물가", "importance": "낮음" },
-    { "date": "20261201", "et": "10:00", "title": "미국 구인·이직 JOLTS", "importance": "보통" },
-    { "date": "20261204", "et": "08:30", "title": "미국 고용보고서", "importance": "높음" },
-    { "date": "20261208", "et": "08:30", "title": "미국 생산성·단위노동비용", "importance": "낮음" },
-    { "date": "20261210", "et": "08:30", "title": "미국 소비자물가 CPI", "importance": "높음" },
-    { "date": "20261210", "et": "08:30", "title": "미국 실질임금", "importance": "낮음" },
-    { "date": "20261215", "et": "08:30", "title": "미국 생산자물가 PPI", "importance": "보통" },
-    { "date": "20261217", "et": "08:30", "title": "미국 수출입물가", "importance": "낮음" }
+    {
+      "date": "20260929",
+      "et": "10:00",
+      "title": "미국 구인·이직 JOLTS",
+      "importance": "보통"
+    },
+    {
+      "date": "20261002",
+      "et": "08:30",
+      "title": "미국 고용보고서",
+      "importance": "높음"
+    },
+    {
+      "date": "20261014",
+      "et": "08:30",
+      "title": "미국 소비자물가 CPI",
+      "importance": "높음"
+    },
+    {
+      "date": "20261014",
+      "et": "08:30",
+      "title": "미국 실질임금",
+      "importance": "낮음"
+    },
+    {
+      "date": "20261015",
+      "et": "08:30",
+      "title": "미국 생산자물가 PPI",
+      "importance": "보통"
+    },
+    {
+      "date": "20261016",
+      "et": "08:30",
+      "title": "미국 수출입물가",
+      "importance": "낮음"
+    },
+    {
+      "date": "20261028",
+      "et": "14:00",
+      "title": "FOMC 결과 발표",
+      "importance": "높음",
+      "memo": "10월 27~28일 회의"
+    },
+    {
+      "date": "20261030",
+      "et": "08:30",
+      "title": "미국 고용비용지수 ECI",
+      "importance": "보통"
+    },
+    {
+      "date": "20261103",
+      "et": "10:00",
+      "title": "미국 구인·이직 JOLTS",
+      "importance": "보통"
+    },
+    {
+      "date": "20261105",
+      "et": "08:30",
+      "title": "미국 생산성·단위노동비용",
+      "importance": "낮음"
+    },
+    {
+      "date": "20261106",
+      "et": "08:30",
+      "title": "미국 고용보고서",
+      "importance": "높음"
+    },
+    {
+      "date": "20261110",
+      "et": "08:30",
+      "title": "미국 소비자물가 CPI",
+      "importance": "높음"
+    },
+    {
+      "date": "20261110",
+      "et": "08:30",
+      "title": "미국 실질임금",
+      "importance": "낮음"
+    },
+    {
+      "date": "20261113",
+      "et": "08:30",
+      "title": "미국 생산자물가 PPI",
+      "importance": "보통"
+    },
+    {
+      "date": "20261117",
+      "et": "08:30",
+      "title": "미국 수출입물가",
+      "importance": "낮음"
+    },
+    {
+      "date": "20261201",
+      "et": "10:00",
+      "title": "미국 구인·이직 JOLTS",
+      "importance": "보통"
+    },
+    {
+      "date": "20261204",
+      "et": "08:30",
+      "title": "미국 고용보고서",
+      "importance": "높음"
+    },
+    {
+      "date": "20261208",
+      "et": "08:30",
+      "title": "미국 생산성·단위노동비용",
+      "importance": "낮음"
+    },
+    {
+      "date": "20261209",
+      "et": "14:00",
+      "title": "FOMC 결과 발표",
+      "importance": "높음",
+      "memo": "12월 8~9일 회의 · 경제전망(점도표) 함께 발표"
+    },
+    {
+      "date": "20261210",
+      "et": "08:30",
+      "title": "미국 소비자물가 CPI",
+      "importance": "높음"
+    },
+    {
+      "date": "20261210",
+      "et": "08:30",
+      "title": "미국 실질임금",
+      "importance": "낮음"
+    },
+    {
+      "date": "20261215",
+      "et": "08:30",
+      "title": "미국 생산자물가 PPI",
+      "importance": "보통"
+    },
+    {
+      "date": "20261217",
+      "et": "08:30",
+      "title": "미국 수출입물가",
+      "importance": "낮음"
+    },
+    {
+      "date": "20270127",
+      "et": "14:00",
+      "title": "FOMC 결과 발표",
+      "importance": "높음",
+      "memo": "1월 26~27일 회의"
+    },
+    {
+      "date": "20270317",
+      "et": "14:00",
+      "title": "FOMC 결과 발표",
+      "importance": "높음",
+      "memo": "3월 16~17일 회의 · 경제전망(점도표)"
+    },
+    {
+      "date": "20270428",
+      "et": "14:00",
+      "title": "FOMC 결과 발표",
+      "importance": "높음",
+      "memo": "4월 27~28일 회의"
+    },
+    {
+      "date": "20270609",
+      "et": "14:00",
+      "title": "FOMC 결과 발표",
+      "importance": "높음",
+      "memo": "6월 8~9일 회의 · 경제전망(점도표)"
+    },
+    {
+      "date": "20270728",
+      "et": "14:00",
+      "title": "FOMC 결과 발표",
+      "importance": "높음",
+      "memo": "7월 27~28일 회의"
+    },
+    {
+      "date": "20270915",
+      "et": "14:00",
+      "title": "FOMC 결과 발표",
+      "importance": "높음",
+      "memo": "9월 14~15일 회의 · 경제전망(점도표)"
+    },
+    {
+      "date": "20271027",
+      "et": "14:00",
+      "title": "FOMC 결과 발표",
+      "importance": "높음",
+      "memo": "10월 26~27일 회의"
+    },
+    {
+      "date": "20271208",
+      "et": "14:00",
+      "title": "FOMC 결과 발표",
+      "importance": "높음",
+      "memo": "12월 7~8일 회의 · 경제전망(점도표)"
+    }
   ]
 }
