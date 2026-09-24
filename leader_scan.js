@@ -15,8 +15,10 @@ const path = require('path');
 
 const 안 = 'http://127.0.0.1:3000';
 const 신선 = 5 * 60 * 1000;
-const 동시 = 4;                    // 한 번에 부르는 종목 수
+const 간격 = 300;                  // 종목 사이 쉬는 시간(ms) — 키움이 밀리지 않게 하나씩 천천히
 const 테마상위 = 12;               // 오늘 오른 테마 몇 개까지를 '상위'로 볼지
+// ETF·레버리지·리츠는 주도주를 찾는 목록에서 뺍니다.
+const 뺄이름 = /(KODEX|TIGER|PLUS|ACE |SOL |RISE |HANARO|KOSEF|ARIRANG|TIMEFOLIO|KIWOOM |BNK|WOORI|마이다스|파워|레버리지|인버스|선물|ETN|리츠|스팩)/i;
 
 async function 내부(경로, 시도 = 2) {
   let 마지막;
@@ -83,10 +85,9 @@ function 상태보기(series) {
   return { osc: o, prevOsc: y, 상태, 연속: Math.min(연속, 60), date: 오늘.date, close: 오늘.close };
 }
 
-const 캐시 = { data: null, at: 0, 도는중: null };
+const 캐시 = { data: null, at: 0, 도는중: null, 진행: 0, 전체: 0 };
 
 async function 훑기() {
-  if (캐시.data && Date.now() - 캐시.at < 신선) return 캐시.data;
   if (캐시.도는중) return await 캐시.도는중;
 
   캐시.도는중 = (async () => {
@@ -95,7 +96,7 @@ async function 훑기() {
     const 후보 = (tr.up50 || tr.up || []).map((r, i) => ({
       code: String(r.code || '').trim(), name: r.name, market: r.market,
       changePct: r.changePct, 등락순위: i + 1,
-    })).filter(x => x.code);
+    })).filter(x => x.code && !뺄이름.test(x.name || ''));
 
     // 2) 오늘 오른 테마와, 그 테마에 든 종목
     let 테마이름 = {}, 오른테마 = [];
@@ -115,18 +116,18 @@ async function 훑기() {
 
     const rs = await rs읽기();
 
-    // 3) 종목마다 오실레이터 — 몇 개씩 나눠 부릅니다
+    // 3) 종목마다 오실레이터 — 하나씩 천천히 부릅니다.
+    //    한꺼번에 부르면 키움이 밀려 대부분 빈손으로 돌아옵니다.
     const 결과 = [];
-    for (let i = 0; i < 후보.length; i += 동시) {
-      const 묶음 = 후보.slice(i, i + 동시);
-      const 받음 = await Promise.all(묶음.map(async x => {
-        try {
-          const d = await 내부('/flow-oscillator?code=' + encodeURIComponent(x.code), 1);
-          return 상태보기(d.series);
-        } catch (e) { return null; }
-      }));
-      묶음.forEach((x, k) => {
-        const s = 받음[k];
+    캐시.진행 = 0; 캐시.전체 = 후보.length;
+    for (const x of 후보) {
+      캐시.진행 += 1;
+      let s = null;
+      try {
+        const d = await 내부('/flow-oscillator?code=' + encodeURIComponent(x.code), 2);
+        s = 상태보기(d.series);
+      } catch (e) { s = null; }
+      {
         const v = rs[x.code] || {};
         const 테마 = 테마이름[x.code] || [];
         const 점수 =
@@ -142,8 +143,8 @@ async function 훑기() {
           테마, rs: v.rs ?? null, high60: !!v.high60, aligned: !!v.aligned,
           점수,
         });
-      });
-      await new Promise(r => setTimeout(r, 120));
+      }
+      await new Promise(r => setTimeout(r, 간격));
     }
 
     결과.sort((a, b) => b.점수 - a.점수 || (b.changePct ?? -99) - (a.changePct ?? -99));
@@ -162,14 +163,44 @@ async function 훑기() {
   finally { 캐시.도는중 = null; }
 }
 
+// 뒤에서 미리 계산해 둡니다. 화면은 계산이 끝난 결과만 받아 가므로 기다리지 않습니다.
+function 뒤에서() {
+  if (캐시.도는중) return;
+  훑기().catch(() => {});
+}
+
+// 장중에는 5분마다, 장이 닫혀 있으면 30분마다 새로 훑습니다.
+function 장중인가() {
+  const t = new Date(Date.now() + 9 * 3600e3);          // 한국 시간
+  const 요일 = t.getUTCDay(), 분 = t.getUTCHours() * 60 + t.getUTCMinutes();
+  return 요일 >= 1 && 요일 <= 5 && 분 >= 8 * 60 + 50 && 분 <= 15 * 60 + 45;
+}
+let 마지막시작 = 0;
+setInterval(() => {
+  const 주기 = 장중인가() ? 5 * 60 * 1000 : 30 * 60 * 1000;
+  if (Date.now() - 마지막시작 < 주기) return;
+  마지막시작 = Date.now();
+  뒤에서();
+}, 60 * 1000);
+
 module.exports = (app) => {
-  app.get('/leader-scan', async (req, res) => {
-    try {
-      res.setHeader('Cache-Control', 'no-store');
-      res.json(await 훑기());
-    } catch (e) {
-      if (캐시.data) return res.json({ ...캐시.data, stale: true });
-      res.status(500).json({ error: String((e && e.message) || e) });
+  app.get('/leader-scan', (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+
+    // 결과가 낡았으면 뒤에서 새로 계산을 시작하되, 응답은 기다리지 않습니다.
+    if (!캐시.도는중 && (!캐시.data || Date.now() - 캐시.at > 신선)) {
+      마지막시작 = Date.now();
+      뒤에서();
     }
+    if (캐시.data) {
+      return res.json({
+        ...캐시.data,
+        stale: Date.now() - 캐시.at > 신선,
+        계산중: !!캐시.도는중,
+      });
+    }
+    res.json({ ready: false, 계산중: true, 진행: 캐시.진행, 전체: 캐시.전체, items: [] });
   });
 };
+
+뒤에서();                                                 // 서버가 켜질 때 한 번
