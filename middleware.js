@@ -86,7 +86,12 @@ export default async function middleware(req) {
 
     const expected = await tokenOf(pw);
 
-    // 로그인 제출
+    // 이미 통과한 사람은 그대로 보냅니다.
+    // 화면이 POST 로 부르는 기능(시장 요약 등)이 있어, 로그인 확인보다 먼저 봅니다.
+    // 이 줄이 뒤에 있으면 요약 요청까지 로그인 시도로 처리되어 막힙니다.
+    if (readCookie(req, COOKIE) === expected) return passThrough();
+
+    // 로그인 제출 — 아직 통과하지 않은 사람의 POST 만 여기로 옵니다.
     if (req.method === 'POST') {
       let entered = '';
       try {
@@ -106,9 +111,6 @@ export default async function middleware(req) {
       }
       return htmlResponse(loginPage('비밀번호가 맞지 않습니다.'), 401);
     }
-
-    // 이미 통과한 사람
-    if (readCookie(req, COOKIE) === expected) return passThrough();
 
     return htmlResponse(loginPage(''), 401);
   } catch (e) {
