@@ -146,6 +146,16 @@
     h1 { font-size: 18px; }
     .tr-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
   }
+  /* 메뉴 버튼 — 좁은 화면에서 글자가 세로로 쪼개지지 않게 */
+  button, .between a button { white-space: nowrap; }
+  @media (max-width: 640px) {
+    .between > div:last-child { gap: 6px; flex-wrap: wrap; }
+    .between > div:last-child button { font-size: 11px; padding: 7px 9px; }
+    .between > div:last-child a { display: inline-flex; }
+  }
+  @media (max-width: 400px) {
+    .between > div:last-child button { font-size: 10.5px; padding: 6px 8px; }
+  }
 </style>
 </head>
 <body>

@@ -127,6 +127,16 @@
     .nums { grid-template-columns:repeat(auto-fit,minmax(144px,1fr)); }
     .num-v { font-size:clamp(12px, 3.6vw, 15px); }
   }
+  /* 메뉴 버튼 — 좁은 화면에서 글자가 세로로 쪼개지지 않게 */
+  button, .between a button { white-space: nowrap; }
+  @media (max-width: 640px) {
+    .between > div:last-child { gap: 6px; flex-wrap: wrap; }
+    .between > div:last-child button { font-size: 11px; padding: 7px 9px; }
+    .between > div:last-child a { display: inline-flex; }
+  }
+  @media (max-width: 400px) {
+    .between > div:last-child button { font-size: 10.5px; padding: 6px 8px; }
+  }
 </style>
 </head>
 <body>
@@ -244,6 +254,7 @@ const pct = v => (v == null ? "—" : (v >= 0 ? "+" : "−") + Math.abs(v).toFix
 const cls = v => (v >= 0 ? "u" : "d");
 const fmtD = d => (d && d.length === 8) ? `${d.slice(0,4)}.${d.slice(4,6)}.${d.slice(6,8)}` : "";
 
+let 요약했나 = false;      // 시장 요약을 한 번만 쓰기 위한 표시
 let IDX = null, SECTOR = { KOSPI: null, KOSDAQ: null }, FG = null, RS = null;
 
 // ── 시장 요약 ────────────────────────────────────
@@ -514,7 +525,8 @@ async function load() {
 
   paintBrief();
   paintStreak();
-  if (!요약했나) { 요약했나 = true; 요약쓰기(); }      // 자료가 오면 한 번만 씁니다
+  // 아래쪽 블록에서 만들어지는 함수라, 준비된 뒤에만 부릅니다
+  if (!요약했나 && typeof 요약쓰기 === "function") { 요약했나 = true; 요약쓰기(); }
 }
 
 load();
@@ -616,7 +628,6 @@ setInterval(load, 300000);
 })();
 
 const 요약시장 = "kr";
-let 요약했나 = false;
 let 쏠림 = null, 테마 = null, 폭 = null;
 
 // 쏠림지수와 테마는 다른 페이지 자료라 따로 받아옵니다.
