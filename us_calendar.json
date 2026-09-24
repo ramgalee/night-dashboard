@@ -1,0 +1,29 @@
+{
+  "note": "미국 노동부(BLS) 공식 발표 일정. 시각은 미국 동부 기준이며 화면이 한국 시각으로 바꿔 보여줍니다.",
+  "source": "https://www.bls.gov/schedule/news_release/bls.ics",
+  "updatedAt": "2026-09-24",
+  "through": "20261231",
+  "events": [
+    { "date": "20260929", "et": "10:00", "title": "미국 구인·이직 JOLTS", "importance": "보통" },
+    { "date": "20261002", "et": "08:30", "title": "미국 고용보고서", "importance": "높음" },
+    { "date": "20261014", "et": "08:30", "title": "미국 소비자물가 CPI", "importance": "높음" },
+    { "date": "20261014", "et": "08:30", "title": "미국 실질임금", "importance": "낮음" },
+    { "date": "20261015", "et": "08:30", "title": "미국 생산자물가 PPI", "importance": "보통" },
+    { "date": "20261016", "et": "08:30", "title": "미국 수출입물가", "importance": "낮음" },
+    { "date": "20261030", "et": "08:30", "title": "미국 고용비용지수 ECI", "importance": "보통" },
+    { "date": "20261103", "et": "10:00", "title": "미국 구인·이직 JOLTS", "importance": "보통" },
+    { "date": "20261105", "et": "08:30", "title": "미국 생산성·단위노동비용", "importance": "낮음" },
+    { "date": "20261106", "et": "08:30", "title": "미국 고용보고서", "importance": "높음" },
+    { "date": "20261110", "et": "08:30", "title": "미국 소비자물가 CPI", "importance": "높음" },
+    { "date": "20261110", "et": "08:30", "title": "미국 실질임금", "importance": "낮음" },
+    { "date": "20261113", "et": "08:30", "title": "미국 생산자물가 PPI", "importance": "보통" },
+    { "date": "20261117", "et": "08:30", "title": "미국 수출입물가", "importance": "낮음" },
+    { "date": "20261201", "et": "10:00", "title": "미국 구인·이직 JOLTS", "importance": "보통" },
+    { "date": "20261204", "et": "08:30", "title": "미국 고용보고서", "importance": "높음" },
+    { "date": "20261208", "et": "08:30", "title": "미국 생산성·단위노동비용", "importance": "낮음" },
+    { "date": "20261210", "et": "08:30", "title": "미국 소비자물가 CPI", "importance": "높음" },
+    { "date": "20261210", "et": "08:30", "title": "미국 실질임금", "importance": "낮음" },
+    { "date": "20261215", "et": "08:30", "title": "미국 생산자물가 PPI", "importance": "보통" },
+    { "date": "20261217", "et": "08:30", "title": "미국 수출입물가", "importance": "낮음" }
+  ]
+}
