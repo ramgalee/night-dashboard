@@ -19,6 +19,20 @@ export const config = { maxDuration: 60 };
 const 캐시 = new Map();          // 열쇠 → { text, at }
 const 캐시시간 = 20 * 60 * 1000;
 
+// 지표 하나만 놓고 짧게 해석할 때 쓰는 규칙
+const 지표규칙 = `당신은 한국 경제지 증권부 기자입니다. 지표 하나를 놓고 지금 상태를 짚어 줍니다.
+
+문체
+- 경제지 기사체. 문장 끝은 '-했다', '-이다' 로 통일한다.
+- 2~3문장, 한 문단. 제목이나 목록 기호를 쓰지 않는다.
+- 숫자는 주어진 그대로 쓴다.
+
+반드시 지킬 것
+- 주어진 수치만으로 말한다. 뉴스·발언·정책 같은 바깥 사정은 지어내지 않는다.
+- 투자 권유로 읽힐 표현을 쓰지 않는다. ("매수 기회", "비중 확대", "지금 사야" 등 금지)
+- 앞으로 오를지 내릴지 예측하지 않는다. 지금이 어떤 상태인지, 최근 흐름이 어느 쪽인지까지만 쓴다.
+- 과열이나 위축 같은 상태 서술은 해도 된다.`;
+
 const 규칙 = `당신은 한국 경제지 증권부 기자입니다. 주어진 수치만으로 마감 시황 기사를 씁니다.
 
 문체
@@ -98,6 +112,42 @@ function 국내정리(d) {
   return 줄.join("\n");
 }
 
+// ── 지표 하나 해석 ───────────────────────────────
+function 공포탐욕정리(d) {
+  const 줄 = [];
+  if (d.date) 줄.push(`기준일: ${d.date} · 시장: ${d.market || "코스피"}`);
+  줄.push(`공포탐욕지수: ${짧게(d.fg, 1)} (0에 가까울수록 공포, 100에 가까울수록 탐욕)`);
+  if (d.label) 줄.push(`구간: ${d.label}`);
+  if (d.prev != null) 줄.push(`전일: ${짧게(d.prev, 1)}`);
+  if (d.ema20 != null) 줄.push(`20일 지수이동평균: ${짧게(d.ema20, 1)} — 지수가 이 선 위면 오름세, 아래면 내림세`);
+  if (d.osc != null) 줄.push(`오실레이터(MACD 히스토그램): ${짧게(d.osc, 3)}` +
+    (d.prevOsc != null ? ` (전일 ${짧게(d.prevOsc, 3)})` : ""));
+  if (d.close != null) 줄.push(`${d.market || "코스피"} 종가: ${d.close}`);
+  if (d.parts) {
+    const a = Object.entries(d.parts).filter(([, v]) => v != null)
+      .map(([k, v]) => `${k} ${짧게(v, 1)}`);
+    if (a.length) 줄.push(`구성 항목(각 20% 가중, 0~100 환산): ${a.join(", ")}`);
+  }
+  return 줄.join("\n");
+}
+
+function 쏠림정리(d) {
+  const 줄 = [];
+  if (d.date) 줄.push(`기준일: ${d.date} · 시장: ${d.market || "코스피"}`);
+  줄.push(`업종 쏠림지수는 그날 많이 오른 상위 ${d.topN || 5}개 업종에 상승이 얼마나 몰렸는지를 나타낸다.`);
+  if (d.top && d.top.length) 줄.push(`오늘 주도 업종: ${d.top.join(", ")}`);
+  if (d.osc != null) 줄.push(`오실레이터: ${짧게(d.osc, 3)}` +
+    (d.prevOsc != null ? ` (전일 ${짧게(d.prevOsc, 3)})` : "") +
+    ` — 0보다 크고 오르면 주도 업종 쏠림, 0보다 작거나 내리면 순환매 성격`);
+  if (d.corr != null) 줄.push(`동조화(30일): ${짧게(d.corr, 3)}` +
+    (d.prevCorr != null ? ` (전일 ${짧게(d.prevCorr, 3)})` : "") +
+    ` — 높으면 업종이 한 몸처럼, 낮으면 업종별로 따로 움직였다는 뜻`);
+  if (d.recent && d.recent.length) {
+    줄.push(`최근 주도 업종 흐름: ` + d.recent.map(x => `${x.date.slice(4)} ${x.top.slice(0, 3).join("·")}`).join(" / "));
+  }
+  return 줄.join("\n");
+}
+
 function 미국정리(d) {
   const 줄 = [];
   for (const g of (d.groups || [])) {
@@ -118,9 +168,12 @@ export default async function handler(req, res) {
   if (!키) return res.status(500).json({ error: "ANTHROPIC_API_KEY 가 없습니다" });
 
   const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
-  const 시장 = body.market === "us" ? "us" : "kr";
+  const 시장 = ["us", "fg", "tilt"].includes(body.market) ? body.market : "kr";
   const 자료 = body.data || {};
-  let 본문 = 시장 === "us" ? 미국정리(자료) : 국내정리(자료);
+  const 지표들 = { fg: 공포탐욕정리, tilt: 쏠림정리 };
+  const 지표냐 = !!지표들[시장];
+  let 본문 = 지표냐 ? 지표들[시장](자료)
+           : 시장 === "us" ? 미국정리(자료) : 국내정리(자료);
   // 종목 뉴스를 먼저, 시장 뉴스를 그다음에 넣습니다.
   // 시각순으로 자르면 정작 필요한 종목 뉴스가 잘려나갑니다.
   const 전부 = body.news || [];
@@ -139,6 +192,8 @@ export default async function handler(req, res) {
 
   const 머리 = 시장 === "us"
     ? "다음은 한국시간 기준 간밤 미국 증시 자료다. 지수·선물·금리·유가와 업종별 종목 등락이다.\n\n"
+    : 시장 === "fg" ? "다음은 오늘 공포탐욕지수 자료다. 지금 상태를 짚어 달라.\n\n"
+    : 시장 === "tilt" ? "다음은 오늘 업종 쏠림지수 자료다. 지금 상태를 짚어 달라.\n\n"
     : "다음은 오늘 한국 증시 마감 자료다.\n\n";
 
   async function 부르기(model) {
@@ -151,9 +206,9 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model,
-        max_tokens: 900,
+        max_tokens: 지표냐 ? 400 : 900,
         temperature: 0.3,
-        system: 규칙,
+        system: 지표냐 ? 지표규칙 : 규칙,
         messages: [{ role: "user", content: 머리 + 본문 }],
       }),
     });
