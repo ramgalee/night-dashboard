@@ -107,6 +107,7 @@
   .st-up   { background:#FEF3E6; color:#9A6210; }        /* 양수에서 상승 */
   .st-flat { background:var(--surface2); color:var(--textSec); }
   .st-rev  { background:#EEF3FE; color:#2F6FED; }        /* 음수에서 반등 */
+  .st-down { background:#E7EEFC; color:#1D4ED8; }        /* 음수 전환 */
   .ld-score { display:inline-block; min-width:20px; font-family:var(--mono); font-weight:700; }
   .ld-tag { font-size:9.5px; padding:1px 5px; border-radius:5px; margin-right:3px; }
   .tag-th { background:#F1EEFC; color:var(--signature); }
@@ -566,7 +567,7 @@ let LD = null, LD_TAB = "양수 전환", 주도주다시 = null;
 const 상태색 = {
   "양수 전환": "st-turn", "양수에서 상승": "st-up",
   "양수이나 둔화": "st-flat", "음수에서 반등": "st-rev",
-  "내림세": "st-flat", "자료 없음": "st-flat",
+  "음수 전환": "st-down", "내림세": "st-flat", "자료 없음": "st-flat",
 };
 function 주도주고르기() {
   const a = (LD && LD.items) || [];
@@ -593,7 +594,7 @@ function 주도주그리기() {
   const 세기 = 이름 => 이름 === "전체"
     ? (LD.items || []).length
     : (LD.items || []).filter(x => x.상태 === 이름).length;
-  const 탭들 = ["양수 전환", "음수에서 반등", "양수에서 상승", "양수이나 둔화", "전체"];
+  const 탭들 = ["양수 전환", "음수에서 반등", "양수에서 상승", "양수이나 둔화", "음수 전환", "전체"];
   탭.innerHTML = 탭들.map(n =>
     `<button data-ld="${n}" class="${n === LD_TAB ? "on" : ""}">${n}<b>${세기(n)}</b></button>`).join("");
   탭.querySelectorAll("[data-ld]").forEach(b =>
@@ -636,7 +637,8 @@ function 주도주그리기() {
   if (LD.계산중) { clearTimeout(주도주다시); 주도주다시 = setTimeout(주도주받기, 15000); }
   document.getElementById("ldNote").innerHTML =
     `<b>양수 전환</b>은 오실레이터가 0 아래에서 위로 올라선 첫날, <b>음수에서 반등</b>은 0 아래지만 전일보다 오른 상태입니다. ` +
-    `<b>양수에서 상승</b>은 연속 일수가 길수록 과매수 구간일 수 있습니다. ` +
+    `<b>양수에서 상승</b>은 연속 일수가 길수록 과매수 구간일 수 있고, ` +
+    `<b>음수 전환</b>은 0 위에서 아래로 내려선 첫날입니다. ` +
     `종목명을 누르면 아래 차트가 그 종목으로 바뀝니다.` +
     ((LD.themes || []).length ? `<br>오늘 오른 테마: ${LD.themes.slice(0, 6).map(t => `${t.name} ${t.changePct >= 0 ? "+" : "−"}${Math.abs(t.changePct).toFixed(2)}%`).join(" · ")}` : "");
 }
