@@ -10,6 +10,9 @@ const 매체 = [
   { name: "마켓워치", url: "https://feeds.content.dowjones.io/public/rss/mw_topstories" },
   { name: "야후 파이낸스", url: "https://finance.yahoo.com/news/rssindex" },
 ];
+// 증시와 무관한 개인 재테크·생활 기사는 걸러냅니다 (마켓워치 Top Stories 에 많이 섞입니다)
+const 버릴말 = /credit card|retirement|retire[d]? |my husband|my wife|my son|my daughter|inherit|social security|mortgage rate|dear (quentin|moneyist)|moneyist|how much should i|should i (buy|sell) a (house|car)|divorce|will and testament/i;
+
 const 종목피드 = s =>
   `https://feeds.finance.yahoo.com/rss/2.0/headline?s=${encodeURIComponent(s)}&region=US&lang=en-US`;
 
@@ -22,8 +25,11 @@ function 태그(글, 이름) {
   return m[1]
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
     .replace(/<[^>]+>/g, "")
-    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ")
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
+    .replace(/&apos;/g, "'").replace(/&quot;/g, '"').replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -45,6 +51,7 @@ async function 한곳(이름, 주소, 표시) {
     for (const 조각 of 덩어리.slice(0, 25)) {
       const t = 태그(조각, "title");
       if (!t || t.length < 12) continue;
+      if (버릴말.test(t)) continue;
       rows.push({
         title: t.slice(0, 180),
         link: 태그(조각, "link") || "",
