@@ -471,7 +471,12 @@ async function 요약쓰기(다시) {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ market: 요약시장, data: 자료, news: 뉴스목록, force: !!다시 }),
     });
-    const d = await r.json();
+    const 원문 = await r.text();
+    let d;
+    try { d = JSON.parse(원문); }
+    catch (e) {                                   // 서버가 오류 페이지를 준 경우
+      throw new Error(`${r.status} ` + 원문.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 110));
+    }
     if (d.error) throw new Error(d.error);
     글.className = "ai-text";
     글.textContent = d.text;

@@ -617,7 +617,12 @@ async function 요약쓰기(다시) {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ market: 요약시장, data: 자료, force: !!다시 }),
     });
-    const d = await r.json();
+    const 원문 = await r.text();
+    let d;
+    try { d = JSON.parse(원문); }
+    catch (e) {                                   // 서버가 오류 페이지를 준 경우
+      throw new Error(`${r.status} ` + 원문.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 110));
+    }
     if (d.error) throw new Error(d.error);
     글.className = "ai-text";
     글.textContent = d.text;
@@ -626,7 +631,8 @@ async function 요약쓰기(다시) {
       + (d.cached ? " (저장된 글)" : "");
   } catch (e) {
     글.className = "ai-text wait";
-    글.textContent = "요약을 만들지 못했습니다. 다시 쓰기를 눌러보세요.";
+    // 이유를 그대로 보여줍니다 — 휴대폰에서도 원인을 알 수 있게
+    글.textContent = "요약을 만들지 못했습니다 — " + (e && e.message ? e.message : e);
   }
 }
 document.getElementById("aiGo").onclick = () => 요약쓰기(true);
