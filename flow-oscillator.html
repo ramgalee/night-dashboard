@@ -103,7 +103,7 @@
   .ld-cd { font-family:var(--mono); font-size:9.5px; color:var(--textTer); margin-left:5px; }
   .ld-num { font-family:var(--mono); }
   .ld-st { font-size:10.5px; padding:2px 7px; border-radius:6px; font-weight:600; }
-  .st-turn { background:#FDEBEC; color:#C0303A; }        /* 막 돌아섬 */
+  .st-turn { background:#FDEBEC; color:#C0303A; }        /* 양수 전환 */
   .st-up   { background:#FEF3E6; color:#9A6210; }        /* 양수에서 상승 */
   .st-flat { background:var(--surface2); color:var(--textSec); }
   .st-rev  { background:#EEF3FE; color:#2F6FED; }        /* 음수에서 반등 */
@@ -137,7 +137,7 @@
   <div class="card">
     <div class="ld-head">
       <div style="font-size:13px;color:var(--textSec);">오늘의 주도주
-        <span style="font-size:11px;color:var(--textTer);">거래대금 상위 150 중 등락률 상위 50 · 조건이 겹칠수록 점수가 높습니다</span></div>
+        <span style="font-size:11px;color:var(--textTer);">거래대금 상위 150 중 등락률 상위 50 (ETF 제외)</span></div>
       <span id="ldMeta" style="margin-left:auto;font-size:10.5px;color:var(--textTer);font-family:var(--mono);"></span>
     </div>
     <div class="ld-tabs" id="ldTabs"></div>
@@ -561,18 +561,15 @@ const UP = "#E5484D", DOWN = "#2F6FED";
 
 // ── 오늘의 주도주 ────────────────────────────────
 // 거래대금 상위 150 중 등락률 상위 50을 서버가 미리 훑어 둡니다.
-// 오실레이터 상태 · 오른 테마 소속 · 신고가/정배열을 겹쳐 점수를 냅니다.
-let LD = null, LD_TAB = "좋은 신호", 주도주다시 = null;
+// 오실레이터 상태별로 나눠 보여 줍니다. 점수 하나로 줄이면 과매수 종목이 높게 나와 판단이 흐려집니다.
+let LD = null, LD_TAB = "양수 전환", 주도주다시 = null;
 const 상태색 = {
-  "막 돌아섬": "st-turn", "양수에서 상승": "st-up",
+  "양수 전환": "st-turn", "양수에서 상승": "st-up",
   "양수이나 둔화": "st-flat", "음수에서 반등": "st-rev",
   "내림세": "st-flat", "자료 없음": "st-flat",
 };
-const 좋은상태 = ["막 돌아섬", "양수에서 상승"];
-
 function 주도주고르기() {
   const a = (LD && LD.items) || [];
-  if (LD_TAB === "좋은 신호") return a.filter(x => 좋은상태.includes(x.상태));
   if (LD_TAB === "전체") return a;
   return a.filter(x => x.상태 === LD_TAB);
 }
@@ -593,11 +590,10 @@ function 주도주그리기() {
     return;
   }
 
-  const 세기 = 이름 => 이름 === "좋은 신호"
-    ? (LD.items || []).filter(x => 좋은상태.includes(x.상태)).length
-    : 이름 === "전체" ? (LD.items || []).length
+  const 세기 = 이름 => 이름 === "전체"
+    ? (LD.items || []).length
     : (LD.items || []).filter(x => x.상태 === 이름).length;
-  const 탭들 = ["좋은 신호", "막 돌아섬", "양수에서 상승", "음수에서 반등", "전체"];
+  const 탭들 = ["양수 전환", "음수에서 반등", "양수에서 상승", "양수이나 둔화", "전체"];
   탭.innerHTML = 탭들.map(n =>
     `<button data-ld="${n}" class="${n === LD_TAB ? "on" : ""}">${n}<b>${세기(n)}</b></button>`).join("");
   탭.querySelectorAll("[data-ld]").forEach(b =>
@@ -610,7 +606,7 @@ function 주도주그리기() {
     const 퍼 = v => v == null ? "—" : (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2) + "%";
     몸.innerHTML = `<table class="ld-tbl">
       <thead><tr><th>종목</th><th>등락률</th><th>오실레이터</th><th>상태</th><th>연속</th>
-        <th>RS</th><th>표시</th><th>점수</th></tr></thead>
+        <th>RS</th><th>표시</th></tr></thead>
       <tbody>${줄.map(x => `<tr>
         <td><span class="ld-nm" data-stk="${x.code}">${x.name}</span><span class="ld-cd">${x.code}</span></td>
         <td class="ld-num" style="color:${(x.changePct ?? 0) >= 0 ? UP : DOWN}">${퍼(x.changePct)}</td>
@@ -622,7 +618,6 @@ function 주도주그리기() {
           (x.테마 || []).slice(0, 2).map(t => `<span class="ld-tag tag-th">${t}</span>`).join("") +
           (x.high60 ? `<span class="ld-tag tag-hi">新</span>` : "") +
           (x.aligned ? `<span class="ld-tag tag-al">정</span>` : "")}</td>
-        <td><span class="ld-score" style="color:${x.점수 >= 4 ? UP : "var(--textSec)"}">${x.점수}</span></td>
       </tr>`).join("")}</tbody></table>`;
     몸.querySelectorAll("[data-stk]").forEach(el =>
       el.onclick = () => {
@@ -640,7 +635,8 @@ function 주도주그리기() {
     + (LD.계산중 ? " · 새로 훑는 중" : "") + (LD.stale ? " · 지난 결과" : "");
   if (LD.계산중) { clearTimeout(주도주다시); 주도주다시 = setTimeout(주도주받기, 15000); }
   document.getElementById("ldNote").innerHTML =
-    `점수는 <b>오름세 · 오실레이터 양수 · 오실레이터 전일보다 상승 · 오른 테마 소속 · 신고가나 정배열</b> 다섯 가지 중 몇 개에 해당하는지입니다. ` +
+    `<b>양수 전환</b>은 오실레이터가 0 아래에서 위로 올라선 첫날, <b>음수에서 반등</b>은 0 아래지만 전일보다 오른 상태입니다. ` +
+    `<b>양수에서 상승</b>은 연속 일수가 길수록 과매수 구간일 수 있습니다. ` +
     `종목명을 누르면 아래 차트가 그 종목으로 바뀝니다.` +
     ((LD.themes || []).length ? `<br>오늘 오른 테마: ${LD.themes.slice(0, 6).map(t => `${t.name} ${t.changePct >= 0 ? "+" : "−"}${Math.abs(t.changePct).toFixed(2)}%`).join(" · ")}` : "");
 }

@@ -2,11 +2,12 @@
 //   GET /leader-scan
 //
 // 거래대금 상위 150 중 등락률 상위 50을 후보로 두고, 종목마다
-//   · 수급 오실레이터가 어떤 상태인지 (막 돌아섬 / 양수에서 상승 / 음수에서 반등)
+//   · 수급 오실레이터가 어떤 상태인지 (양수 전환 / 양수에서 상승 / 음수에서 반등)
 //   · 며칠째 이어지는지
 //   · 오늘 오른 테마에 속하는지
 //   · 60일 신고가나 정배열인지
-// 를 붙여 점수를 냅니다.
+// 를 붙여 돌려줍니다. 점수로 줄이지 않습니다.
+// (양수에서 오래 오른 종목은 과매수일 수 있어, 한 숫자로 합치면 판단이 흐려집니다.)
 //
 // 회원마다 종목을 하나씩 부르면 키움 호출이 감당이 안 되므로,
 // 서버가 한 번 계산해 5분간 나눠 씁니다.
@@ -69,7 +70,7 @@ function 상태보기(series) {
   const o = 오늘.oscillator, y = 어제.oscillator;
 
   let 상태 = '해당 없음';
-  if (o > 0 && y <= 0) 상태 = '막 돌아섬';
+  if (o > 0 && y <= 0) 상태 = '양수 전환';
   else if (o > 0 && o > y) 상태 = '양수에서 상승';
   else if (o > 0) 상태 = '양수이나 둔화';
   else if (o > y) 상태 = '음수에서 반등';
@@ -130,24 +131,22 @@ async function 훑기() {
       {
         const v = rs[x.code] || {};
         const 테마 = 테마이름[x.code] || [];
-        const 점수 =
-          (x.changePct > 0 ? 1 : 0) +
-          (s && s.osc > 0 ? 1 : 0) +
-          (s && s.osc > s.prevOsc ? 1 : 0) +
-          (테마.length ? 1 : 0) +
-          ((v.high60 || v.aligned) ? 1 : 0);
         결과.push({
           ...x,
           osc: s ? s.osc : null, prevOsc: s ? s.prevOsc : null,
           상태: s ? s.상태 : '자료 없음', 연속: s ? s.연속 : null,
           테마, rs: v.rs ?? null, high60: !!v.high60, aligned: !!v.aligned,
-          점수,
         });
       }
       await new Promise(r => setTimeout(r, 간격));
     }
 
-    결과.sort((a, b) => b.점수 - a.점수 || (b.changePct ?? -99) - (a.changePct ?? -99));
+    // 양수 전환을 맨 위로, 그다음 음수에서 반등, 나머지는 뒤로.
+    // 같은 상태끼리는 등락률 순입니다.
+    const 순서 = { '양수 전환': 0, '음수에서 반등': 1, '양수에서 상승': 2, '양수이나 둔화': 3, '내림세': 4, '자료 없음': 5 };
+    결과.sort((a, b) =>
+      (순서[a.상태] ?? 9) - (순서[b.상태] ?? 9) ||
+      (b.changePct ?? -99) - (a.changePct ?? -99));
 
     const out = {
       generatedAt: new Date().toISOString(),
