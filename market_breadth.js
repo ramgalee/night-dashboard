@@ -1,7 +1,9 @@
 // 시장 폭 지표
 //   GET /market-breadth
 //
-//   · ADR(등락비율)      오른 종목 ÷ 내린 종목 × 100 · 20일 평균과 함께
+//   · ADR(등락비율)      20일 동안의 상승종목수 합계 ÷ 하락종목수 합계 × 100
+//                        (증권사·adrinfo 와 같은 표준 방식. 80 아래 과매도, 120 위 과매수)
+//   · 당일 등락비율       오늘 하루만 본 상승 ÷ 하락 × 100
 //   · 섹터 거래비중       오늘 거래대금이 어느 업종에 몰렸는지
 //   · 거래대금 가중 등락률  큰 종목 중심으로 본 시장 등락
 //   · 60일 신고가 종목 수
@@ -92,7 +94,7 @@ function 시장하나(m, 이름) {
   return {
     index: 전체.index ?? null, changePct: 전체.changePct ?? null,
     rising: 오름, falling: 내림, flat: 보합, stocks: 전체.stocks || 0,
-    adr: 내림 ? Math.round(오름 / 내림 * 1000) / 10 : null,
+    adr: 내림 ? Math.round(오름 / 내림 * 1000) / 10 : null,   // 당일 비율 (20일 누적은 adr20)
     weightedChangePct: 가중 == null ? null : Math.round(가중 * 100) / 100,
     sectors: 업종.slice(0, 8),
     믿을만,
@@ -129,22 +131,37 @@ async function 재기() {
       if (v && v.aligned) 정배열 += 1;
     }
 
-    // ADR 이력 — 하루에 한 줄씩 덮어씁니다.
+    // ── ADR 이력 ────────────────────────────────
+    // 표준 ADR 은 '20일 동안의 상승종목수 합계 ÷ 하락종목수 합계'입니다.
+    // 하루치 비율을 평균내면 값이 부풀려지므로, 종목 수 자체를 쌓아 둡니다.
     const 오늘 = 오늘날짜();
     const 이력 = 이력읽기();
-    if (합.adr != null) 이력[오늘] = { adr: 합.adr, rising: 합.rising, falling: 합.falling };
+    이력[오늘] = {
+      KOSPI: { r: 시장.KOSPI.rising, f: 시장.KOSPI.falling },
+      KOSDAQ: { r: 시장.KOSDAQ.rising, f: 시장.KOSDAQ.falling },
+    };
     이력쓰기(이력);
-    const 값들 = Object.keys(이력).sort().slice(-20).map(k => 이력[k].adr).filter(v => v != null);
-    const adr20 = 값들.length ? Math.round(값들.reduce((a, b) => a + b, 0) / 값들.length * 10) / 10 : null;
-    const 어제열쇠 = Object.keys(이력).sort().filter(k => k < 오늘).pop();
+
+    const 최근 = Object.keys(이력).sort().slice(-20);
+    function adr누적(이름) {
+      let r = 0, f = 0, n = 0;
+      for (const d of 최근) {
+        const x = (이력[d] || {})[이름];
+        if (!x || x.f == null) continue;
+        r += x.r || 0; f += x.f || 0; n += 1;
+      }
+      return { adr: f ? Math.round(r / f * 1000) / 10 : null, days: n };
+    }
+    const a1 = adr누적('KOSPI'), a2 = adr누적('KOSDAQ');
+    시장.KOSPI.adr20 = a1.adr; 시장.KOSDAQ.adr20 = a2.adr;
+    const 쌓인날 = Math.max(a1.days, a2.days);
 
     const out = {
       generatedAt: new Date().toISOString(),
       date: 오늘,
-      markets: 시장,
+      markets: 시장,          // 시장마다 adr20(20일 누적) 과 adr(당일 비율)
       total: 합,
-      adr20, adrPrev: 어제열쇠 ? 이력[어제열쇠].adr : null,
-      adrDays: 값들.length,
+      adrDays: 쌓인날,
       high60: 신고가, aligned: 정배열, rsCount: 종목, rsDate: (rs && rs.date) || null,
     };
     캐시.data = out; 캐시.at = Date.now();

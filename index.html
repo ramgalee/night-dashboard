@@ -162,15 +162,6 @@
     </div>
   </div>
 
-  <div class="card">
-    <div class="between" style="margin-bottom:12px;">
-      <div style="font-size:13px;color:var(--textSec);">시장 폭
-        <span style="font-size:11px;color:var(--textTer);">지수가 아니라 종목이 어땠는지</span></div>
-      <span id="bdMeta" style="font-size:10.5px;color:var(--textTer);font-family:var(--mono);"></span>
-    </div>
-    <div id="bdBody"><div class="news-empty">불러오는 중...</div></div>
-  </div>
-
   <div class="layout">
     <div>
       <div class="card">
@@ -221,10 +212,12 @@
     </div>
 
     <div class="card" style="margin-bottom:0;">
-      <div class="between" style="margin-bottom:8px;">
-        <span style="font-size:13px;color:var(--textSec);">뉴스</span>
+      <div class="between" style="margin-bottom:12px;">
+        <div style="font-size:13px;color:var(--textSec);">시장 폭
+          <span style="font-size:11px;color:var(--textTer);">지수가 아니라 종목이 어땠는지</span></div>
+        <span id="bdMeta" style="font-size:10.5px;color:var(--textTer);font-family:var(--mono);"></span>
       </div>
-      <div id="newsList" class="news-empty">불러오는 중...</div>
+      <div id="bdBody"><div class="news-empty">불러오는 중...</div></div>
     </div>
   </div>
 </div>
@@ -535,25 +528,8 @@ function timeAgo(pubDate){
   return Math.round(h/24) + "일 전";
 }
 
-async function fetchNews(){
-  if (!document.getElementById("newsList")) return;
-  const el = document.getElementById("newsList");
-  try {
-    const r = await fetch("/api/telegram-news", { cache: "no-store" });
-    const data = await r.json();
-    if (!data.items || data.items.length === 0) {
-      el.innerHTML = `<div class="news-empty">표시할 뉴스가 없습니다.${data.error ? " (불러오는 중 오류 발생)" : ""}</div>`;
-      return;
-    }
-    el.innerHTML = data.items.map(it => `
-      <a class="news-item" href="${it.link}" target="_blank" rel="noopener">
-        <div class="news-title">${it.title}</div>
-        <div class="news-date">${timeAgo(it.pubDate)}</div>
-      </a>`).join("");
-  } catch (e) {
-    el.innerHTML = `<div class="news-empty">뉴스를 불러오지 못했습니다.</div>`;
-  }
-}
+// 뉴스 카드는 뺐습니다. 다른 곳에서 쉽게 보는 것이라 자리를 시장 폭에 내주었습니다.
+
 
 const RANK_UNIT_DIVISOR = 100;
 
@@ -1026,7 +1002,6 @@ document.getElementById("refreshBtn").addEventListener("click", () => { fetchAnd
 const kimchiEl = document.getElementById("kimchiToggle");
 if (kimchiEl) kimchiEl.addEventListener("change", fetchAndRender);
 fetchAndRender();
-fetchNews();
 fetchMacro();
 fetchMacroSpark();
 fetchTwse();
@@ -1036,7 +1011,6 @@ fetchFinalSupply();
 fetchInvestorRank();
 fetchIndexIntraday();
 setInterval(fetchAndRender, 6000);
-setInterval(fetchNews, 60000);
 setInterval(fetchMacro, 60000);
 setInterval(fetchMacroSpark, 60000);
 setInterval(fetchTwse, 30000);
@@ -1161,19 +1135,20 @@ function bd그리기() {
   const t = BD.total || {};
   const kp = (BD.markets || {}).KOSPI || {}, kq = (BD.markets || {}).KOSDAQ || {};
 
-  // ADR 100 이 넘으면 오른 종목이 더 많다는 뜻입니다.
-  const adr색 = v => v == null ? "var(--textTer)" : v >= 100 ? T.up : T.down;
-  const 대비 = (BD.adr20 != null && t.adr != null) ? t.adr - BD.adr20 : null;
+  // ADR 은 20일 동안의 상승종목수 합계 ÷ 하락종목수 합계입니다.
+  // 80 아래면 과매도, 120 위면 과매수로 보는 것이 증권사 공통 기준입니다.
+  const adr색 = v => v == null ? "var(--textTer)" : v >= 120 ? T.up : v <= 80 ? T.down : "var(--textPri)";
+  const 구간 = v => v == null ? "" : v >= 120 ? "과열권" : v <= 80 ? "침체권" : "중립";
 
   const 칸 = [
-    ["ADR (오른 종목 ÷ 내린 종목)", `${t.adr ?? "—"}`, adr색(t.adr),
-     BD.adr20 != null ? `20일 평균 ${BD.adr20}${대비 != null ? ` · ${대비 >= 0 ? "+" : "−"}${Math.abs(대비).toFixed(1)}` : ""}` : `쌓이는 중 (${BD.adrDays || 0}일)`],
-    ["오른 종목", 돈(t.rising), T.up, `내린 종목 ${돈(t.falling)} · 보합 ${돈(t.flat)}`],
-    ["코스피 ADR", `${kp.adr ?? "—"}`, adr색(kp.adr), `${돈(kp.rising)} 대 ${돈(kp.falling)}`],
-    ["코스닥 ADR", `${kq.adr ?? "—"}`, adr색(kq.adr), `${돈(kq.rising)} 대 ${돈(kq.falling)}`],
+    ["코스피 ADR (20일)", `${kp.adr20 ?? "—"}`, adr색(kp.adr20),
+     `${구간(kp.adr20)} · 오늘 ${kp.adr ?? "—"} (${돈(kp.rising)} 대 ${돈(kp.falling)})`],
+    ["코스닥 ADR (20일)", `${kq.adr20 ?? "—"}`, adr색(kq.adr20),
+     `${구간(kq.adr20)} · 오늘 ${kq.adr ?? "—"} (${돈(kq.rising)} 대 ${돈(kq.falling)})`],
     ["거래대금 가중 등락률", 퍼(kp.weightedChangePct), (kp.weightedChangePct ?? 0) >= 0 ? T.up : T.down,
      `코스피 지수 ${퍼(kp.changePct)}`],
-    ["60일 신고가", `${BD.high60 ?? "—"}`, T.up, `정배열 ${BD.aligned ?? "—"} · ${BD.rsDate || ""} 기준`],
+    ["60일 신고가", `${BD.high60 ?? "—"}`, T.up,
+     `정배열 ${BD.aligned ?? "—"} · ${BD.rsDate || ""} 기준`],
   ];
 
   const 총 = (t.rising || 0) + (t.falling || 0) + (t.flat || 0) || 1;
@@ -1200,8 +1175,10 @@ function bd그리기() {
         </div>`).join("") + `</div>`;
   }
 
-  h += `<div class="bd-note">ADR 이 100 보다 크면 오른 종목이 더 많다는 뜻입니다. ` +
-       `거래대금 가중 등락률은 큰 종목에 무게를 둔 값이라, 지수보다 높으면 대형주가 장을 끌었다는 의미입니다.</div>`;
+  h += `<div class="bd-note">ADR 은 최근 20일 동안 오른 종목 수를 내린 종목 수로 나눈 값입니다` +
+       (BD.adrDays && BD.adrDays < 20 ? ` (지금은 ${BD.adrDays}일치만 쌓여 있습니다)` : "") +
+       `. 80 아래면 침체권, 120 위면 과열권으로 봅니다. ` +
+       `거래대금 가중 등락률이 지수보다 높으면 대형주가 장을 끌었다는 뜻입니다.</div>`;
   몸.innerHTML = h;
 
   const 시각 = BD.generatedAt

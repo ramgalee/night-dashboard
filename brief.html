@@ -609,8 +609,12 @@ async function 추가자료() {
   ]);
   if (b && b.total) {
     const kp = (b.markets || {}).KOSPI || {};
+    const kq = (b.markets || {}).KOSDAQ || {};
     폭 = {
-      adr: b.total.adr, adr20: b.adr20, rising: b.total.rising, falling: b.total.falling,
+      adr: {
+        코스피: { adr20: kp.adr20, adr: kp.adr, rising: kp.rising, falling: kp.falling },
+        코스닥: { adr20: kq.adr20, adr: kq.adr, rising: kq.rising, falling: kq.falling },
+      },
       weightedChangePct: kp.weightedChangePct,
       sectors: (kp.sectors || []).slice(0, 3).map(x => ({ name: x.name, share: x.share })),
       high60: b.high60, aligned: b.aligned,
