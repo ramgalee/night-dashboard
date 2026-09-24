@@ -4,7 +4,15 @@
 //
 // Vercel 환경변수 ANTHROPIC_API_KEY 가 있어야 합니다.
 // 값을 새로 받아오지 않고 화면이 준 숫자만 쓰므로, 요약과 화면이 어긋나지 않습니다.
-const MODEL = "claude-sonnet-5";
+// 계정마다 쓸 수 있는 모델 이름이 달라, 앞에서부터 되는 것을 씁니다.
+// 한 번 성공하면 그 이름을 기억해 다음부터는 바로 씁니다.
+const 모델후보 = [
+  "claude-sonnet-5",
+  "claude-sonnet-4-5",
+  "claude-opus-5-5",
+  "claude-haiku-4-5-20251001",
+];
+let 쓰는모델 = null;
 const 캐시 = new Map();          // 열쇠 → { text, at }
 const 캐시시간 = 20 * 60 * 1000;
 
@@ -102,7 +110,7 @@ export default async function handler(req, res) {
     ? "다음은 한국시간 기준 간밤 미국 증시 자료다. 지수·선물·금리·유가와 업종별 종목 등락이다.\n\n"
     : "다음은 오늘 한국 증시 마감 자료다.\n\n";
 
-  try {
+  async function 부르기(model) {
     const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -111,16 +119,29 @@ export default async function handler(req, res) {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: MODEL,
+        model,
         max_tokens: 700,
         temperature: 0.3,
         system: 규칙,
         messages: [{ role: "user", content: 머리 + 본문 }],
       }),
     });
-    const j = await r.json();
+    return { r, j: await r.json() };
+  }
+
+  try {
+    let r, j;
+    for (const m of (쓰는모델 ? [쓰는모델] : 모델후보)) {
+      ({ r, j } = await 부르기(m));
+      if (r.ok) { 쓰는모델 = m; break; }
+      const 말 = String((j.error && j.error.message) || "");
+      if (!/model/i.test(말) && r.status !== 404) break;   // 모델 이름 문제일 때만 다음 후보로
+    }
     if (!r.ok) {
-      return res.status(r.status).json({ error: (j.error && j.error.message) || "요약 실패" });
+      return res.status(r.status).json({
+        error: (j.error && j.error.message) || "요약 실패",
+        tried: 쓰는모델 ? [쓰는모델] : 모델후보,
+      });
     }
     const text = (j.content || []).filter(x => x.type === "text").map(x => x.text).join("\n").trim();
     if (!text) return res.status(502).json({ error: "빈 응답" });
@@ -128,7 +149,7 @@ export default async function handler(req, res) {
     캐시.set(열쇠, { text, at });
     if (캐시.size > 40) 캐시.delete(캐시.keys().next().value);
     res.setHeader("Cache-Control", "no-store");
-    res.status(200).json({ text, at, cached: false });
+    res.status(200).json({ text, at, cached: false, model: 쓰는모델 });
   } catch (e) {
     res.status(500).json({ error: String((e && e.message) || e) });
   }
