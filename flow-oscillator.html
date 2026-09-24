@@ -115,15 +115,16 @@
   .tag-al { background:#EDE9FB; color:#6D4FE0; }
   .ld-note { font-size:11px; color:var(--textTer); margin-top:10px; line-height:1.7; }
   @media (max-width:560px) { .ld-tbl { font-size:11.5px; } .ld-tbl td, .ld-tbl th { padding:6px 5px; } }
-  /* 메뉴 버튼 — 좁은 화면에서 글자가 세로로 쪼개지지 않게 */
+  /* 메뉴 버튼 — 글자가 세로로 쪼개지지 않게, 조금 크고 굵게 */
   button, .between a button { white-space: nowrap; }
+  .between > div:last-child button { font-size: 13px; font-weight: 600; }
   @media (max-width: 640px) {
     .between > div:last-child { gap: 6px; flex-wrap: wrap; }
-    .between > div:last-child button { font-size: 11px; padding: 7px 9px; }
+    .between > div:last-child button { font-size: 12.5px; font-weight: 600; padding: 8px 11px; }
     .between > div:last-child a { display: inline-flex; }
   }
   @media (max-width: 400px) {
-    .between > div:last-child button { font-size: 10.5px; padding: 6px 8px; }
+    .between > div:last-child button { font-size: 12px; padding: 7px 10px; }
   }
 </style>
 </head>
@@ -135,14 +136,14 @@
       <h1>수급오실레이터</h1>
     </div>
     <div style="display:flex;gap:8px;">
-      <a href="/brief.html" style="text-decoration:none;"><button>오늘의 브리핑 →</button></a>
-      <a href="/night.html" style="text-decoration:none;"><button>야간 증시 →</button></a>
-      <a href="/us.html" style="text-decoration:none;"><button>미국 증시 →</button></a>
-      <a href="/calendar.html" style="text-decoration:none;"><button>증시 일정 →</button></a>
-      <a href="/map.html" style="text-decoration:none;"><button>히트맵 →</button></a>
-      <a href="/fg.html" style="text-decoration:none;"><button>F&amp;G 지수 →</button></a>
-      <a href="/leader.html" style="text-decoration:none;"><button>대형주 수급 →</button></a>
-      <a href="/index.html" style="text-decoration:none;"><button>← 주간 증시</button></a>
+      <a href="/brief.html" style="text-decoration:none;"><button>오늘의 브리핑</button></a>
+      <a href="/night.html" style="text-decoration:none;"><button>야간 증시</button></a>
+      <a href="/us.html" style="text-decoration:none;"><button>미국 증시</button></a>
+      <a href="/calendar.html" style="text-decoration:none;"><button>증시 일정</button></a>
+      <a href="/map.html" style="text-decoration:none;"><button>히트맵</button></a>
+      <a href="/fg.html" style="text-decoration:none;"><button>F&amp;G 지수</button></a>
+      <a href="/leader.html" style="text-decoration:none;"><button>대형주 수급</button></a>
+      <a href="/index.html" style="text-decoration:none;"><button>주간 증시</button></a>
     </div>
   </div>
 
