@@ -7,12 +7,15 @@
 // 계정마다 쓸 수 있는 모델 이름이 달라, 앞에서부터 되는 것을 씁니다.
 // 한 번 성공하면 그 이름을 기억해 다음부터는 바로 씁니다.
 const 모델후보 = [
+  "claude-opus-5-5",              // 계정에서 쓸 수 있는 것이 확인된 이름
   "claude-sonnet-5",
   "claude-sonnet-4-5",
-  "claude-opus-5-5",
   "claude-haiku-4-5-20251001",
 ];
 let 쓰는모델 = null;
+// Vercel 기본 제한(10초)으로는 모자랄 수 있어 늘려 둡니다.
+export const config = { maxDuration: 60 };
+
 const 캐시 = new Map();          // 열쇠 → { text, at }
 const 캐시시간 = 20 * 60 * 1000;
 
@@ -95,7 +98,7 @@ export default async function handler(req, res) {
   const 시장 = body.market === "us" ? "us" : "kr";
   const 자료 = body.data || {};
   let 본문 = 시장 === "us" ? 미국정리(자료) : 국내정리(자료);
-  const 뉴스 = (body.news || []).slice(0, 40)
+  const 뉴스 = (body.news || []).slice(0, 25)
     .map(x => `- (${x.source}) ${x.title}`).join("\n");
   if (뉴스) 본문 += "\n\n[오늘 나온 뉴스 제목]\n" + 뉴스;
   if (!본문.trim()) return res.status(400).json({ error: "요약할 자료가 없습니다" });
