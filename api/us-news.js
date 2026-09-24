@@ -48,7 +48,7 @@ async function 한곳(이름, 주소, 표시) {
     const 글 = await r.text();
     const 덩어리 = 글.split(/<item[\s>]/i).slice(1);
     const rows = [];
-    for (const 조각 of 덩어리.slice(0, 25)) {
+    for (const 조각 of 덩어리.slice(0, 20)) {
       const t = 태그(조각, "title");
       if (!t || t.length < 12) continue;
       if (버릴말.test(t)) continue;
@@ -75,7 +75,7 @@ export default async function handler(req, res) {
   const 종목 = String(req.query.symbols || "")
     .split(",").map(x => x.trim().toUpperCase())
     .filter(x => /^[A-Z]{1,5}([.-][A-Z])?$/.test(x))
-    .slice(0, 8);
+    .slice(0, 10);
 
   try {
     const 뭉치 = await Promise.all([
@@ -93,10 +93,15 @@ export default async function handler(req, res) {
         rows.push(x);
       }
     }
-    rows.sort((a, b) => 시각(b.at) - 시각(a.at));
+    // 종목 뉴스를 앞쪽에 둡니다. 시각순으로만 자르면 종목 뉴스가 밀려납니다.
+    const 종목뉴스 = /^야후 [A-Z.\-]+$/;
+    rows.sort((a, b) => {
+      const A = 종목뉴스.test(a.source) ? 0 : 1, B = 종목뉴스.test(b.source) ? 0 : 1;
+      return A - B || 시각(b.at) - 시각(a.at);
+    });
 
     res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=600");
-    res.status(200).json({ count: rows.length, generatedAt: new Date().toISOString(), items: rows.slice(0, 60) });
+    res.status(200).json({ count: rows.length, generatedAt: new Date().toISOString(), items: rows.slice(0, 70) });
   } catch (e) {
     res.status(500).json({ error: String((e && e.message) || e), items: [] });
   }

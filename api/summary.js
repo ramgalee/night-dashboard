@@ -33,6 +33,10 @@ const 규칙 = `당신은 한국 경제지 증권부 기자입니다. 주어진 
 - 뉴스 제목이 함께 주어지면, 그 제목에 적힌 사실만 원인으로 언급할 수 있다.
   제목에 없는 내용을 덧붙이거나 제목 문장을 그대로 번역해 옮기지 않는다. 우리 문장으로 다시 쓴다.
   오늘 크게 움직인 종목과 관련된 제목을 우선 쓰고, 관련 없는 제목은 버린다.
+- [종목 뉴스] 로 묶인 제목은 그 종목이 왜 움직였는지 알려주는 단서다.
+  크게 오른 종목과 크게 내린 종목 가운데 2~3개는 이유를 한 구절로 덧붙인다.
+  (예: "○○는 실적 전망 상향 소식에 4.2% 올랐다")
+  뉴스에 근거가 없는 종목은 이유를 쓰지 말고 등락만 적는다. 추측해서 붙이지 않는다.
 - 투자 권유로 읽힐 표현을 쓰지 않는다. ("매수 기회", "비중 확대", "주목할 만하다" 등 금지)
 - 전망이나 예측을 쓰지 않는다. 오늘 일어난 일만 서술한다.
 - 자료가 비어 있는 항목은 언급하지 않는다.`;
@@ -98,9 +102,14 @@ export default async function handler(req, res) {
   const 시장 = body.market === "us" ? "us" : "kr";
   const 자료 = body.data || {};
   let 본문 = 시장 === "us" ? 미국정리(자료) : 국내정리(자료);
-  const 뉴스 = (body.news || []).slice(0, 25)
-    .map(x => `- (${x.source}) ${x.title}`).join("\n");
-  if (뉴스) 본문 += "\n\n[오늘 나온 뉴스 제목]\n" + 뉴스;
+  // 종목 뉴스를 먼저, 시장 뉴스를 그다음에 넣습니다.
+  // 시각순으로 자르면 정작 필요한 종목 뉴스가 잘려나갑니다.
+  const 전부 = body.news || [];
+  const 종목뉴스 = 전부.filter(x => /^야후 [A-Z.\-]+$/.test(x.source || ""));
+  const 시장뉴스 = 전부.filter(x => !/^야후 [A-Z.\-]+$/.test(x.source || ""));
+  const 적기 = a => a.map(x => `- (${x.source}) ${x.title}`).join("\n");
+  if (종목뉴스.length) 본문 += "\n\n[종목 뉴스 — 괄호 안이 해당 종목]\n" + 적기(종목뉴스.slice(0, 25));
+  if (시장뉴스.length) 본문 += "\n\n[시장 뉴스]\n" + 적기(시장뉴스.slice(0, 15));
   if (!본문.trim()) return res.status(400).json({ error: "요약할 자료가 없습니다" });
 
   const 열쇠 = 시장 + "|" + 본문;
@@ -123,7 +132,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model,
-        max_tokens: 700,
+        max_tokens: 900,
         temperature: 0.3,
         system: 규칙,
         messages: [{ role: "user", content: 머리 + 본문 }],
