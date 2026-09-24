@@ -413,6 +413,7 @@ document.querySelectorAll('[data-mkt]').forEach(b => {
   b.addEventListener('click', () => {
     MKT = b.dataset.mkt;
     document.querySelectorAll('[data-mkt]').forEach(x => x.classList.toggle('on', x === b));
+    해석했나.fg = false;          // 시장이 바뀌었으니 해석도 새로 받습니다
     paint();
   });
 });
@@ -833,6 +834,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal()
     b.addEventListener('click', () => {
       시장 = b.dataset.tilt;
       document.querySelectorAll('[data-tilt]').forEach(x => x.classList.toggle('on', x === b));
+      해석했나.tilt = false;      // 시장이 바뀌었으니 해석도 새로 받습니다
       그리기();
     });
   });
