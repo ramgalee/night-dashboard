@@ -41,6 +41,19 @@
              padding:12px; font-family:var(--mono); font-size:11.5px; line-height:1.7; resize:vertical;
              background:var(--surface2); color:var(--textPri); display:none; }
 
+  /* 시장 요약 (자동 작성) */
+  .ai-card { border-left:3px solid var(--signature); background:var(--surface2);
+             border-radius:0 12px 12px 0; padding:14px 16px; margin-top:12px; }
+  .ai-head { display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+  .ai-badge { font-size:10px; font-family:var(--mono); color:var(--signature);
+              border:1px solid var(--signature); border-radius:5px; padding:1px 5px; }
+  .ai-time { font-size:10.5px; color:var(--textTer); font-family:var(--mono); }
+  .ai-btns { margin-left:auto; display:flex; gap:6px; }
+  .ai-btns button { padding:5px 10px; font-size:11px; }
+  .ai-text { font-size:13.5px; line-height:1.85; color:var(--textPri); white-space:pre-wrap; }
+  .ai-text.wait { color:var(--textTer); }
+  .ai-note { font-size:10.5px; color:var(--textTer); margin-top:9px; line-height:1.6; }
+
   /* 숫자 요약 */
   /* 칸 높이를 맞추려면 값이 한 줄에 들어가야 합니다.
      폭을 넉넉히 주고, 그래도 넘치면 줄바꿈 대신 글자가 살짝 작아지게 합니다. */
@@ -126,7 +139,20 @@
       <div style="font-size:13px;color:var(--textSec);">시장 요약</div>
       <span id="briefMeta" class="meta"></span>
     </div>
-    <div class="brief" id="brief"><div class="empty">불러오는 중...</div></div>
+    <div class="brief" id="brief"><div class="empty">불러오는 중...</div>
+  <div class="ai-card" id="aiCard">
+    <div class="ai-head">
+      <span class="ai-badge">AI 작성</span>
+      <span class="ai-time" id="aiTime"></span>
+      <span class="ai-btns">
+        <button id="aiCopy">복사</button>
+        <button id="aiGo">다시 쓰기</button>
+      </span>
+    </div>
+    <div class="ai-text wait" id="aiText">자료를 모으는 중입니다...</div>
+    <div class="ai-note">화면에 보이는 수치만으로 자동 작성된 문장입니다. 방송에 쓰기 전에 한 번 확인해 주세요.</div>
+  </div>
+</div>
     <div class="nums" id="nums"></div>
     <textarea id="copyBox" readonly></textarea>
   </div>
@@ -462,6 +488,7 @@ async function load() {
 
   paintBrief();
   paintStreak();
+  if (!요약했나) { 요약했나 = true; 요약쓰기(); }      // 자료가 오면 한 번만 씁니다
 }
 
 load();
@@ -561,6 +588,56 @@ setInterval(load, 300000);
   window.addEventListener("resize", () => requestAnimationFrame(맞춤));
   requestAnimationFrame(맞춤);
 })();
+
+const 요약시장 = "kr";
+let 요약했나 = false;
+function 요약자료() {
+  if (!IDX || !IDX.kospi) return null;
+  const 업종 = m => (SECTOR[m] && SECTOR[m].sectors || [])
+    .filter(x => x.changePct != null).map(x => ({ name: x.name, changePct: x.changePct }));
+  const 끝 = (FG && FG.series && FG.series.length) ? FG.series[FG.series.length - 1] : null;
+  const 전 = (FG && FG.series && FG.series.length > 1) ? FG.series[FG.series.length - 2] : null;
+  return {
+    date: IDX.kospi.date,
+    kospi: IDX.kospi, kosdaq: IDX.kosdaq,
+    sectors: { KOSPI: 업종("KOSPI"), KOSDAQ: 업종("KOSDAQ") },
+    fg: 끝 ? { value: 끝.value ?? 끝.fg, prev: 전 ? (전.value ?? 전.fg) : null } : null,
+  };
+}
+
+// ── 시장 요약 (자동 작성) ─────────────────────────
+async function 요약쓰기(다시) {
+  const 글 = document.getElementById("aiText");
+  const 자료 = 요약자료();
+  if (!자료) { 글.textContent = "요약할 자료가 없습니다."; return; }
+  글.className = "ai-text wait";
+  글.textContent = 다시 ? "다시 쓰는 중입니다..." : "문장을 만드는 중입니다...";
+  try {
+    const r = await fetch("/api/summary", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ market: 요약시장, data: 자료, force: !!다시 }),
+    });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    글.className = "ai-text";
+    글.textContent = d.text;
+    document.getElementById("aiTime").textContent =
+      new Date(d.at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false })
+      + (d.cached ? " (저장된 글)" : "");
+  } catch (e) {
+    글.className = "ai-text wait";
+    글.textContent = "요약을 만들지 못했습니다. 다시 쓰기를 눌러보세요.";
+  }
+}
+document.getElementById("aiGo").onclick = () => 요약쓰기(true);
+document.getElementById("aiCopy").onclick = async () => {
+  const b = document.getElementById("aiCopy");
+  try {
+    await navigator.clipboard.writeText(document.getElementById("aiText").textContent);
+    b.textContent = "복사됨!"; setTimeout(() => { b.textContent = "복사"; }, 1500);
+  } catch (e) { b.textContent = "복사 실패"; }
+};
+
 </script>
 
 </body>
