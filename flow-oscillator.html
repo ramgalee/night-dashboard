@@ -409,17 +409,21 @@ function paintPick() {
   document.getElementById("pickMeta").textContent = (notes[PICK_SRC] || "") + extra;
 }
 
+// ETF·상장지수·스팩·리츠는 종목 고르는 목록에서 뺍니다.
+const ETF꼴 = /(^|\s)(KODEX|TIGER|PLUS|ACE|SOL|RISE|HANARO|KOSEF|ARIRANG|TIMEFOLIO|KIWOOM|SMART|FOCUS|BNK|WOORI|마이다스|히어로즈|파워|TREX|UNICORN|VITA|이지스|하이|마이티)\s|(레버리지|인버스|선물\s?ETN|\bETN\b|스팩|리츠)/i;
+const ETF빼기 = a => (a || []).filter(x => !ETF꼴.test(x.name || ""));
+
 async function loadPicks() {
   // 1) 거래대금 상위 150 중 등락률 상위 50 (하락장이면 덜 빠진 순)
   try {
     const d = await (await fetch("/api/trade-rank", { cache: "no-store" })).json();
-    PICK.up = (d.up50 || []).map(r => ({ code: r.code, name: r.name, market: r.market, value: r.changePct }));
+    PICK.up = ETF빼기((d.up50 || []).map(r => ({ code: r.code, name: r.name, market: r.market, value: r.changePct })));
   } catch (e) { PICK.up = []; }
 
   // 2) 장중 · 시총대비 프로그램 순매수 상위 50
   try {
     const p = await (await fetch("/api/program-flow", { cache: "no-store" })).json();
-    PICK.prog = (p.buy || []).map(r => ({ code: r.code, name: r.name, market: r.market, value: r.ratio }));
+    PICK.prog = ETF빼기((p.buy || []).map(r => ({ code: r.code, name: r.name, market: r.market, value: r.ratio })));
   } catch (e) { PICK.prog = []; }
 
   // 0) RS (하루 한 번 갱신되는 파일)
@@ -443,16 +447,16 @@ async function loadPicks() {
   try {
     const g = await (await fetch("/api/supply-ratio", { cache: "no-store" })).json();
     const side = (g.data && g.data["기관합계"]) || {};
-    PICK.orgn = (side.buy || []).slice(0, 30)
-      .map(r => ({ code: r.code, name: r.name, market: r.market, value: r.ratio }));
+    PICK.orgn = ETF빼기((side.buy || [])
+      .map(r => ({ code: r.code, name: r.name, market: r.market, value: r.ratio }))).slice(0, 30);
   } catch (e) { PICK.orgn = []; }
 
   // 4) 마감 확정 · 사모펀드 시총대비 순매수 상위 20
   try {
     const f = await (await fetch("/supply_final.json", { cache: "no-store" })).json();
     const side = (f.data && (f.data["사모"] || f.data["사모펀드"])) || {};
-    PICK.samo = (side.buy || []).slice(0, 20)
-      .map(r => ({ code: r.code, name: r.name, market: r.market, value: r.ratio }));
+    PICK.samo = ETF빼기((side.buy || [])
+      .map(r => ({ code: r.code, name: r.name, market: r.market, value: r.ratio }))).slice(0, 20);
   } catch (e) { PICK.samo = []; }
 
   paintPick();

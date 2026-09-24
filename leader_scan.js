@@ -18,7 +18,7 @@ const 신선 = 5 * 60 * 1000;
 const 간격 = 300;                  // 종목 사이 쉬는 시간(ms) — 키움이 밀리지 않게 하나씩 천천히
 const 테마상위 = 12;               // 오늘 오른 테마 몇 개까지를 '상위'로 볼지
 // ETF·레버리지·리츠는 주도주를 찾는 목록에서 뺍니다.
-const 뺄이름 = /(KODEX|TIGER|PLUS|ACE |SOL |RISE |HANARO|KOSEF|ARIRANG|TIMEFOLIO|KIWOOM |BNK|WOORI|마이다스|파워|레버리지|인버스|선물|ETN|리츠|스팩)/i;
+const 뺄이름 = /(^|\s)(KODEX|TIGER|PLUS|ACE|SOL|RISE|HANARO|KOSEF|ARIRANG|TIMEFOLIO|KIWOOM|SMART|FOCUS|BNK|WOORI|마이다스|히어로즈|파워|TREX|UNICORN|VITA|이지스|하이|마이티)\s|(레버리지|인버스|선물\s?ETN|\bETN\b|스팩|리츠)/i;
 
 async function 내부(경로, 시도 = 2) {
   let 마지막;
