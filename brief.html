@@ -41,6 +41,21 @@
              padding:12px; font-family:var(--mono); font-size:11.5px; line-height:1.7; resize:vertical;
              background:var(--surface2); color:var(--textPri); display:none; }
 
+  /* 오늘의 흐름 */
+  .tl-row { display:flex; gap:12px; padding:11px 0; border-bottom:1px solid var(--surface2); }
+  .tl-row:last-child { border-bottom:none; }
+  .tl-time { flex:none; width:44px; font-family:var(--mono); font-size:11.5px;
+             color:var(--textTer); padding-top:2px; }
+  .tl-body { flex:1; min-width:0; }
+  .tl-title { font-size:13px; font-weight:600; margin-bottom:3px; }
+  .tl-text { font-size:12.5px; line-height:1.75; color:var(--textSec); white-space:pre-wrap; }
+  .tl-more { width:100%; margin-top:10px; padding:7px; font-size:11.5px;
+             background:var(--surface2); border:1px solid var(--hair); border-radius:9px;
+             color:var(--textSec); cursor:pointer; font-family:var(--sans); }
+  .tl-more:hover { border-color:var(--signature); color:var(--signature); }
+  .tl-badge { font-size:10px; font-family:var(--mono); color:var(--signature);
+              border:1px solid var(--signature); border-radius:5px; padding:1px 5px; }
+
   /* 시장 요약 (자동 작성) */
   .ai-card { border-left:3px solid var(--signature); background:var(--surface2);
              border-radius:0 12px 12px 0; padding:14px 16px; margin-top:12px; }
@@ -152,6 +167,15 @@
     </div>
     <div class="ai-text wait" id="aiText">자료를 모으는 중입니다...</div>
     <div class="ai-note">화면에 보이는 수치만으로 자동 작성된 문장입니다.</div>
+  </div>
+
+  <div class="card">
+    <div class="between" style="margin-bottom:10px;">
+      <div style="font-size:13px;color:var(--textSec);">오늘의 흐름
+        <span class="tl-badge">AI 작성</span></div>
+      <span id="tlMeta" style="font-size:10.5px;color:var(--textTer);font-family:var(--mono);"></span>
+    </div>
+    <div id="tlBody"><div class="empty" style="font-size:12px;color:var(--textTer);">불러오는 중...</div></div>
   </div>
 
     <div class="nums" id="nums"></div>
@@ -694,6 +718,48 @@ document.getElementById("aiCopy").onclick = async () => {
     b.textContent = "복사됨!"; setTimeout(() => { b.textContent = "복사"; }, 1500);
   } catch (e) { b.textContent = "복사 실패"; }
 };
+
+
+// ── 오늘의 흐름 (장중 30분마다 쌓인 시황) ──────────
+let TL = null, TL_전부 = false;
+const TL_기본 = 4;
+
+function tl그리기() {
+  const 몸 = document.getElementById("tlBody");
+  if (!TL || !(TL.items || []).length) {
+    몸.innerHTML = `<div style="font-size:12px;color:var(--textTer);padding:6px 0;">` +
+      `아직 오늘 기록이 없습니다. 장중 30분마다 쌓입니다.</div>`;
+    document.getElementById("tlMeta").textContent = "";
+    return;
+  }
+  const 줄 = TL_전부 ? TL.items : TL.items.slice(0, TL_기본);
+  몸.innerHTML = 줄.map(x => `
+    <div class="tl-row">
+      <div class="tl-time">${x.time}</div>
+      <div class="tl-body">
+        <div class="tl-title">${x.title}</div>
+        <div class="tl-text">${x.body}</div>
+      </div>
+    </div>`).join("") +
+    (TL.items.length > TL_기본
+      ? `<button class="tl-more" id="tlMore">${TL_전부 ? "접기" : `오늘 기록 ${TL.items.length}건 모두 보기`}</button>`
+      : "");
+  const 더 = document.getElementById("tlMore");
+  if (더) 더.onclick = () => { TL_전부 = !TL_전부; tl그리기(); };
+  document.getElementById("tlMeta").textContent = `${TL.items.length}건 · 최근 ${TL.items[0].time}`;
+}
+
+async function tl받기() {
+  try {
+    const r = await fetch("/api/timeline", { cache: "no-store" });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    TL = d;
+  } catch (e) { TL = null; }
+  tl그리기();
+}
+tl받기();
+setInterval(tl받기, 180000);
 
 </script>
 
