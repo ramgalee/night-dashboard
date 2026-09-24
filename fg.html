@@ -37,6 +37,20 @@
   .gauge-scale { display:flex; justify-content:space-between; font-size:10px; color:var(--textTer);
                  font-family:var(--mono); margin-top:6px; }
 
+  /* 지표 해석 (자동 작성) */
+  .ai-card { border-left:3px solid var(--signature); background:var(--surface2);
+             border-radius:0 12px 12px 0; padding:13px 15px; margin-top:14px; }
+  .ai-head { display:flex; align-items:center; gap:8px; margin-bottom:7px; flex-wrap:wrap; }
+  .ai-badge { font-size:10px; font-family:var(--mono); color:var(--signature);
+              border:1px solid var(--signature); border-radius:5px; padding:1px 5px; }
+  .ai-time { font-size:10.5px; color:var(--textTer); font-family:var(--mono); }
+  .ai-btn { margin-left:auto; background:var(--surface); border:1px solid var(--hair);
+            color:var(--textSec); border-radius:8px; padding:4px 10px; font-size:11px;
+            cursor:pointer; font-family:var(--sans); }
+  .ai-btn:hover { border-color:var(--signature); color:var(--signature); }
+  .ai-text { font-size:13px; line-height:1.8; color:var(--textPri); white-space:pre-wrap; }
+  .ai-text.wait { color:var(--textTer); }
+
   .parts { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-top:16px; }
   .part { background:var(--surface2); border-radius:10px; padding:10px 12px; }
   .part-l { font-size:11px; color:var(--textTer); margin-bottom:4px; }
@@ -178,6 +192,13 @@
     </div>
 
     <div class="parts" id="parts"></div>
+
+    <div class="ai-card">
+      <div class="ai-head"><span class="ai-badge">AI 해석</span>
+        <span class="ai-time" id="fgAiTime"></span>
+        <button class="ai-btn" id="fgAiGo">다시 쓰기</button></div>
+      <div class="ai-text wait" id="fgAiText">지표를 읽는 중입니다...</div>
+    </div>
   </div>
 
   <div class="card">
@@ -235,6 +256,13 @@
     <div class="tbl-wrap"><table class="tilt-tbl" id="tiltTable"></table></div>
 
     <div class="status" id="tiltStatus" style="margin-top:12px;">불러오는 중...</div>
+
+    <div class="ai-card">
+      <div class="ai-head"><span class="ai-badge">AI 해석</span>
+        <span class="ai-time" id="tiltAiTime"></span>
+        <button class="ai-btn" id="tiltAiGo">다시 쓰기</button></div>
+      <div class="ai-text wait" id="tiltAiText">지표를 읽는 중입니다...</div>
+    </div>
   </div>
 
   <div class="note">
@@ -271,6 +299,7 @@ if (typeof LightweightCharts === "undefined") {
 
 const UP = "#E5484D", DOWN = "#2F6FED", PURPLE = "#6D4FE0", GRAY = "#8B94B0";
 let DATA = null;
+const 해석했나 = { fg: false, tilt: false };   // 자료가 오면 한 번씩만 씁니다
 let MKT = "KOSPI";
 
 const base = {
@@ -338,6 +367,7 @@ function paint() {
   });
 
   const last = rows[rows.length - 1];
+  if (!해석했나.fg) { 해석했나.fg = true; setTimeout(() => 해석쓰기("fg", 공포탐욕자료()), 0); }
   const [txt, color] = label(last.fg);
   document.getElementById('gNum').textContent = last.fg.toFixed(1);
   document.getElementById('gNum').style.color = color;
@@ -747,6 +777,18 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal()
     });
 
     끝행 = 목록[목록.length - 1];
+    // 쏠림 자료는 이 함수 안에만 있어, 해석에 쓰도록 밖으로 내어 둡니다.
+    {
+      const b = 목록[목록.length - 2];
+      window.__쏠림 = {
+        date: 끝행.date, market: 시장 === "KOSPI" ? "코스피" : "코스닥",
+        topN: 자료.topN || 5, top: 끝행.top || [],
+        osc: 끝행.osc, prevOsc: b ? b.osc : null,
+        corr: 끝행.corr, prevCorr: b ? b.corr : null,
+        recent: 목록.slice(-5).map(x => ({ date: x.date, top: x.top || [] })),
+      };
+      if (!해석했나.tilt) { 해석했나.tilt = true; setTimeout(() => 해석쓰기("tilt", window.__쏠림), 0); }
+    }
     주도업종(끝행);
     표그리기(목록);
 
@@ -906,6 +948,58 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal()
   window.addEventListener("resize", () => requestAnimationFrame(맞춤));
   requestAnimationFrame(맞춤);
 })();
+
+// ── 지표 해석 (자동 작성) ─────────────────────────
+// 화면이 이미 가진 값만 서버로 넘겨 두세 문장으로 해석을 받습니다.
+async function 해석쓰기(갈래, 자료, 다시) {
+  const 글 = document.getElementById(갈래 + "AiText");
+  const 때 = document.getElementById(갈래 + "AiTime");
+  if (!글) return;
+  if (!자료) { 글.textContent = "읽을 자료가 없습니다."; return; }
+  글.className = "ai-text wait";
+  글.textContent = 다시 ? "다시 읽는 중입니다..." : "지표를 읽는 중입니다...";
+  try {
+    const r = await fetch("/api/summary", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ market: 갈래, data: 자료, force: !!다시 }),
+    });
+    const 원문 = await r.text();
+    let d;
+    try { d = JSON.parse(원문); }
+    catch (e) {
+      throw new Error(`${r.status} ` + 원문.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 110));
+    }
+    if (d.error) throw new Error(d.error);
+    글.className = "ai-text";
+    글.textContent = d.text;
+    때.textContent = new Date(d.at).toLocaleTimeString("ko-KR",
+      { hour: "2-digit", minute: "2-digit", hour12: false }) + (d.cached ? " (저장된 글)" : "");
+  } catch (e) {
+    글.className = "ai-text wait";
+    글.textContent = "해석을 만들지 못했습니다 — " + (e && e.message ? e.message : e);
+  }
+}
+
+function 공포탐욕자료() {
+  const rows = (DATA && DATA.data && DATA.data[MKT]) || [];
+  if (!rows.length) return null;
+  const a = rows[rows.length - 1], b = rows[rows.length - 2];
+  return {
+    date: a.date, market: MKT === "KOSPI" ? "코스피" : "코스닥",
+    fg: a.fg, prev: b ? b.fg : null, label: label(a.fg)[0],
+    ema20: a.ema20, osc: a.osc, prevOsc: b ? b.osc : null,
+    close: a.close == null ? null : a.close.toLocaleString("ko-KR"),
+    parts: { "125일 모멘텀": a.momentum, "RSI 10일": a.rsi,
+             "Put/Call": a.putCall, "VKOSPI": a.vkospi, "국채 10−5년": a.bondDiff },
+  };
+}
+
+// 쏠림지수를 그릴 때 window.__쏠림 에 담아 둔 값을 씁니다.
+function 쏠림자료() { return window.__쏠림 || null; }
+
+document.getElementById("fgAiGo").onclick = () => 해석쓰기("fg", 공포탐욕자료(), true);
+document.getElementById("tiltAiGo").onclick = () => 해석쓰기("tilt", 쏠림자료(), true);
+
 </script>
 
 </body>
