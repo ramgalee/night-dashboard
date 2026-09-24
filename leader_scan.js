@@ -94,12 +94,19 @@ async function 훑기() {
   if (캐시.도는중) return await 캐시.도는중;
 
   캐시.도는중 = (async () => {
-    // 1) 후보 — 거래대금 상위 150 중 등락률 상위 50
+    // 1) 후보 — 거래대금 상위 150 에서 ETF 를 먼저 빼고, 등락률 상위 50을 다시 세웁니다.
+    //    서버가 주는 up50 은 ETF 를 포함해 고른 것이라, 거기서 빼면 50개가 안 채워집니다.
     const tr = await 내부('/trade-rank');
-    const 후보 = (tr.up50 || tr.up || []).map((r, i) => ({
+    const 바탕 = (tr.top150 || []).filter(x => x && x.code && !뺄이름.test(String(x.name || '')));
+    const 골라낸 = 바탕.length
+      ? 바탕.filter(x => x.changePct != null)
+            .sort((a, b) => b.changePct - a.changePct)
+            .slice(0, 50)
+      : (tr.up50 || tr.up || []).filter(x => x && x.code && !뺄이름.test(String(x.name || '')));
+    const 후보 = 골라낸.map((r, i) => ({
       code: String(r.code || '').trim(), name: r.name, market: r.market,
       changePct: r.changePct, 등락순위: i + 1,
-    })).filter(x => x.code && !뺄이름.test(x.name || ''));
+    })).filter(x => x.code);
 
     // 2) 오늘 오른 테마와, 그 테마에 든 종목
     let 테마이름 = {}, 오른테마 = [];
