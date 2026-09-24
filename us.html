@@ -427,10 +427,11 @@ async function 뉴스받기() {
   if (!DATA || !DATA.groups) return [];
   const 종목 = DATA.groups.flatMap(g => g.items || [])
     .filter(x => x.changePct != null && /^[A-Z]{1,5}([.-][A-Z])?$/.test(x.symbol || ""))
-    .sort((a, b) => Math.abs(b.changePct) - Math.abs(a.changePct))
-    .slice(0, 6).map(x => x.symbol);
+    .sort((a, b) => Math.abs(b.changePct) - Math.abs(a.changePct));
+  const 큰변동 = [...종목.filter(x => x.changePct > 0).slice(0, 5),
+                  ...종목.filter(x => x.changePct < 0).slice(0, 5)].map(x => x.symbol);
   try {
-    const r = await fetch(`/api/us-news?symbols=${종목.join(",")}`, { cache: "no-store" });
+    const r = await fetch(`/api/us-news?symbols=${큰변동.join(",")}`, { cache: "no-store" });
     const d = await r.json();
     뉴스목록 = d.items || [];
   } catch (e) { 뉴스목록 = []; }
