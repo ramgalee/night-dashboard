@@ -142,7 +142,14 @@ async function 재기() {
     //  · 휴장일에도 KRX 는 마지막 거래일 자료를 그대로 돌려줍니다.
     //    그래서 오늘 날짜가 아니라 '자료에 적힌 날짜' 를 씁니다.
     //  · 그 날짜가 이미 쌓여 있으면 새 자료가 아니므로 건드리지 않습니다.
-    const 자료날 = (idx && /^\d{8}$/.test(String(idx.date || ''))) ? String(idx.date) : 오늘;
+    // 날짜는 kospi 안에 들어 있습니다. 혹시 모를 다른 자리도 함께 찾습니다.
+    const 날찾기 = o => {
+      for (const v of [o && o.date, o && o.kospi && o.kospi.date, o && o.kosdaq && o.kosdaq.date]) {
+        if (/^\d{8}$/.test(String(v || ''))) return String(v);
+      }
+      return null;
+    };
+    const 자료날 = 날찾기(idx) || 오늘;
     const 오늘값 = {
       KOSPI: { r: 시장.KOSPI.rising, f: 시장.KOSPI.falling },
       KOSDAQ: { r: 시장.KOSDAQ.rising, f: 시장.KOSDAQ.falling },
