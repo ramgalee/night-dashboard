@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>시총대비 순매수 순위</title>
+<style>
+  :root {
+    --void:#F2F4F9; --surface:#FFFFFF; --surface2:#F0F2F8; --hair:#E1E5F0;
+    --textPri:#131A2C; --textSec:#5B6483; --textTer:#8B94B0;
+    --up:#E5484D; --down:#2F6FED; --signature:#6D4FE0;
+    --mono: ui-monospace,'SF Mono','Roboto Mono',Menlo,Consolas,monospace;
+    --sans: -apple-system,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--void); color:var(--textPri); font-family:var(--sans); margin:0; padding:24px 16px; }
+  .wrap { max-width:1180px; margin:0 auto; }
+  .between { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .card { background:var(--surface); border:1px solid var(--hair); border-radius:16px; padding:18px;
+          margin-bottom:16px; box-shadow:0 1px 3px rgba(19,26,44,.06); }
+  .eyebrow { font-size:11px; letter-spacing:2px; color:var(--textTer); font-family:var(--mono); }
+  h1 { font-size:22px; margin:2px 0 0; }
+  button { background:var(--surface2); border:1px solid var(--hair); color:var(--textSec);
+           padding:8px 14px; border-radius:10px; font-size:12px; cursor:pointer; font-family:var(--sans); }
+  button, .between a button { white-space:nowrap; }
+  .between > div:last-child button { font-size:13px; font-weight:600; }
+
+  .tabs { display:flex; gap:5px; flex-wrap:wrap; margin-bottom:6px; }
+  .tabs button.on { background:var(--signature); border-color:var(--signature); color:#fff; font-weight:600; }
+  .tabs button b { font-family:var(--mono); margin-left:5px; opacity:.85; }
+  .only { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--textSec);
+          margin:10px 0 4px; cursor:pointer; user-select:none; }
+  .only input { width:15px; height:15px; accent-color:var(--signature); }
+
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { text-align:right; font-size:11px; font-weight:500; color:var(--textTer);
+       padding:7px 8px; border-bottom:1px solid var(--hair); white-space:nowrap; }
+  td { text-align:right; padding:9px 8px; border-bottom:1px solid var(--surface2); white-space:nowrap; }
+  th:nth-child(2), td:nth-child(2) { text-align:left; }
+  tbody tr:hover { background:var(--surface2); }
+  tbody tr:last-child td { border-bottom:none; }
+  .no { font-family:var(--mono); color:var(--textTer); font-size:12px; width:34px; }
+  .nm { font-weight:600; cursor:pointer; }
+  .nm:hover { color:var(--signature); text-decoration:underline; }
+  .cd { font-family:var(--mono); font-size:10.5px; color:var(--textTer); margin-left:5px; }
+  .num { font-family:var(--mono); }
+  .big { color:var(--up); font-weight:700; }
+  .star { display:inline-block; font-family:var(--mono); font-size:11px; font-weight:700;
+          background:#FDEBEC; color:#C0303A; border-radius:6px; padding:2px 7px; }
+  .star.s2 { background:#FEF3E6; color:#9A6210; }
+  .star.s3 { background:var(--surface2); color:var(--textSec); }
+  .days { font-family:var(--mono); font-size:10.5px; color:var(--textTer); margin-left:4px; }
+  .empty { font-size:12.5px; color:var(--textTer); padding:14px 0; }
+  .note { font-size:11.5px; color:var(--textTer); line-height:1.75; }
+
+  @media (max-width:640px) {
+    .between > div:last-child { gap:6px; flex-wrap:wrap; }
+    .between > div:last-child button { font-size:12.5px; padding:8px 11px; }
+    .card { padding:14px; }
+    button { min-height:34px; }
+    table { display:block; overflow-x:auto; }
+    .cd, .days, .star { font-size:10.5px !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="between" style="margin-bottom:16px;">
+    <div>
+      <div class="eyebrow">SUPPLY RANK</div>
+      <h1>시총대비 순매수 순위</h1>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <a href="/index.html" style="text-decoration:none;"><button>주간 증시</button></a>
+      <a href="/flow-oscillator.html" style="text-decoration:none;"><button>수급오실레이터</button></a>
+      <a href="/etf-flow.html" style="text-decoration:none;"><button>액티브 ETF</button></a>
+      <a href="/brief.html" style="text-decoration:none;"><button>오늘의 브리핑</button></a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="between" style="margin-bottom:12px;">
+      <div style="font-size:13px;color:var(--textSec);">오늘 들어온 돈이 그 종목에 얼마나 큰 일인가
+        <span style="font-size:11px;color:var(--textTer);">금액이 아니라 시가총액 대비</span></div>
+      <span id="meta" style="font-size:10.5px;color:var(--textTer);font-family:var(--mono);"></span>
+    </div>
+    <div class="tabs" id="tabs"></div>
+    <label class="only"><input type="checkbox" id="onlyStar"> 자기 기록을 갈아치운 종목만 보기</label>
+    <div id="body"><div class="empty">불러오는 중...</div></div>
+  </div>
+
+  <div class="card">
+    <div class="note">
+      금액이 큰 순서가 아니라 <b>시가총액 대비 얼마나 들어왔는지</b>로 줄을 세웁니다.
+      삼성전자에 100억은 티도 안 나지만 시총 3천억 종목에 100억은 큰 일이기 때문입니다.<br><br>
+      <b>★ 표시가 이 화면의 핵심입니다.</b> 그 종목이 최근 순매수받은 날들 가운데
+      오늘이 몇 번째로 큰 규모였는지를 뜻합니다. <b>★1위</b>면 그동안 중 가장 크게 들어온 날이고,
+      표시가 없으면 이 종목에는 흔히 있는 일이라는 뜻입니다.<br><br>
+      같은 1위라도 <b>늘 있는 일인지, 처음 있는 일인지</b>를 가려 보시라고 만든 화면입니다.
+      종목명을 누르면 수급오실레이터에서 그 종목의 흐름을 볼 수 있습니다.<br><br>
+      시가총액 500억 미만 종목은 뺐습니다. 작은 종목은 비율이 쉽게 튀기 때문입니다.
+    </div>
+  </div>
+</div>
+
+<script>
+let DATA = null, TAB = null, 별만 = false;
+
+function 그리기() {
+  const 몸 = document.getElementById("body");
+  if (!DATA || !DATA.data) { 몸.innerHTML = `<div class="empty">불러오지 못했습니다.</div>`; return; }
+
+  const 투자자들 = DATA.investors || Object.keys(DATA.data);
+  if (!TAB || !DATA.data[TAB]) TAB = 투자자들[0];
+  const 위 = DATA.topRank || 5;
+
+  document.getElementById("tabs").innerHTML = 투자자들.map(누구 => {
+    const a = DATA.data[누구] || [];
+    const n = a.filter(x => x.rank && x.rank <= 위).length;
+    return `<button data-t="${누구}" class="${누구 === TAB ? "on" : ""}">${누구}<b>★${n}</b></button>`;
+  }).join("");
+  document.querySelectorAll("[data-t]").forEach(b =>
+    b.onclick = () => { TAB = b.dataset.t; 그리기(); });
+
+  let 줄 = DATA.data[TAB] || [];
+  if (별만) 줄 = 줄.filter(x => x.rank && x.rank <= 위);
+  if (!줄.length) { 몸.innerHTML = `<div class="empty">해당하는 종목이 없습니다.</div>`; return; }
+
+  몸.innerHTML = `<table>
+    <thead><tr>
+      <th class="no">순위</th><th>종목</th><th>시가총액</th><th>순매수</th>
+      <th>시총 대비</th><th>이 종목 안에서</th>
+    </tr></thead>
+    <tbody>${줄.map(x => {
+      const 별 = x.rank && x.rank <= 위
+        ? `<span class="star ${x.rank === 1 ? "" : x.rank <= 3 ? "s2" : "s3"}">★ ${x.rank}위</span>` +
+          `<span class="days">/ ${x.days}일 중</span>`
+        : (x.rank ? `<span class="days">${x.rank}위 / ${x.days}일 중</span>` : "");
+      return `<tr>
+        <td class="no">${x.todayRank}</td>
+        <td><span class="nm" data-stk="${x.code}">${x.name}</span><span class="cd">${x.code}</span></td>
+        <td class="num">${x.cap >= 1 ? x.cap.toFixed(1) + "조" : Math.round(x.cap * 10000).toLocaleString("ko-KR") + "억"}</td>
+        <td class="num">${x.amount.toLocaleString("ko-KR")}억</td>
+        <td class="num ${x.ratio >= 0.3 ? "big" : ""}">${x.ratio.toFixed(2)}%</td>
+        <td>${별}</td>
+      </tr>`;
+    }).join("")}</tbody></table>`;
+
+  몸.querySelectorAll("[data-stk]").forEach(el =>
+    el.onclick = () => { location.href = `/flow-oscillator.html?code=${el.dataset.stk}`; });
+}
+
+document.getElementById("onlyStar").onchange = e => { 별만 = e.target.checked; 그리기(); };
+
+async function 받기() {
+  try {
+    const r = await fetch("/supply_rank.json", { cache: "no-store" });
+    const d = await r.json();
+    if (d.error || !d.data) throw new Error("no data");
+    DATA = d;
+    const 보기 = s => s && s.length === 8 ? `${s.slice(0, 4)}.${s.slice(4, 6)}.${s.slice(6, 8)}` : s;
+    document.getElementById("meta").textContent =
+      `${보기(DATA.date)} 기준 · 최근 ${DATA.days}일과 견줌`;
+  } catch (e) {
+    DATA = null;
+    document.getElementById("meta").textContent = "자료를 불러오지 못했습니다";
+  }
+  그리기();
+}
+받기();
+</script>
+</body>
+</html>
