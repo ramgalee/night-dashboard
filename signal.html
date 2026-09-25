@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>시장 신호등</title>
+<style>
+  :root {
+    --void:#F2F4F9; --surface:#FFFFFF; --surface2:#F0F2F8; --hair:#E1E5F0;
+    --textPri:#131A2C; --textSec:#5B6483; --textTer:#8B94B0;
+    --up:#E5484D; --down:#2F6FED; --signature:#6D4FE0; --amber:#B8790A;
+    --mono: ui-monospace,'SF Mono','Roboto Mono',Menlo,Consolas,monospace;
+    --sans: -apple-system,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--void); color:var(--textPri); font-family:var(--sans); margin:0; padding:24px 16px; }
+  .wrap { max-width:1180px; margin:0 auto; }
+  .between { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .card { background:var(--surface); border:1px solid var(--hair); border-radius:16px; padding:18px;
+          margin-bottom:16px; box-shadow:0 1px 3px rgba(19,26,44,.06); }
+  .eyebrow { font-size:11px; letter-spacing:2px; color:var(--textTer); font-family:var(--mono); }
+  h1 { font-size:22px; margin:2px 0 0; }
+  button { background:var(--surface2); border:1px solid var(--hair); color:var(--textSec);
+           padding:8px 14px; border-radius:10px; font-size:12px; cursor:pointer; font-family:var(--sans); }
+  button, .between a button { white-space:nowrap; }
+  .between > div:last-child button { font-size:13px; font-weight:600; }
+
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .mkt-head { display:flex; align-items:baseline; gap:10px; margin-bottom:12px; }
+  .mkt-name { font-size:16px; font-weight:700; }
+  .mkt-idx { font-family:var(--mono); font-size:15px; font-weight:600; }
+  .status { font-size:13px; font-weight:700; padding:4px 11px; border-radius:8px; margin-left:auto; }
+  .st-green { background:#E9F7EE; color:#177245; }
+  .st-amber { background:#FEF3E6; color:#9A6210; }
+  .st-red   { background:#FDEBEC; color:#C0303A; }
+  .st-blue  { background:#EEF3FE; color:#2F6FED; }
+  .st-gray  { background:var(--surface2); color:var(--textSec); }
+  .note { font-size:12.5px; color:var(--textSec); line-height:1.7; }
+
+  .sig { border-radius:12px; padding:12px 14px; margin-bottom:10px; border:1px solid var(--hair); }
+  .sig-h { display:flex; align-items:center; gap:8px; font-size:13.5px; font-weight:700; margin-bottom:5px; }
+  .sig-dot { width:9px; height:9px; border-radius:50%; flex:none; }
+  .sig-t { font-size:12px; color:var(--textSec); line-height:1.7; }
+  .sig.red   { background:#FDEBEC30; border-color:#F3C9CC; }
+  .sig.green { background:#E9F7EE40; border-color:#BFE3CC; }
+  .sig.amber { background:#FEF3E640; border-color:#F0DBBC; }
+  .sig.blue  { background:#EEF3FE60; border-color:#CBDAF8; }
+  .sig.gray  { background:var(--surface2); }
+
+  .gauge { margin:16px 0 6px; }
+  .g-row { display:flex; align-items:center; gap:10px; margin-bottom:9px; font-size:12px; }
+  .g-k { width:74px; flex:none; color:var(--textTer); font-size:11.5px; }
+  .g-bar { flex:1; height:22px; background:var(--surface2); border-radius:6px; position:relative; overflow:hidden; }
+  .g-fill { position:absolute; top:0; bottom:0; left:0; border-radius:6px; }
+  .g-mark { position:absolute; top:-2px; bottom:-2px; width:2px; background:var(--textTer); opacity:.5; }
+  .g-mark b { position:absolute; top:-15px; left:50%; transform:translateX(-50%);
+              font-size:10.5px; font-family:var(--mono); color:var(--textTer); font-weight:400; }
+  .g-v { width:62px; text-align:right; font-family:var(--mono); font-size:13px; font-weight:700; flex:none; }
+
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  th { text-align:right; font-size:11px; font-weight:500; color:var(--textTer);
+       padding:6px 8px; border-bottom:1px solid var(--hair); }
+  td { text-align:right; padding:8px; border-bottom:1px solid var(--surface2); font-family:var(--mono); }
+  th:first-child, td:first-child { text-align:left; font-family:var(--sans); }
+  tbody tr:last-child td { border-bottom:none; }
+  .empty { font-size:12.5px; color:var(--textTer); padding:14px 0; }
+  .guide { font-size:11.5px; color:var(--textTer); line-height:1.8; }
+  .guide b { color:var(--textSec); }
+
+  @media (max-width:860px) { .two { grid-template-columns:1fr; } }
+  @media (max-width:640px) {
+    .between > div:last-child { gap:6px; flex-wrap:wrap; }
+    .between > div:last-child button { font-size:12.5px; padding:8px 11px; }
+    .card { padding:14px; }
+    button { min-height:34px; }
+    .g-k { width:60px; font-size:10.5px; }
+    .g-mark b { font-size:10px; }
+    td span, .note, .sig-t { font-size:12px !important; }
+    table td[style*="11.5px"], table td span { font-size:11px !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="between" style="margin-bottom:16px;">
+    <div>
+      <div class="eyebrow">MARKET SIGNAL</div>
+      <h1>시장 신호등</h1>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <a href="/index.html" style="text-decoration:none;"><button>주간 증시</button></a>
+      <a href="/brief.html" style="text-decoration:none;"><button>오늘의 브리핑</button></a>
+      <a href="/supply-rank.html" style="text-decoration:none;"><button>순매수 순위</button></a>
+      <a href="/flow-oscillator.html" style="text-decoration:none;"><button>수급오실레이터</button></a>
+    </div>
+  </div>
+
+  <div class="between" style="margin-bottom:10px;">
+    <span style="font-size:12px;color:var(--textTer);">지수가 아니라 시장의 속을 봅니다</span>
+    <span id="meta" style="font-size:10.5px;color:var(--textTer);font-family:var(--mono);"></span>
+  </div>
+
+  <div class="two" id="body">
+    <div class="card"><div class="empty">불러오는 중...</div></div>
+  </div>
+
+  <div class="card">
+    <div class="guide">
+      <b>신호는 다섯 가지뿐입니다.</b> 지난 5년 자료로 재어 실제로 결과가 갈렸던 것만 남겼습니다.
+      나머지 숫자는 <b>지금 시장이 어떤 상태인지 설명하는 데만</b> 씁니다.<br><br>
+
+      <b>경계</b> — 60이격도가 115를 넘었는데 20일선 위 종목이 35%도 안 될 때입니다.
+      지난 5년 32일이 여기 해당했고, 그 뒤 60일 동안 지수가 평균 10% 내렸습니다.
+      다만 2026년 5~6월에는 신호가 켜진 뒤에도 지수가 한 달 넘게 더 올랐습니다.
+      <b>파는 신호가 아니라, 속이 비어가고 있다는 표시</b>로 보시는 게 맞습니다.<br><br>
+
+      <b>강세</b> — 60이격도 110~120이면서 확산이 50% 이상일 때입니다. 지난 5년 중 가장 성적이 좋았습니다.<br><br>
+
+      <b>과열</b> — 60이격도 120은 1985년 이후 과열로 여겨 온 자리입니다.
+      넘은 뒤에도 더 오른 적이 많아 곧바로 꺾인다는 뜻은 아닙니다.<br><br>
+
+      <b>바닥권 · 주의</b> — 코스닥만 해당합니다. 60이격도 80 아래는 드물고 그 뒤가 좋았지만,
+      80~90 구간은 과매도처럼 보여도 바닥이 아니었습니다.<br><br>
+
+      <b>수급은 신호에 넣지 않았습니다.</b> 지난 5년을 재어 보니 외국인이 크게 팔 때가 오히려 좋았고,
+      방향이 일정하지 않았습니다. 다만 <b>지금 이 상승을 누가 떠받치고 있는지</b>는 볼 값어치가 있어
+      숫자로만 보여 줍니다.<br><br>
+
+      모든 숫자는 지난 일을 잰 것입니다. 앞으로도 같을 거라는 보장은 없습니다.
+    </div>
+  </div>
+</div>
+
+<script>
+let DATA = null;
+
+const 색이름 = { red: "st-red", green: "st-green", amber: "st-amber", blue: "st-blue", gray: "st-gray" };
+const 상태색 = s => s === "동반 상승" ? "green" : s === "주도주 집중" ? "amber"
+  : s === "반등 시도" ? "blue" : s === "방어 구간" ? "red" : "gray";
+
+function 눈금(값, 낮, 높, 표시들, 색) {
+  if (값 == null) return `<div class="g-bar"></div>`;
+  const 위치 = v => Math.max(0, Math.min(100, (v - 낮) / (높 - 낮) * 100));
+  return `<div class="g-bar">
+    <div class="g-fill" style="width:${위치(값)}%;background:${색}"></div>
+    ${표시들.map(v => `<div class="g-mark" style="left:${위치(v)}%"><b>${v}</b></div>`).join("")}
+  </div>`;
+}
+
+function 그리기() {
+  const 몸 = document.getElementById("body");
+  if (!DATA || !DATA.markets) { 몸.innerHTML = `<div class="card"><div class="empty">불러오지 못했습니다.</div></div>`; return; }
+
+  몸.innerHTML = Object.values(DATA.markets).map(m => {
+    const 확산 = m.breadth, 이격 = m.disparity60;
+    const 확산색 = 확산 == null ? "var(--textTer)" : 확산 >= 50 ? "var(--up)" : 확산 < 35 ? "var(--down)" : "var(--textTer)";
+    const 이격색 = 이격 >= 120 ? "var(--amber)" : 이격 >= 110 ? "var(--up)" : 이격 < 90 ? "var(--down)" : "var(--textTer)";
+    const 수급 = m.flow || {};
+    const 억 = v => v == null ? "—" : (v >= 0 ? "+" : "−") + Math.abs(v).toLocaleString("ko-KR");
+
+    return `<div class="card">
+      <div class="mkt-head">
+        <span class="mkt-name">${m.name}</span>
+        <span class="mkt-idx">${m.close.toLocaleString("ko-KR")}</span>
+        <span class="status ${색이름[상태색(m.status)]}">${m.status}</span>
+      </div>
+      <div class="note" style="margin-bottom:12px;">${m.note}</div>
+
+      ${(m.signals || []).map(s => `
+        <div class="sig ${s.color}">
+          <div class="sig-h"><span class="sig-dot" style="background:${
+            s.color === "red" ? "var(--up)" : s.color === "green" ? "#177245"
+            : s.color === "amber" ? "var(--amber)" : s.color === "blue" ? "var(--down)" : "var(--textTer)"}"></span>${s.name}</div>
+          <div class="sig-t">${s.note}</div>
+        </div>`).join("") ||
+        `<div class="sig gray"><div class="sig-t">지금은 켜진 신호가 없습니다. 아래 숫자로 상태만 보시면 됩니다.</div></div>`}
+
+      <div class="gauge">
+        <div class="g-row">
+          <span class="g-k">60이격도</span>
+          ${눈금(이격, 70, 140, [90, 110, 120], 이격색)}
+          <span class="g-v" style="color:${이격색}">${이격.toFixed(1)}</span>
+        </div>
+        <div class="g-row">
+          <span class="g-k">20일선 위</span>
+          ${눈금(확산, 0, 100, [35, 50], 확산색)}
+          <span class="g-v" style="color:${확산색}">${확산 == null ? "—" : 확산.toFixed(0) + "%"}</span>
+        </div>
+        <div class="g-row">
+          <span class="g-k">ADR 20일</span>
+          ${눈금(m.adr20, 60, 140, [80, 100, 120], "var(--textTer)")}
+          <span class="g-v">${m.adr20 ?? "—"}</span>
+        </div>
+      </div>
+
+      <table style="margin-top:12px;">
+        <thead><tr><th>항목</th><th>값</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td>추세</td><td>${m.trend.score} / ${m.trend.of}</td>
+              <td style="font-family:var(--sans);color:var(--textTer);font-size:11.5px">
+                ${Object.entries(m.trend.checks).filter(([, v]) => v).map(([k]) => k).join(" · ") || "모두 아님"}</td></tr>
+          <tr><td>20이격도</td><td>${m.disparity20.toFixed(1)}</td>
+              <td style="font-family:var(--sans);color:var(--textTer);font-size:11.5px">단기 과열·과매도</td></tr>
+          ${m.breadthPrev != null ? `<tr><td>확산 5일 전</td><td>${m.breadthPrev.toFixed(0)}%</td>
+              <td style="font-family:var(--sans);color:${확산 > m.breadthPrev ? "var(--up)" : "var(--down)"};font-size:11.5px">
+                ${확산 > m.breadthPrev ? "늘고 있음" : "줄고 있음"}</td></tr>` : ""}
+        </tbody>
+      </table>
+
+      ${Object.keys(수급).length ? `
+      <div style="font-size:11px;color:var(--textTer);margin:14px 0 6px;">5일 누적 순매수 · 억원</div>
+      <table>
+        <tbody>${["외국인", "금융투자", "투신", "연기금", "사모", "개인"].filter(k => 수급[k] != null).map(k => `
+          <tr><td>${k}</td><td style="color:${수급[k] >= 0 ? "var(--up)" : "var(--down)"}">${억(수급[k])}</td>
+              <td></td></tr>`).join("")}</tbody>
+      </table>` : ""}
+    </div>`;
+  }).join("");
+}
+
+async function 받기() {
+  try {
+    const r = await fetch("/signal.json", { cache: "no-store" });
+    const d = await r.json();
+    if (!d.markets) throw new Error("no data");
+    DATA = d;
+    const 어느 = Object.values(d.markets)[0];
+    const 보기 = s => s && s.length === 8 ? `${s.slice(0, 4)}.${s.slice(4, 6)}.${s.slice(6, 8)}` : s;
+    document.getElementById("meta").textContent = `${보기(어느.date)} 종가 기준`;
+  } catch (e) {
+    DATA = null;
+    document.getElementById("meta").textContent = "자료를 불러오지 못했습니다";
+  }
+  그리기();
+}
+받기();
+</script>
+</body>
+</html>
