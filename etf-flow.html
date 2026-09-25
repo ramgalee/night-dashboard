@@ -40,8 +40,9 @@
   .etfs { margin-top:5px; display:flex; flex-wrap:wrap; gap:4px 6px; }
   .etf { font-size:11px; background:var(--surface2); border-radius:6px; padding:3px 8px; color:var(--textSec); }
   .etf b { font-family:var(--mono); margin-left:5px; }          /* 주식수 증감 */
-  .etf i { font-family:var(--mono); font-style:normal; margin-left:5px;
-           color:var(--textPri); font-weight:700; }             /* 보유비중 */
+  .etf i { font-family:var(--mono); font-style:normal; margin-left:4px;
+           color:var(--textPri); font-weight:700; }             /* 지금 보유비중 */
+  .etf em { font-style:normal; color:var(--textTer); margin:0 2px; }
   .plus b { color:var(--up); } .minus b { color:var(--down); }
   .big { font-family:var(--mono); font-size:11.5px; color:var(--textSec); margin-left:7px; }
   .big b { color:var(--signature); }
@@ -96,6 +97,9 @@
       전문가들이 어제와 견줘 무엇을 새로 담고 덜어냈는지 볼 수 있습니다.<br><br>
       <b>진한 숫자는 그 ETF 안에서 이 종목이 차지하는 비중</b>입니다. 주식수를 늘렸어도 비중이 작으면
       시늉이고, 비중이 크면 그만큼 무게를 실었다는 뜻입니다. 편출은 어제 비중을 보여줍니다.<br><br>
+      <b>+80주 · 비중 4.03%</b> 처럼 읽으시면 됩니다. 앞은 어제보다 늘거나 준 주식수,
+      뒤는 지금 그 ETF 안에서 차지하는 비중입니다. 주식수는 ETF 1좌(CU) 기준이라
+      10주가 13주가 되어도 비율로는 30% 증가처럼 보이기 때문에, 바뀐 수를 그대로 씁니다.<br><br>
       <b>비중이 아니라 주식수로 봅니다.</b> 비중은 주가가 오르기만 해도 늘어나지만,
       주식수는 운용사가 실제로 사야 늘어납니다. 3% 넘게 움직인 것만 셉니다.<br><br>
       한 곳의 선택은 취향일 수 있지만 <b>여러 곳이 같은 종목을 동시에 담거나 덜어내면</b>
@@ -139,11 +143,20 @@ function 그리기() {
       <div class="main">
         <div><span class="nm" data-stk="${x.code}">${x.name || x.code}</span><span class="cd">${x.code}</span>
           ${x.maxW ? `<span class="big">최대 비중 <b>${x.maxW}%</b></span>` : ""}</div>
-        <div class="etfs">${(x[TAB] || []).slice(0, 8).map(i =>
-          `<span class="etf ${색 === "up" ? "plus" : "minus"}">${i.etf}` +
-          `<i>${i.w != null ? i.w + "%" : "—"}</i>` +
-          ((TAB === "up" || TAB === "down") ? `<b>${i.값 > 0 ? "+" : ""}${i.값}%</b>` : "") +
-          `</span>`).join("")}
+        <div class="etfs">${(x[TAB] || []).slice(0, 8).map(i => {
+          const 수 = n => n == null ? "?" : Number(n).toLocaleString("ko-KR");
+          // "몇 주 늘렸고 / 그래서 지금 비중이 몇 %" 순서로 읽히게 둡니다.
+          // 주식수는 ETF 1좌(CU) 기준이라 늘어난 양 자체로 봅니다.
+          const 늘어난 = (i.q != null && i.q0 != null) ? i.q - i.q0 : null;
+          const 증감 = (TAB === "up" || TAB === "down")
+            ? `<b>${늘어난 > 0 ? "+" : "−"}${수(Math.abs(늘어난))}주</b>`
+            : (TAB === "new" ? `<b>+${수(i.q)}주</b>`
+            : (TAB === "out" ? `<b>−${수(i.q0)}주</b>` : ""));
+          const 비중 = i.w != null
+            ? `<em>·</em><i>비중 ${i.w}%</i>` + (TAB === "out" ? `<em>였음</em>` : "")
+            : "";
+          return `<span class="etf ${색 === "up" ? "plus" : "minus"}">${i.etf}${증감}${비중}</span>`;
+        }).join("")}
           ${(x[TAB] || []).length > 8 ? `<span class="etf">외 ${(x[TAB] || []).length - 8}곳</span>` : ""}
         </div>
       </div>
