@@ -94,7 +94,7 @@
   <div class="card">
     <div class="note">
       액티브 ETF 는 운용사가 종목을 직접 고르는 상품입니다. 구성종목은 법에 따라 매일 공개되므로,
-      전문가들이 어제와 견줘 무엇을 새로 담고 덜어냈는지 볼 수 있습니다.<br><br>
+      전문가들이 어제와 견줘 무엇을 신규 편입하고 편출했는지 볼 수 있습니다.<br><br>
       <b>진한 숫자는 그 ETF 안에서 이 종목이 차지하는 비중</b>입니다. 주식수를 늘렸어도 비중이 작으면
       시늉이고, 비중이 크면 그만큼 무게를 실었다는 뜻입니다. 편출은 어제 비중을 보여줍니다.<br><br>
       <b>+80주 · 비중 4.03%</b> 처럼 읽으시면 됩니다. 앞은 어제보다 늘거나 준 주식수,
@@ -102,7 +102,7 @@
       10주가 13주가 되어도 비율로는 30% 증가처럼 보이기 때문에, 바뀐 수를 그대로 씁니다.<br><br>
       <b>비중이 아니라 주식수로 봅니다.</b> 비중은 주가가 오르기만 해도 늘어나지만,
       주식수는 운용사가 실제로 사야 늘어납니다. 3% 넘게 움직인 것만 셉니다.<br><br>
-      한 곳의 선택은 취향일 수 있지만 <b>여러 곳이 같은 종목을 동시에 담거나 덜어내면</b>
+      한 곳의 선택은 취향일 수 있지만 <b>여러 곳이 같은 종목을 동시에 편입하거나 편출하면</b>
       눈여겨볼 만합니다. 종목명을 누르면 수급오실레이터에서 그 종목을 볼 수 있습니다.
     </div>
   </div>
@@ -111,10 +111,10 @@
 <script>
 let DATA = null, TAB = "new";
 const 탭들 = [
-  ["new", "새로 담음", "nNew", "up"],
+  ["new", "신규 편입", "nNew", "up"],
   ["up", "주식수 늘림", "nUp", "up"],
   ["down", "주식수 줄임", "nDown", "down"],
-  ["out", "덜어냄", "nOut", "down"],
+  ["out", "편출", "nOut", "down"],
 ];
 
 function 그리기() {
@@ -169,10 +169,10 @@ function 요약() {
   const a = DATA.items || [];
   const 칸 = [
     ["추적 ETF", DATA.etfCount || 0, "개"],
-    ["새로 담김", a.filter(x => x.nNew > 0).length, "종목"],
+    ["신규 편입", a.filter(x => x.nNew > 0).length, "종목"],
     ["주식수 늘림", a.filter(x => x.nUp > 0).length, "종목"],
     ["주식수 줄임", a.filter(x => x.nDown > 0).length, "종목"],
-    ["덜어냄", a.filter(x => x.nOut > 0).length, "종목"],
+    ["편출", a.filter(x => x.nOut > 0).length, "종목"],
   ];
   document.getElementById("sum").innerHTML = 칸.map(([k, v, u]) =>
     `<div><div class="k">${k}</div><div class="v">${v}<span style="font-size:11px;font-weight:400;color:var(--textTer);margin-left:3px">${u}</span></div></div>`).join("");
