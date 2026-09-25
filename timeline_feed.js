@@ -88,6 +88,18 @@ function 숫자(v, 자리 = 2) {
   return (v == null || !isFinite(v)) ? null : Number(Number(v).toFixed(자리));
 }
 
+// 휴장일 판별 — 지수가 멈춰 있으면 장이 안 열린 것입니다.
+// (공휴일 목록을 따로 넣지 않아도 되고, 임시 휴장도 걸러집니다)
+function 쉬는날인가(idx) {
+  if (!idx) return true;
+  const 값 = [idx.kospi, idx.kosdaq].filter(Boolean);
+  if (!값.length) return true;
+  // 등락률이 모두 0 이고 오른 종목도 없으면 거래가 없는 날입니다.
+  const 안움직임 = 값.every(x => (x.changePct == null || Math.abs(x.changePct) < 0.005));
+  const 종목없음 = 값.every(x => !(x.rising || 0) && !(x.falling || 0));
+  return 안움직임 && 종목없음;
+}
+
 async function 자료모으기() {
   const 줄 = [];
   const [idx, bd, theme] = await Promise.all([
@@ -95,6 +107,8 @@ async function 자료모으기() {
     내부('/market-breadth').catch(() => null),
     내부('/infra-theme').catch(() => null),
   ]);
+
+  if (쉬는날인가(idx)) return '';          // 휴장일이면 아무것도 적지 않습니다
 
   if (idx) {
     for (const [이름, x] of [['코스피', idx.kospi], ['코스닥', idx.kosdaq]]) {
@@ -144,6 +158,9 @@ async function 미국자료() {
     내부('/us-news-lite').catch(() => null),          // 없으면 뉴스 없이 씁니다
   ]);
   if (!us || !(us.groups || []).length) return '';
+  // 미국 휴장일 — 모든 종목의 등락률이 0 이면 장이 안 열린 것입니다.
+  const 전부 = us.groups.flatMap(g => g.items || []).filter(x => x.changePct != null);
+  if (전부.length && 전부.every(x => Math.abs(x.changePct) < 0.005)) return '';
 
   for (const g of us.groups) {
     const items = (g.items || []).filter(x => x.changePct != null);
@@ -281,11 +298,25 @@ setTimeout(() => {
 module.exports = (app) => {
   app.get('/timeline', (req, res) => {
     const 미국 = String(req.query.market || '').toLowerCase() === 'us';
-    const d = /^\d{8}$/.test(String(req.query.date || '')) ? String(req.query.date)
-            : (미국 ? 미국날짜() : 오늘날짜());
+    const 콕 = /^\d{8}$/.test(String(req.query.date || '')) ? String(req.query.date) : null;
+    let d = 콕 || (미국 ? 미국날짜() : 오늘날짜());
+    let 파일 = 읽기(d, 미국);
+
+    // 오늘 장이 아직 시작 전이면 비어 있습니다. 그럴 땐 직전 장을 보여줍니다.
+    // (미국장은 한국시간 밤에 열리므로, 낮 동안에는 간밤 기록을 계속 보는 것이 자연스럽습니다)
+    if (!콕 && !파일.items.length) {
+      const 앞 = new Date(Date.UTC(+d.slice(0, 4), +d.slice(4, 6) - 1, +d.slice(6, 8)));
+      for (let i = 0; i < 7; i++) {
+        앞.setUTCDate(앞.getUTCDate() - 1);
+        const 옛날 = `${앞.getUTCFullYear()}${String(앞.getUTCMonth() + 1).padStart(2, '0')}${String(앞.getUTCDate()).padStart(2, '0')}`;
+        const 옛파일 = 읽기(옛날, 미국);
+        if (옛파일.items.length) { d = 옛날; 파일 = 옛파일; break; }
+      }
+    }
+
     res.setHeader('Cache-Control', 'no-store');
-    const 파일 = 읽기(d, 미국);
-    res.json({ date: d, market: 미국 ? 'us' : 'kr', count: 파일.items.length, items: 파일.items, model: 쓰는모델 });
+    res.json({ date: d, market: 미국 ? 'us' : 'kr', count: 파일.items.length,
+               items: 파일.items, model: 쓰는모델 });
   });
 
   // 손으로 한 줄 더 적고 싶을 때 (장 마감 뒤에도 됩니다)
