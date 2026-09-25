@@ -14,7 +14,7 @@ const fs = require('fs');
 const 안 = 'http://127.0.0.1:3000';
 const 신선 = 60 * 1000;
 const 이력파일 = '/root/app/breadth_history.json';
-const 이력일수 = 400;   // 차트에 180일을 그리려면 넉넉히 둡니다
+const 이력일수 = 3000;  // 주피터에서 만든 5년치를 잘라내지 않도록 넉넉히
 
 // 업종 목록에는 규모별(대형주·중형주·소형주)과 대분류(제조), 지수(KOSDAQ 150 등)가 섞여 있습니다.
 // 그대로 더하면 같은 종목이 두세 번 세어지므로 빼야 합니다.
@@ -108,10 +108,11 @@ async function 재기() {
   if (캐시.도는중) return await 캐시.도는중;
 
   캐시.도는중 = (async () => {
-    const [kp, kq, rs] = await Promise.all([
+    const [kp, kq, rs, idx] = await Promise.all([
       내부('/sector-map?market=KOSPI'),
       내부('/sector-map?market=KOSDAQ'),
       rs읽기(),
+      내부('/index-intraday').catch(() => null),
     ]);
 
     const 시장 = { KOSPI: 시장하나(kp, 'KOSPI'), KOSDAQ: 시장하나(kq, 'KOSDAQ') };
@@ -138,22 +139,21 @@ async function 재기() {
     const 이력 = 이력읽기();
 
     // 휴장일에는 쌓지 않습니다.
-    //  · 종목이 거의 안 움직였으면 장이 안 열린 것입니다.
-    //  · 휴장일에도 KRX 는 마지막 거래일 자료를 그대로 돌려줍니다. 그래서
-    //    직전에 쌓아 둔 날과 숫자가 똑같으면 새 자료가 아니라고 보고 건너뜁니다.
+    //  · 휴장일에도 KRX 는 마지막 거래일 자료를 그대로 돌려줍니다.
+    //    그래서 오늘 날짜가 아니라 '자료에 적힌 날짜' 를 씁니다.
+    //  · 그 날짜가 이미 쌓여 있으면 새 자료가 아니므로 건드리지 않습니다.
+    const 자료날 = (idx && /^\d{8}$/.test(String(idx.date || ''))) ? String(idx.date) : 오늘;
     const 오늘값 = {
       KOSPI: { r: 시장.KOSPI.rising, f: 시장.KOSPI.falling },
       KOSDAQ: { r: 시장.KOSDAQ.rising, f: 시장.KOSDAQ.falling },
     };
     const 움직임 = 오늘값.KOSPI.r + 오늘값.KOSPI.f + 오늘값.KOSDAQ.r + 오늘값.KOSDAQ.f;
-    const 앞날 = Object.keys(이력).filter(d => d < 오늘).sort().pop();
-    const 같음 = 앞날 && JSON.stringify(이력[앞날]) === JSON.stringify(오늘값);
 
-    if (움직임 > 100 && !같음) {
-      이력[오늘] = 오늘값;
+    if (움직임 > 100 && !이력[자료날]) {
+      이력[자료날] = 오늘값;            // 처음 보는 거래일만 새로 쌓습니다
       이력쓰기(이력);
-    } else if (이력[오늘]) {
-      delete 이력[오늘];               // 잘못 쌓인 휴장일 줄을 치웁니다
+    } else if (자료날 !== 오늘 && 이력[오늘]) {
+      delete 이력[오늘];               // 휴장일에 잘못 쌓인 줄을 치웁니다
       이력쓰기(이력);
     }
 
