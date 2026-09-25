@@ -61,9 +61,12 @@
   .idx-bd { display:flex; align-items:baseline; gap:5px; font-size:11.5px; }
   .idx-bd b { font-family:var(--mono); font-size:13px; font-weight:600; }
   .idx-flow { margin-top:8px; padding-top:9px; border-top:1px solid var(--hair); display:flex; gap:8px; }
-  .idx-fl { flex:1; text-align:center; background:var(--surface2); border-radius:8px; padding:7px 4px; }
+  .idx-fl { flex:1 1 0; min-width:0; text-align:center; background:var(--surface2);
+            border-radius:8px; padding:7px 4px; overflow:hidden; }
   .idx-fl-l { font-size:10.5px; color:var(--textTer); margin-bottom:3px; }
-  .idx-fl-v { font-family:var(--mono); font-size:14px; font-weight:600; }
+  .idx-fl-v { font-family:var(--mono); font-size:14px; font-weight:600;
+              overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  @media (max-width:560px) { .idx-fl-v { font-size:12px; } .idx-flow { gap:5px; } }
   .kr2-top { display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap; }
   .kr2-value { font-size:38px; font-weight:700; font-family:var(--mono); letter-spacing:-1px; line-height:1; }
   .kr2-chg { font-size:15px; font-family:var(--mono); padding-bottom:3px; }
@@ -148,6 +151,19 @@
   }
   @media (max-width: 400px) {
     .between > div:last-child button { font-size: 12px; padding: 7px 10px; }
+  }
+
+  /* ── 휴대폰 공통 다듬기 ───────────────────── */
+  @media (max-width: 640px) {
+    /* 너무 작아 안 읽히는 글씨 최소 10.5px */
+    .ls-tk, .rank-code, .sup-mkt, .ld-cd, .ld-tag, .tag, .cal-more,
+    .bd-k, .bd-s, .ai-time, .ai-badge, .tl-time, .day-sub { font-size: 10.5px !important; }
+    /* 표는 좌우로 밀어 볼 수 있게 */
+    table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; }
+    /* 손가락으로 누르기 좋게 */
+    button, .between a button { min-height: 34px; }
+    /* 카드 안쪽 여백 줄여 화면을 넓게 */
+    .card { padding: 14px; }
   }
 </style>
 </head>
@@ -916,15 +932,23 @@ function renderIndexCard(label, o) {
 
   let flow = "";
   if (o.flow) {
+    // 원 단위 그대로 쓰면 자릿수가 길어 좁은 화면을 넘칩니다. 억 단위로 줄입니다.
+    const 억으로 = v => {
+      const 억 = Math.abs(v) / 1e8;
+      if (억 >= 10000) return (억 / 10000).toFixed(1) + "조";
+      if (억 >= 100) return Math.round(억).toLocaleString("ko-KR");
+      return 억.toFixed(억 >= 10 ? 0 : 1);
+    };
     const cell = (label, v) => {
       const c = v == null ? T.textTer : (v >= 0 ? T.up : T.down);
-      const txt = v == null ? "—" : (v >= 0 ? "+" : "−") + Math.abs(v).toLocaleString("ko-KR");
+      const txt = v == null ? "—" : (v >= 0 ? "+" : "−") + 억으로(v);
       return `<div class="idx-fl">
         <div class="idx-fl-l">${label}</div>
         <div class="idx-fl-v" style="color:${c}">${txt}</div>
       </div>`;
     };
-    flow = `<div class="idx-flow">
+    flow = `<div style="font-size:10px;color:var(--textTer);text-align:right;margin-top:6px;">순매수 · 억원</div>
+    <div class="idx-flow">
       ${cell("개인", o.flow.individual)}
       ${cell("외국인", o.flow.foreign)}
       ${cell("기관", o.flow.institution)}
