@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>액티브 ETF 편입·편출</title>
+<style>
+  :root {
+    --void:#F2F4F9; --surface:#FFFFFF; --surface2:#F0F2F8; --hair:#E1E5F0;
+    --textPri:#131A2C; --textSec:#5B6483; --textTer:#8B94B0;
+    --up:#E5484D; --down:#2F6FED; --signature:#6D4FE0;
+    --mono: ui-monospace,'SF Mono','Roboto Mono',Menlo,Consolas,monospace;
+    --sans: -apple-system,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--void); color:var(--textPri); font-family:var(--sans); margin:0; padding:24px 16px; }
+  .wrap { max-width:1180px; margin:0 auto; }
+  .between { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .card { background:var(--surface); border:1px solid var(--hair); border-radius:16px; padding:18px;
+          margin-bottom:16px; box-shadow:0 1px 3px rgba(19,26,44,.06); }
+  .eyebrow { font-size:11px; letter-spacing:2px; color:var(--textTer); font-family:var(--mono); }
+  h1 { font-size:22px; margin:2px 0 0; }
+  button { background:var(--surface2); border:1px solid var(--hair); color:var(--textSec);
+           padding:8px 14px; border-radius:10px; font-size:12px; cursor:pointer; font-family:var(--sans); }
+  button, .between a button { white-space:nowrap; }
+  .between > div:last-child button { font-size:13px; font-weight:600; }
+
+  .tabs { display:flex; gap:5px; flex-wrap:wrap; margin-bottom:12px; }
+  .tabs button.on { background:var(--signature); border-color:var(--signature); color:#fff; font-weight:600; }
+  .tabs button b { font-family:var(--mono); margin-left:5px; opacity:.85; }
+
+  .row { display:flex; gap:12px; padding:12px 0; border-bottom:1px solid var(--surface2); align-items:flex-start; }
+  .row:last-child { border-bottom:none; }
+  .cnt { flex:none; width:40px; text-align:center; font-family:var(--mono); font-size:16px; font-weight:700; }
+  .cnt small { display:block; font-size:9.5px; font-weight:400; color:var(--textTer); }
+  .main { flex:1; min-width:0; }
+  .nm { font-size:14px; font-weight:700; cursor:pointer; }
+  .nm:hover { color:var(--signature); text-decoration:underline; }
+  .cd { font-family:var(--mono); font-size:10.5px; color:var(--textTer); margin-left:5px; }
+  .etfs { margin-top:5px; display:flex; flex-wrap:wrap; gap:4px 6px; }
+  .etf { font-size:11px; background:var(--surface2); border-radius:6px; padding:3px 8px; color:var(--textSec); }
+  .etf b { font-family:var(--mono); margin-left:5px; }          /* 주식수 증감 */
+  .etf i { font-family:var(--mono); font-style:normal; margin-left:5px;
+           color:var(--textPri); font-weight:700; }             /* 보유비중 */
+  .plus b { color:var(--up); } .minus b { color:var(--down); }
+  .big { font-family:var(--mono); font-size:11.5px; color:var(--textSec); margin-left:7px; }
+  .big b { color:var(--signature); }
+  .empty { font-size:12.5px; color:var(--textTer); padding:14px 0; }
+  .note { font-size:11.5px; color:var(--textTer); line-height:1.75; }
+  .sum { display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:1px;
+         background:var(--hair); border:1px solid var(--hair); border-radius:11px; overflow:hidden; margin-bottom:14px; }
+  .sum div { background:var(--surface); padding:10px 12px; }
+  .sum .k { font-size:10.5px; color:var(--textTer); margin-bottom:3px; }
+  .sum .v { font-family:var(--mono); font-size:17px; font-weight:700; }
+
+  @media (max-width:640px) {
+    .between > div:last-child { gap:6px; flex-wrap:wrap; }
+    .between > div:last-child button { font-size:12.5px; padding:8px 11px; }
+    .card { padding:14px; }
+    button { min-height:34px; }
+    .cnt small, .cd, .etf { font-size:10.5px !important; }
+    .etf { padding:2px 6px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="between" style="margin-bottom:16px;">
+    <div>
+      <div class="eyebrow">ACTIVE ETF FLOW</div>
+      <h1>액티브 ETF 편입·편출</h1>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <a href="/index.html" style="text-decoration:none;"><button>주간 증시</button></a>
+      <a href="/flow-oscillator.html" style="text-decoration:none;"><button>수급오실레이터</button></a>
+      <a href="/calendar.html" style="text-decoration:none;"><button>증시 일정</button></a>
+      <a href="/brief.html" style="text-decoration:none;"><button>오늘의 브리핑</button></a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="between" style="margin-bottom:12px;">
+      <div style="font-size:13px;color:var(--textSec);">운용사가 실제로 사고판 흔적
+        <span style="font-size:11px;color:var(--textTer);">비중이 아니라 주식수 기준</span></div>
+      <span id="meta" style="font-size:10.5px;color:var(--textTer);font-family:var(--mono);"></span>
+    </div>
+    <div class="sum" id="sum"></div>
+    <div class="tabs" id="tabs"></div>
+    <div id="body"><div class="empty">불러오는 중...</div></div>
+  </div>
+
+  <div class="card">
+    <div class="note">
+      액티브 ETF 는 운용사가 종목을 직접 고르는 상품입니다. 구성종목은 법에 따라 매일 공개되므로,
+      전문가들이 어제와 견줘 무엇을 새로 담고 덜어냈는지 볼 수 있습니다.<br><br>
+      <b>진한 숫자는 그 ETF 안에서 이 종목이 차지하는 비중</b>입니다. 주식수를 늘렸어도 비중이 작으면
+      시늉이고, 비중이 크면 그만큼 무게를 실었다는 뜻입니다. 편출은 어제 비중을 보여줍니다.<br><br>
+      <b>비중이 아니라 주식수로 봅니다.</b> 비중은 주가가 오르기만 해도 늘어나지만,
+      주식수는 운용사가 실제로 사야 늘어납니다. 3% 넘게 움직인 것만 셉니다.<br><br>
+      한 곳의 선택은 취향일 수 있지만 <b>여러 곳이 같은 종목을 동시에 담거나 덜어내면</b>
+      눈여겨볼 만합니다. 종목명을 누르면 수급오실레이터에서 그 종목을 볼 수 있습니다.
+    </div>
+  </div>
+</div>
+
+<script>
+let DATA = null, TAB = "new";
+const 탭들 = [
+  ["new", "새로 담음", "nNew", "up"],
+  ["up", "주식수 늘림", "nUp", "up"],
+  ["down", "주식수 줄임", "nDown", "down"],
+  ["out", "덜어냄", "nOut", "down"],
+];
+
+function 그리기() {
+  const 몸 = document.getElementById("body");
+  if (!DATA) { 몸.innerHTML = `<div class="empty">불러오지 못했습니다.</div>`; return; }
+  const 목록 = (DATA.items || []).filter(x => (x[탭들.find(t => t[0] === TAB)[2]] || 0) > 0)
+    .sort((a, b) => {
+      const k = 탭들.find(t => t[0] === TAB)[2];
+      return (b[k] - a[k]) || (b.score - a.score);
+    });
+
+  document.getElementById("tabs").innerHTML = 탭들.map(([키, 이름, 세는키]) => {
+    const n = (DATA.items || []).filter(x => (x[세는키] || 0) > 0).length;
+    return `<button data-t="${키}" class="${키 === TAB ? "on" : ""}">${이름}<b>${n}</b></button>`;
+  }).join("");
+  document.querySelectorAll("[data-t]").forEach(b =>
+    b.onclick = () => { TAB = b.dataset.t; 그리기(); });
+
+  if (!목록.length) { 몸.innerHTML = `<div class="empty">해당하는 종목이 없습니다.</div>`; return; }
+  const 색 = 탭들.find(t => t[0] === TAB)[3];
+  const 단위 = (TAB === "new" || TAB === "out") ? "%" : "%";
+  몸.innerHTML = 목록.slice(0, 40).map(x => `
+    <div class="row">
+      <div class="cnt" style="color:${색 === "up" ? "var(--up)" : "var(--down)"}">
+        ${x[탭들.find(t => t[0] === TAB)[2]]}<small>곳</small></div>
+      <div class="main">
+        <div><span class="nm" data-stk="${x.code}">${x.name || x.code}</span><span class="cd">${x.code}</span>
+          ${x.maxW ? `<span class="big">최대 비중 <b>${x.maxW}%</b></span>` : ""}</div>
+        <div class="etfs">${(x[TAB] || []).slice(0, 8).map(i =>
+          `<span class="etf ${색 === "up" ? "plus" : "minus"}">${i.etf}` +
+          `<i>${i.w != null ? i.w + "%" : "—"}</i>` +
+          ((TAB === "up" || TAB === "down") ? `<b>${i.값 > 0 ? "+" : ""}${i.값}%</b>` : "") +
+          `</span>`).join("")}
+          ${(x[TAB] || []).length > 8 ? `<span class="etf">외 ${(x[TAB] || []).length - 8}곳</span>` : ""}
+        </div>
+      </div>
+    </div>`).join("");
+  몸.querySelectorAll("[data-stk]").forEach(el =>
+    el.onclick = () => { location.href = `/flow-oscillator.html?code=${el.dataset.stk}`; });
+}
+
+function 요약() {
+  const a = DATA.items || [];
+  const 칸 = [
+    ["추적 ETF", DATA.etfCount || 0, "개"],
+    ["새로 담김", a.filter(x => x.nNew > 0).length, "종목"],
+    ["주식수 늘림", a.filter(x => x.nUp > 0).length, "종목"],
+    ["주식수 줄임", a.filter(x => x.nDown > 0).length, "종목"],
+    ["덜어냄", a.filter(x => x.nOut > 0).length, "종목"],
+  ];
+  document.getElementById("sum").innerHTML = 칸.map(([k, v, u]) =>
+    `<div><div class="k">${k}</div><div class="v">${v}<span style="font-size:11px;font-weight:400;color:var(--textTer);margin-left:3px">${u}</span></div></div>`).join("");
+}
+
+async function 받기() {
+  try {
+    const r = await fetch("/etf_flow.json", { cache: "no-store" });
+    const d = await r.json();
+    if (d.error || !d.items) throw new Error("no data");
+    DATA = d;
+    const 보기 = s => s && s.length === 8 ? `${s.slice(4, 6)}.${s.slice(6, 8)}` : s;
+    document.getElementById("meta").textContent =
+      `${보기(DATA.prevDate)} → ${보기(DATA.date)} · 움직인 종목 ${DATA.count}개`;
+    요약();
+  } catch (e) {
+    DATA = null;
+    document.getElementById("meta").textContent = "자료를 불러오지 못했습니다";
+  }
+  그리기();
+}
+받기();
+</script>
+</body>
+</html>
