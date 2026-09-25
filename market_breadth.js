@@ -136,11 +136,21 @@ async function 재기() {
     // 하루치 비율을 평균내면 값이 부풀려지므로, 종목 수 자체를 쌓아 둡니다.
     const 오늘 = 오늘날짜();
     const 이력 = 이력읽기();
-    이력[오늘] = {
-      KOSPI: { r: 시장.KOSPI.rising, f: 시장.KOSPI.falling },
-      KOSDAQ: { r: 시장.KOSDAQ.rising, f: 시장.KOSDAQ.falling },
-    };
-    이력쓰기(이력);
+
+    // 휴장일에는 쌓지 않습니다. 오른 종목도 내린 종목도 없으면 장이 안 열린 것입니다.
+    // (그대로 쌓으면 20일 창이 밀려 값이 조금씩 틀어집니다)
+    const 움직임 = 시장.KOSPI.rising + 시장.KOSPI.falling
+                 + 시장.KOSDAQ.rising + 시장.KOSDAQ.falling;
+    if (움직임 > 100) {
+      이력[오늘] = {
+        KOSPI: { r: 시장.KOSPI.rising, f: 시장.KOSPI.falling },
+        KOSDAQ: { r: 시장.KOSDAQ.rising, f: 시장.KOSDAQ.falling },
+      };
+      이력쓰기(이력);
+    } else if (이력[오늘]) {
+      delete 이력[오늘];               // 잘못 쌓인 휴장일 줄을 치웁니다
+      이력쓰기(이력);
+    }
 
     const 최근 = Object.keys(이력).sort().slice(-20);
     function adr누적(이름) {
