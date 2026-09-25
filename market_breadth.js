@@ -137,15 +137,20 @@ async function 재기() {
     const 오늘 = 오늘날짜();
     const 이력 = 이력읽기();
 
-    // 휴장일에는 쌓지 않습니다. 오른 종목도 내린 종목도 없으면 장이 안 열린 것입니다.
-    // (그대로 쌓으면 20일 창이 밀려 값이 조금씩 틀어집니다)
-    const 움직임 = 시장.KOSPI.rising + 시장.KOSPI.falling
-                 + 시장.KOSDAQ.rising + 시장.KOSDAQ.falling;
-    if (움직임 > 100) {
-      이력[오늘] = {
-        KOSPI: { r: 시장.KOSPI.rising, f: 시장.KOSPI.falling },
-        KOSDAQ: { r: 시장.KOSDAQ.rising, f: 시장.KOSDAQ.falling },
-      };
+    // 휴장일에는 쌓지 않습니다.
+    //  · 종목이 거의 안 움직였으면 장이 안 열린 것입니다.
+    //  · 휴장일에도 KRX 는 마지막 거래일 자료를 그대로 돌려줍니다. 그래서
+    //    직전에 쌓아 둔 날과 숫자가 똑같으면 새 자료가 아니라고 보고 건너뜁니다.
+    const 오늘값 = {
+      KOSPI: { r: 시장.KOSPI.rising, f: 시장.KOSPI.falling },
+      KOSDAQ: { r: 시장.KOSDAQ.rising, f: 시장.KOSDAQ.falling },
+    };
+    const 움직임 = 오늘값.KOSPI.r + 오늘값.KOSPI.f + 오늘값.KOSDAQ.r + 오늘값.KOSDAQ.f;
+    const 앞날 = Object.keys(이력).filter(d => d < 오늘).sort().pop();
+    const 같음 = 앞날 && JSON.stringify(이력[앞날]) === JSON.stringify(오늘값);
+
+    if (움직임 > 100 && !같음) {
+      이력[오늘] = 오늘값;
       이력쓰기(이력);
     } else if (이력[오늘]) {
       delete 이력[오늘];               // 잘못 쌓인 휴장일 줄을 치웁니다
