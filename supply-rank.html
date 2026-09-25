@@ -53,7 +53,22 @@
   .empty { font-size:12.5px; color:var(--textTer); padding:14px 0; }
   .note { font-size:11.5px; color:var(--textTer); line-height:1.75; }
 
+  /* 종목 차트 창 */
+  #modal { position:fixed; inset:0; background:rgba(19,26,44,.45); display:none;
+           align-items:center; justify-content:center; padding:24px; z-index:50; }
+  #modal.on { display:flex; }
+  .modal-box { background:var(--surface); border-radius:16px; width:100%; max-width:960px;
+               max-height:92vh; overflow:auto; padding:18px 20px; box-shadow:0 12px 40px rgba(19,26,44,.25); }
+  .modal-x { background:transparent; border:none; font-size:20px; line-height:1; color:var(--textTer);
+             cursor:pointer; padding:2px 6px; }
+  #mChart { width:100%; height:320px; }
+  #mOsc { width:100%; height:150px; }
+  .meta { font-size:11px; color:var(--textTer); font-family:var(--mono); margin-top:3px; }
+
   @media (max-width:640px) {
+    #modal { padding:10px; }
+    .modal-box { padding:14px; max-height:94vh; }
+    #mChart { height:240px; } #mOsc { height:120px; }
     .between > div:last-child { gap:6px; flex-wrap:wrap; }
     .between > div:last-child button { font-size:12.5px; padding:8px 11px; }
     .card { padding:14px; }
@@ -98,13 +113,109 @@
       오늘이 몇 번째로 큰 규모였는지를 뜻합니다. <b>★1위</b>면 그동안 중 가장 크게 들어온 날이고,
       표시가 없으면 이 종목에는 흔히 있는 일이라는 뜻입니다.<br><br>
       같은 1위라도 <b>늘 있는 일인지, 처음 있는 일인지</b>를 가려 보시라고 만든 화면입니다.
-      종목명을 누르면 수급오실레이터에서 그 종목의 흐름을 볼 수 있습니다.<br><br>
+      종목명을 누르면 그 자리에서 캔들 차트와 수급오실레이터를 볼 수 있습니다.<br><br>
       시가총액 500억 미만 종목은 뺐습니다. 작은 종목은 비율이 쉽게 튀기 때문입니다.
     </div>
   </div>
 </div>
 
+<div id="modal">
+  <div class="modal-box">
+    <div class="between" style="margin-bottom:10px;">
+      <div>
+        <div style="font-size:15px;font-weight:600;" id="mName">종목</div>
+        <div class="meta" id="mMeta"></div>
+      </div>
+      <button class="modal-x" id="mClose">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--textSec);margin-bottom:6px;">캔들 차트 <span style="color:var(--textTer)">빨간 실선은 수급오실레이터</span></div>
+    <div id="mChart"></div>
+    <div style="font-size:12px;color:var(--textSec);margin:12px 0 6px;">수급오실레이터</div>
+    <div id="mOsc"></div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <script>
+const T = { up: "#E5484D", down: "#2F6FED" };
+const UP = T.up, DOWN = T.down;
+
+// ── 종목 차트 창 ──────────────────────────────────
+let mChart = null, mOsc = null, mCandle = null, mOscBars = null, mOverlay = null;
+
+function initModal() {
+  if (mChart || typeof LightweightCharts === "undefined") return;
+  const base = {
+    layout: { background: { color: '#FFFFFF' }, textColor: '#5B6483' },
+    grid: { vertLines: { color: '#E1E5F0' }, horzLines: { color: '#E1E5F0' } },
+    timeScale: { borderColor: '#E1E5F0' },
+    rightPriceScale: { borderColor: '#E1E5F0' },
+  };
+  mChart = LightweightCharts.createChart(document.getElementById('mChart'), base);
+  mCandle = mChart.addCandlestickSeries({
+    upColor: UP, downColor: DOWN, borderUpColor: UP, borderDownColor: DOWN,
+    wickUpColor: UP, wickDownColor: DOWN,
+  });
+  // 캔들 위에 오실레이터를 겹쳐 그립니다(값 크기가 달라 별도 축을 씁니다).
+  mOverlay = mChart.addLineSeries({
+    color: UP, lineWidth: 2, priceScaleId: 'osc-overlay',
+    priceLineVisible: false, lastValueVisible: false,
+  });
+  mChart.priceScale('osc-overlay').applyOptions({
+    scaleMargins: { top: 0.1, bottom: 0.1 }, visible: false,
+  });
+  mOsc = LightweightCharts.createChart(document.getElementById('mOsc'), base);
+  mOscBars = mOsc.addHistogramSeries({ color: '#6D4FE0' });
+
+  mChart.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) mOsc.timeScale().setVisibleLogicalRange(r); });
+  mOsc.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) mChart.timeScale().setVisibleLogicalRange(r); });
+}
+
+async function openStock(code, name) {
+  const modal = document.getElementById("modal");
+  modal.classList.add("on");
+  document.getElementById("mName").textContent = `${name} (${code})`;
+  document.getElementById("mMeta").textContent = "불러오는 중...";
+  initModal();
+  if (!mChart) { document.getElementById("mMeta").textContent = "차트를 불러오지 못했습니다."; return; }
+
+  try {
+    const r = await fetch(`/api/flow-oscillator?code=${code}`, { cache: "no-store" });
+    const d = await r.json();
+    const s = d.series || [];
+    if (!s.length) throw new Error("데이터 없음");
+
+    const fd = x => x.slice(0,4) + "-" + x.slice(4,6) + "-" + x.slice(6,8);
+    mCandle.setData(s.map(x => ({
+      time: fd(x.date), open: x.open, high: x.high, low: x.low, close: x.close,
+    })));
+    mOverlay.setData(s.map(x => ({ time: fd(x.date), value: x.oscillator })));
+    mOscBars.setData(s.map(x => ({
+      time: fd(x.date), value: x.oscillator, color: x.oscillator >= 0 ? UP : DOWN,
+    })));
+
+    const SHOW = 120;
+    requestAnimationFrame(() => {
+      const range = { from: Math.max(0, s.length - SHOW), to: s.length + 2 };
+      mChart.timeScale().setVisibleLogicalRange(range);
+      mOsc.timeScale().setVisibleLogicalRange(range);
+    });
+
+    document.getElementById("mMeta").textContent = `${s.length}거래일 · 최근 6개월`;
+  } catch (e) {
+    document.getElementById("mMeta").textContent = "데이터를 불러오지 못했습니다.";
+  }
+}
+
+function closeModal() { document.getElementById("modal").classList.remove("on"); }
+document.getElementById("mClose").addEventListener("click", closeModal);
+document.getElementById("modal").addEventListener("click", e => {
+  if (e.target.id === "modal") closeModal();
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+
+// ── 목록의 종목명을 누르면 차트 창 ────────────────
+// 나중에 그려지는 줄도 잡히도록 문서 전체에서 한 번만 듣습니다.
+
 let DATA = null, TAB = null, 별만 = false;
 
 function 그리기() {
@@ -139,7 +250,7 @@ function 그리기() {
         : (x.rank ? `<span class="days">${x.rank}위 / ${x.days}일 중</span>` : "");
       return `<tr>
         <td class="no">${x.todayRank}</td>
-        <td><span class="nm" data-stk="${x.code}">${x.name}</span><span class="cd">${x.code}</span></td>
+        <td><span class="nm" data-stk="${x.code}" data-nm="${x.name}">${x.name}</span><span class="cd">${x.code}</span></td>
         <td class="num">${x.cap >= 1 ? x.cap.toFixed(1) + "조" : Math.round(x.cap * 10000).toLocaleString("ko-KR") + "억"}</td>
         <td class="num">${x.amount.toLocaleString("ko-KR")}억</td>
         <td class="num ${x.ratio >= 0.3 ? "big" : ""}">${x.ratio.toFixed(2)}%</td>
@@ -148,7 +259,7 @@ function 그리기() {
     }).join("")}</tbody></table>`;
 
   몸.querySelectorAll("[data-stk]").forEach(el =>
-    el.onclick = () => { location.href = `/flow-oscillator.html?code=${el.dataset.stk}`; });
+    el.onclick = () => openStock(el.dataset.stk, el.dataset.nm || el.textContent.trim()));
 }
 
 document.getElementById("onlyStar").onchange = e => { 별만 = e.target.checked; 그리기(); };

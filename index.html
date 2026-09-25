@@ -114,6 +114,12 @@
   #mOsc { width:100%; height:150px; }
   /* 목록의 종목명을 누를 수 있게 */
   .sup-name, .rank-name { cursor:pointer; }
+  /* 그 종목 기준으로 오늘이 몇 번째로 큰 순매수였는지 */
+  .rk { display:inline-block; font-family:var(--mono); font-size:10px; font-weight:700;
+        background:#FDEBEC; color:#C0303A; border-radius:5px; padding:1px 5px; margin-left:5px;
+        vertical-align:1px; }
+  .rk.r2 { background:#FEF3E6; color:#9A6210; }
+  .rk.r3 { background:var(--surface2); color:var(--textTer); }
   .sup-row:hover .sup-name, .rank-row:hover .rank-name { color:var(--signature); text-decoration:underline; }
   /* 시장 폭 */
   .bd-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1px;
@@ -616,13 +622,37 @@ async function fetchInvestorRank(){
 let SUPPLY = null;
 let SUPPLY_TAB = null;
 
+// ── 그 종목 안에서의 순위 ────────────────────────
+// supply_rank.json 에 "이 종목이 순매수받은 날들 중 오늘이 몇 번째로 컸나" 가 들어 있습니다.
+// 시장 전체 순위(1위, 2위)와 달리, 그 종목에게 오늘이 이례적인 날인지를 알려 줍니다.
+let RANK = null;
+function 순위표(코드, sign) {
+  if (!RANK || !코드 || sign < 0) return "";
+  const 위 = RANK.topRank || 5;
+  for (const 누구 of (RANK.investors || [])) {
+    const x = (RANK.data[누구] || []).find(v => v.code === 코드);
+    if (x && x.rank && x.rank <= 위) {
+      return `<span class="rk ${x.rank === 1 ? "" : x.rank <= 3 ? "r2" : "r3"}"` +
+             ` title="${누구} 기준 · 최근 ${x.days}일 중 ${x.rank}번째로 큰 순매수">★${x.rank}</span>`;
+    }
+  }
+  return "";
+}
+async function 순위받기() {
+  try {
+    const r = await fetch("/supply_rank.json", { cache: "no-store" });
+    const d = await r.json();
+    if (d && d.data) { RANK = d; paintSupply(); }
+  } catch (e) {}
+}
+
 function supRows(list, sign) {
   if (!list || !list.length) return `<div class="news-empty" style="padding-top:10px;">데이터가 없습니다.</div>`;
   const color = sign > 0 ? T.up : T.down;
   return list.map((it, i) => `
     <div class="sup-row">
       <span class="sup-no">${i + 1}</span>
-      <span class="sup-name" data-stk="${it.code || ""}" data-nm="${it.name}">${it.name}<span class="sup-mkt">${it.market === "KOSPI" ? "KP" : "KQ"}</span></span>
+      <span class="sup-name" data-stk="${it.code || ""}" data-nm="${it.name}">${it.name}<span class="sup-mkt">${it.market === "KOSPI" ? "KP" : "KQ"}</span>${순위표(it.code, sign)}</span>
       <span class="sup-net">${Math.round(it.net / 100).toLocaleString("ko-KR")}억</span>
       <span class="sup-ratio" style="color:${color}">${it.ratio >= 0 ? "+" : "−"}${Math.abs(it.ratio).toFixed(2)}%</span>
     </div>`).join("");
@@ -1287,6 +1317,8 @@ async function bd받기() {
 bd받기();
 setInterval(bd받기, 60000);
 
+
+순위받기();
 </script>
 </body>
 </html>
