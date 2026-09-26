@@ -151,6 +151,43 @@
     /* 카드 안쪽 여백 줄여 화면을 넓게 */
     .card { padding: 14px; }
   }
+
+  /* ── 투자자 동향 (티스토리 캡처와 같은 배치) ───────────── */
+  .fd-head { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
+  .fd-title { font-size:14px; font-weight:700; color:var(--textPri); }
+  .fd-title span { font-size:11px; font-weight:400; color:var(--textTer); margin-left:6px; }
+  .fd-tools { display:flex; align-items:center; gap:8px; }
+  .fd-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  table.fd-t { width:100%; border-collapse:collapse; font-size:12.5px; font-variant-numeric:tabular-nums; }
+  table.fd-t th { background:#203864; color:#fff; font-weight:600; padding:6px 8px; border:1px solid #203864;
+                  white-space:nowrap; text-align:center; font-size:12px; }
+  table.fd-t td { padding:5px 8px; border:1px solid var(--hair); text-align:right; white-space:nowrap; font-family:var(--mono); }
+  table.fd-t td.fd-dt { text-align:center; color:var(--textSec); }
+  table.fd-t tr.fd-sum td { background:var(--surface2); font-weight:700; }
+  table.fd-t tr.fd-sum td.fd-dt { color:var(--textTer); font-weight:400; font-size:11px; font-family:var(--sans); }
+  table.fd-t.fd-sm { font-size:11.5px; } table.fd-t.fd-sm th { font-size:11px; padding:5px 5px; }
+  table.fd-t.fd-sm td { padding:4px 5px; }
+  .fd-u { color:var(--up); } .fd-d { color:var(--down); } .fd-na { color:var(--textTer); }
+  .fd-idx { font-weight:700; }
+  .fd-cap { font-size:13px; font-weight:700; color:var(--textPri); text-align:center; margin:4px 0 6px; }
+  .fd-leg { display:flex; justify-content:center; gap:14px; font-size:11px; color:var(--textSec); margin-bottom:4px; }
+  .fd-leg i { display:inline-block; width:14px; height:3px; border-radius:2px; vertical-align:middle; margin-right:5px; }
+  .fd-c { width:100%; height:230px; }
+  .fd-c.fd-bar { height:220px; }
+  .fd-2 { display:grid; grid-template-columns:1fr 1fr; gap:14px 18px; margin:14px 0 18px; }
+  .fd-3 { display:grid; grid-template-columns:repeat(3,1fr); gap:14px 16px; margin:14px 0; }
+  .fd-3.fd-tbls { grid-template-columns:0.82fr 1.09fr 1.09fr; }
+  .fd-2 > *, .fd-3 > * { min-width:0; }        /* 칸이 넓은 표에 끌려 늘어나지 않게 — 표는 칸 안에서 옆으로 밉니다 */
+  .fd-box { border:1px solid var(--hair); border-radius:12px; padding:10px 10px 6px; background:var(--surface); }
+  .fd-sub { font-size:12.5px; font-weight:700; color:var(--textSec); margin:0 0 6px; }
+  .fd-note { font-size:11px; color:var(--textTer); line-height:1.7; margin-top:10px; }
+  @media (max-width:1100px) { .fd-3.fd-tbls { grid-template-columns:1fr; } }
+  @media (max-width:900px) { .fd-3 { grid-template-columns:1fr; } }
+  @media (max-width:760px) {
+    .fd-2 { grid-template-columns:1fr; }
+    table.fd-t { font-size:11px; } table.fd-t th { font-size:11px; padding:5px 6px; } table.fd-t td { padding:4px 6px; }
+    .fd-c { height:200px; } .fd-c.fd-bar { height:190px; }
+  }
 </style>
 </head>
 <body>
@@ -225,6 +262,72 @@
       <button data-inv="기관합계">기관합계</button>
     </div>
     <div id="stBody"><div class="empty">불러오는 중...</div></div>
+  </div>
+
+  <!-- ── 투자자 동향 · 첫 장 (코스피·코스닥) ───────────── -->
+  <div class="card" id="fdA">
+    <div class="fd-head">
+      <div class="fd-title">투자자 동향 <span>코스피·코스닥 · 억원</span></div>
+      <div class="fd-tools fd-noshot">
+        <span class="meta" id="fdMetaA"></span>
+        <button data-fdsave="fdA">그림으로 저장</button>
+      </div>
+    </div>
+    <div class="fd-scroll"><div id="fdKospi"><div class="empty">불러오는 중...</div></div></div>
+    <div class="fd-2">
+      <div><div class="fd-cap">코스피 주간 외국인 순매수</div><div class="fd-c fd-bar" id="fdKsF"></div></div>
+      <div><div class="fd-cap">코스피 주간 기관 순매수</div><div class="fd-c fd-bar" id="fdKsI"></div></div>
+    </div>
+    <div class="fd-scroll"><div id="fdKosdaq"></div></div>
+    <div class="fd-2" style="margin-bottom:0;">
+      <div><div class="fd-cap">코스닥 주간 외국인 순매수</div><div class="fd-c fd-bar" id="fdKqF"></div></div>
+      <div><div class="fd-cap">코스닥 주간 기관 순매수</div><div class="fd-c fd-bar" id="fdKqI"></div></div>
+    </div>
+  </div>
+
+  <!-- ── 투자자 동향 · 둘째 장 (선물 · 곱버스 · 대형주) ───── -->
+  <div class="card" id="fdB">
+    <div class="fd-head">
+      <div class="fd-title">선물 · 곱버스 · 대형주 수급</div>
+      <div class="fd-tools fd-noshot">
+        <span class="meta" id="fdMetaB"></span>
+        <button data-fdsave="fdB">그림으로 저장</button>
+      </div>
+    </div>
+    <div class="fd-2" style="margin-top:0;">
+      <div>
+        <div class="fd-sub">코스피 선물 매매 동향 <span class="meta">억원</span></div>
+        <div class="fd-scroll"><div id="fdFut"></div></div>
+      </div>
+      <div><div class="fd-cap">코스피 선물 외국인 순매수</div><div class="fd-c" id="fdFutC"></div></div>
+    </div>
+    <div class="fd-3 fd-tbls">
+      <div><div class="fd-sub">KODEX 200선물인버스2X <span class="meta">백만원</span></div><div class="fd-scroll"><div id="fdInv"></div></div></div>
+      <div><div class="fd-sub">삼성전자 최근 5거래일 <span class="meta">백만원</span></div><div class="fd-scroll"><div id="fdSam"></div></div></div>
+      <div><div class="fd-sub">SK하이닉스 최근 5거래일 <span class="meta">백만원</span></div><div class="fd-scroll"><div id="fdHyn"></div></div></div>
+    </div>
+    <div class="fd-3" style="margin-bottom:0;">
+      <div class="fd-box">
+        <div class="fd-cap" id="fdInvT">4월이후 개인 곱버스 &amp; 코스피</div>
+        <div class="fd-leg"><span><i style="background:#F08C2E"></i>개인 곱버스</span><span><i style="background:#3E7BD6"></i>종합지수</span></div>
+        <div class="fd-c" id="fdInvC"></div>
+      </div>
+      <div class="fd-box">
+        <div class="fd-cap" id="fdSamT">4월이후 삼성전자 &amp; 개인 순매수</div>
+        <div class="fd-leg"><span><i style="background:#F08C2E"></i>개인</span><span><i style="background:#3E7BD6"></i>삼성전자</span></div>
+        <div class="fd-c" id="fdSamC"></div>
+      </div>
+      <div class="fd-box">
+        <div class="fd-cap" id="fdKsCT">4월이후 코스피 외국인 순매수</div>
+        <div class="fd-leg"><span><i style="background:#3E7BD6"></i>외국인 누적</span></div>
+        <div class="fd-c" id="fdKsC"></div>
+      </div>
+    </div>
+    <div class="fd-note fd-noshot" id="fdNote">
+      코스피·코스닥·선물은 억원, 곱버스·삼성전자·SK하이닉스는 백만원입니다.
+      대형주 표의 <b>자사주</b>는 거래소 분류상 <b>기타법인</b>(회사의 자사주 매입이 여기에 잡힙니다)입니다.
+      주간 막대는 월~금으로 묶고, 그 주의 목요일이 속한 달의 몇째 주로 이름을 붙입니다.
+    </div>
   </div>
 
   <div class="note">
@@ -793,5 +896,239 @@ setInterval(tl받기, 180000);
 
 </script>
 
+<!-- ═══════════════════════════════════════════════════════════
+     투자자 동향 — 티스토리 캡처 두 장과 같은 표 · 차트
+     자료: /api/flow-diary (서버가 매일 갱신) · 없으면 /flow_diary.json (엑셀 씨앗)
+     단위: 코스피·코스닥·선물 억원 / 곱버스·삼성전자·SK하이닉스 백만원
+     ═══════════════════════════════════════════════════════════ -->
+<script>
+(function 투자자동향() {
+  const 붉 = "#E5484D", 푸 = "#2F6FED", 주황 = "#F08C2E", 파랑 = "#3E7BD6";
+  const 차트들 = [];
+
+  // ── 모양 도구 ──
+  const 콤마 = v => Math.round(v).toLocaleString("ko-KR");
+  const 대시날 = d => `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`;
+  const 짧은날 = d => `${+d.slice(4, 6)}/${+d.slice(6, 8)}`;
+  const 없음 = `<span class="fd-na">—</span>`;
+  const 화살 = v => v == null ? 없음
+    : `<span class="${v > 0 ? "fd-u" : v < 0 ? "fd-d" : ""}">${v > 0 ? "▲" : v < 0 ? "▼" : ""}${콤마(Math.abs(v))}</span>`;
+  const 소수화살 = v => v == null ? 없음
+    : `<span class="${v > 0 ? "fd-u" : v < 0 ? "fd-d" : ""}">${v > 0 ? "▲" : v < 0 ? "▼" : ""}${Math.abs(v).toFixed(2)}</span>`;
+  const 퍼센트 = v => v == null ? 없음
+    : `<span class="${v > 0 ? "fd-u" : v < 0 ? "fd-d" : ""}">${v.toFixed(2)}%</span>`;
+  const 지수칸 = (v, chg) => v == null ? 없음
+    : `<span class="fd-idx ${chg > 0 ? "fd-u" : chg < 0 ? "fd-d" : ""}">${v.toLocaleString("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
+
+  // ── 표 ──
+  //   열 = [이름, 키, 그리는 법, 합계 여부]. 다섯 날 모두 비어 있는 열은 뺍니다(씨앗에 없는 항목).
+  function 표(대상, 날자료, 열, 작게) {
+    const 날들 = Object.keys(날자료 || {}).sort().slice(-5).reverse();
+    const el = document.getElementById(대상);
+    if (!날들.length) { el.innerHTML = `<div class="empty">자료가 없습니다.</div>`; return; }
+    const 쓸열 = 열.filter(([, k]) => k === "date" || 날들.some(d => 날자료[d][k] != null));
+    let h = `<table class="fd-t${작게 ? " fd-sm" : ""}"><thead><tr>${쓸열.map(([n]) => `<th>${n}</th>`).join("")}</tr></thead><tbody>`;
+    for (const d of 날들) {
+      const r = 날자료[d];
+      h += `<tr>${쓸열.map(([, k, 그림]) => k === "date"
+        ? `<td class="fd-dt">${작게 ? 대시날(d).slice(5) : 대시날(d)}</td>` : `<td>${그림(r[k], r)}</td>`).join("")}</tr>`;
+    }
+    const 합칸 = 쓸열.map(([, k, , 합]) => {
+      if (k === "date") return `<td class="fd-dt">${작게 ? "합계" : "5일 합계"}</td>`;
+      if (!합) return `<td></td>`;
+      const 값 = 날들.map(d => 날자료[d][k]).filter(v => v != null);
+      return `<td>${값.length ? 화살(값.reduce((a, b) => a + b, 0)) : ""}</td>`;
+    });
+    h += `<tr class="fd-sum">${합칸.join("")}</tr></tbody></table>`;
+    el.innerHTML = h;
+  }
+  const 수 = v => v == null ? 없음 : 콤마(v);
+  const 시장열 = [
+    ["일자", "date"], ["종합지수", "close", (v, r) => 지수칸(v, r.chg)], ["전일비", "chg", 소수화살],
+    ["등락률", "pct", 퍼센트], ["거래대금", "amt", 수],
+    ["개인", "개인", 화살, 1], ["외국인", "외국인", 화살, 1], ["기관계", "기관계", 화살, 1],
+    ["금융투자", "금융투자", 화살, 1], ["보험", "보험", 화살, 1], ["투신", "투신", 화살, 1],
+    ["연기금등", "연기금등", 화살, 1], ["사모펀드", "사모펀드", 화살, 1],
+  ];
+  const 선물열 = [
+    ["일자", "date"], ["종합지수", "close", (v, r) => 지수칸(v, r.chg)], ["전일비", "chg", 소수화살],
+    ["등락률", "pct", 퍼센트], ["거래대금", "amt", 수],
+    ["개인", "개인", 화살, 1], ["외국인", "외국인", 화살, 1], ["기관계", "기관계", 화살, 1],
+  ];
+  const 삼열 = [["일자", "date"], ["개인", "개인", 화살, 1], ["외국인", "외국인", 화살, 1], ["기관계", "기관계", 화살, 1]];
+  const 종목열 = [...삼열, ["자사주", "기타법인", 화살, 1]];
+
+  // ── 차트 ──
+  function 새차트(id, 더) {
+    const el = document.getElementById(id);
+    if (!el || typeof LightweightCharts === "undefined") return null;
+    el.innerHTML = "";
+    const c = LightweightCharts.createChart(el, Object.assign({
+      layout: { background: { color: "#FFFFFF" }, textColor: "#5B6483", fontSize: 11 },
+      grid: { vertLines: { visible: false }, horzLines: { color: "#E1E5F0" } },
+      rightPriceScale: { borderColor: "#E1E5F0" },
+      timeScale: { borderColor: "#E1E5F0" },
+      handleScroll: false, handleScale: false,          // 엑셀처럼 고정 — 페이지 스크롤을 방해하지 않게
+      localization: { priceFormatter: v => 콤마(v) },
+      crosshair: { horzLine: { visible: false } },
+    }, 더 || {}));
+    차트들.push([el, c]);
+    return c;
+  }
+  const 날짜키 = t => typeof t === "string" ? t
+    : t && t.year ? `${t.year}-${String(t.month).padStart(2, "0")}-${String(t.day).padStart(2, "0")}` : "";
+
+  // 주간 묶기 — 월~금 한 주, 이름은 그 주 목요일이 속한 달의 몇째 주
+  function 주별(날자료, 키) {
+    const 주 = new Map();
+    for (const d of Object.keys(날자료 || {}).sort()) {
+      const v = 날자료[d][키];
+      if (v == null) continue;
+      const t = new Date(Date.UTC(+d.slice(0, 4), +d.slice(4, 6) - 1, +d.slice(6, 8)));
+      const 월 = new Date(t); 월.setUTCDate(t.getUTCDate() - (t.getUTCDay() + 6) % 7);
+      const 키2 = 월.toISOString().slice(0, 10);
+      if (!주.has(키2)) 주.set(키2, { 월, 합: 0, 처음: d, 끝: d });
+      const w = 주.get(키2); w.합 += v; w.끝 = d;
+    }
+    return [...주.values()].map(w => {
+      const 목 = new Date(w.월); 목.setUTCDate(w.월.getUTCDate() + 3);
+      return { time: 대시날(w.끝), value: w.합, 이름: `${목.getUTCMonth() + 1}월${Math.ceil(목.getUTCDate() / 7)}`,
+               구간: `${짧은날(w.처음)}~${짧은날(w.끝)}` };
+    });
+  }
+  function 주간막대(id, 날자료, 키) {
+    const 주 = 주별(날자료, 키);
+    const 이름표 = {}; for (const w of 주) 이름표[w.time] = w;
+    const c = 새차트(id, {
+      timeScale: { borderColor: "#E1E5F0", tickMarkFormatter: t => (이름표[날짜키(t)] || {}).이름 || "" },
+      localization: { priceFormatter: v => 콤마(v),
+                      timeFormatter: t => { const w = 이름표[날짜키(t)]; return w ? `${w.이름} (${w.구간})` : ""; } },
+    });
+    if (!c) return;
+    const s = c.addHistogramSeries({ priceFormat: { type: "custom", formatter: v => 콤마(v), minMove: 1 }, priceLineVisible: false });
+    s.setData(주.map(w => ({ time: w.time, value: w.value, color: w.value >= 0 ? 붉 : 푸 })));
+    c.timeScale().fitContent();
+  }
+  // 누적선 (+ 오른쪽 축에 겹칠 선)
+  function 누적선(id, 날자료, 키, 시작, 겹칠) {
+    const 날들 = Object.keys(날자료 || {}).sort().filter(d => d >= 시작 && 날자료[d][키] != null);
+    if (!날들.length) return null;
+    const c = 새차트(id, 겹칠 ? { leftPriceScale: { visible: true, borderColor: "#E1E5F0" } } : {});
+    if (!c) return null;
+    let 합 = 0;
+    const 선 = c.addLineSeries({ color: 겹칠 ? 주황 : 파랑, lineWidth: 2, priceLineVisible: false, lastValueVisible: false,
+                                priceScaleId: 겹칠 ? "left" : "right",
+                                priceFormat: { type: "custom", formatter: v => 콤마(v), minMove: 1 } });
+    선.setData(날들.map(d => { 합 += 날자료[d][키]; return { time: 대시날(d), value: 합 }; }));
+    if (겹칠) {
+      const 날2 = Object.keys(겹칠.자료).sort().filter(d => d >= 시작 && 겹칠.자료[d][겹칠.키] != null);
+      const 둘 = c.addLineSeries({ color: 파랑, lineWidth: 2, priceLineVisible: false, lastValueVisible: false,
+                                  priceScaleId: "right", priceFormat: { type: "custom", formatter: v => 콤마(v), minMove: 1 } });
+      둘.setData(날2.map(d => ({ time: 대시날(d), value: 겹칠.자료[d][겹칠.키] })));
+    }
+    c.timeScale().fitContent();
+    return 날들[0];
+  }
+
+  // ── 그리기 ──
+  function 그리기(D) {
+    // 30분마다 다시 그릴 때 이전 차트를 치웁니다 (안 치우면 쌓입니다)
+    for (const [, c] of 차트들) { try { c.remove(); } catch (e) {} }
+    차트들.length = 0;
+    const M = D.market || {}, KS = M.KOSPI || {}, KQ = M.KOSDAQ || {};
+    표("fdKospi", KS, 시장열.map((x, i) => i === 1 ? ["코스피", ...x.slice(1)] : x));
+    표("fdKosdaq", KQ, 시장열.map((x, i) => i === 1 ? ["코스닥", ...x.slice(1)] : x));
+    주간막대("fdKsF", KS, "외국인"); 주간막대("fdKsI", KS, "기관계");
+    주간막대("fdKqF", KQ, "외국인"); 주간막대("fdKqI", KQ, "기관계");
+
+    표("fdFut", D.futures, 선물열);
+    누적선("fdFutC", D.futures, "외국인", "00000000");
+
+    표("fdInv", D.inverse, 삼열, true);
+    const st = D.stocks || {};
+    표("fdSam", (st["005930"] || {}).days, 종목열, true);
+    표("fdHyn", (st["000660"] || {}).days, 종목열, true);
+
+    const 시작 = "20260401";
+    const 달 = d => d ? `${+d.slice(4, 6)}월이후` : "";
+    const a = 누적선("fdInvC", D.inverse, "개인", 시작, { 자료: KS, 키: "close" });
+    const b = 누적선("fdSamC", D.samsungChart, "개인", 시작, { 자료: D.samsungChart, 키: "close" });
+    const c = 누적선("fdKsC", KS, "외국인", 시작);
+    if (a) document.getElementById("fdInvT").textContent = `${달(a)} 개인 곱버스 & 코스피`;
+    if (b) document.getElementById("fdSamT").textContent = `${달(b)} 삼성전자 & 개인 순매수`;
+    if (c) document.getElementById("fdKsCT").textContent = `${달(c)} 코스피 외국인 순매수`;
+
+    const 끝날 = Object.keys(KS).sort().pop();
+    const 글 = 끝날 ? `${짧은날(끝날)} 기준 · ${D.source || ""}` : "";
+    document.getElementById("fdMetaA").textContent = 글;
+    document.getElementById("fdMetaB").textContent = 글;
+    맞춤();
+  }
+
+  async function 불러오기() {
+    for (const 주소 of ["/api/flow-diary", "/flow_diary.json"]) {
+      try {
+        const r = await fetch(주소, { cache: "no-store" });
+        if (!r.ok) continue;
+        const d = await r.json();
+        if (d && d.market) { 그리기(d); return; }
+      } catch (e) {}
+    }
+    document.getElementById("fdKospi").innerHTML = `<div class="empty">투자자 동향 자료를 불러오지 못했습니다.</div>`;
+  }
+
+  // ── 크기 따라가기 ──
+  function 맞춤() {
+    for (const [el, c] of 차트들) {
+      const w = Math.floor(el.clientWidth);
+      if (w > 0) { try { c.applyOptions({ width: w }); c.timeScale().fitContent(); } catch (e) {} }
+    }
+  }
+  if (typeof ResizeObserver !== "undefined") {
+    const ro = new ResizeObserver(() => requestAnimationFrame(맞춤));
+    for (const id of ["fdKsF", "fdKsI", "fdKqF", "fdKqI", "fdFutC", "fdInvC", "fdSamC", "fdKsC"]) {
+      const el = document.getElementById(id); if (el) ro.observe(el);
+    }
+  }
+  window.addEventListener("resize", () => requestAnimationFrame(맞춤));
+
+  // ── 그림으로 저장 (티스토리용 PNG) ──
+  function 도구싣기() {
+    return new Promise((ok, no) => {
+      if (window.html2canvas) return ok();
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+      s.onload = ok; s.onerror = () => no(new Error("그림 도구를 불러오지 못했습니다"));
+      document.head.appendChild(s);
+    });
+  }
+  document.querySelectorAll("[data-fdsave]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const 카드 = document.getElementById(btn.dataset.fdsave);
+      const 원래 = btn.textContent;
+      btn.textContent = "만드는 중..."; btn.disabled = true;
+      try {
+        await 도구싣기();
+        const 판 = await window.html2canvas(카드, {
+          scale: 2, backgroundColor: "#FFFFFF", useCORS: true,
+          ignoreElements: el => el.classList && el.classList.contains("fd-noshot"),
+        });
+        const 끝날 = (document.getElementById("fdMetaA").textContent.match(/^(\d+)\/(\d+)/) || []);
+        const 이름 = `투자자동향_${끝날[1] ? String(끝날[1]).padStart(2, "0") + String(끝날[2]).padStart(2, "0") : ""}_${btn.dataset.fdsave === "fdA" ? "1" : "2"}.png`;
+        const a = document.createElement("a");
+        a.href = 판.toDataURL("image/png"); a.download = 이름;
+        document.body.appendChild(a); a.click(); a.remove();
+      } catch (e) {
+        alert(e.message || "그림을 만들지 못했습니다");
+      } finally {
+        btn.textContent = 원래; btn.disabled = false;
+      }
+    });
+  });
+
+  불러오기();
+  setInterval(불러오기, 30 * 60 * 1000);
+})();
+</script>
 </body>
 </html>
