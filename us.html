@@ -184,6 +184,15 @@
             font-weight:700; flex:none; }
   .flow-p { width:58px; text-align:right; font-family:var(--mono); font-size:11.5px;
             color:var(--textTer); flex:none; }
+  .flow-tag { display:inline-block; font-size:9.5px; font-family:var(--sans); font-weight:700;
+              border-radius:4px; padding:1px 4px; margin-left:4px; vertical-align:1px; }
+  .flow-tag.exact { background:#E8F3EC; color:#1F6D4A; }
+  .flow-tag.est   { background:var(--surface2); color:var(--textTer); }
+  .flow-wait { flex:1; font-size:11.5px; color:var(--textTer); }
+  @media (max-width:640px) {
+    .flow-tag { font-size:9px; }
+    .flow-wait { font-size:10.5px; }
+  }
 </style>
 </head>
 <body>
@@ -257,10 +266,17 @@
     </div>
     <div id="flowBody"><div class="empty">불러오는 중...</div></div>
     <div style="font-size:11px;color:var(--textTer);line-height:1.75;margin-top:12px;">
-      순자산 변화에서 그날 주가 등락분을 빼서 계산합니다. 주가가 올라 덩치가 커진 것과
-      실제로 돈이 들어온 것을 가른 값입니다.
-      <b>EWY</b>는 외국인이 한국을 어떻게 보는지, <b>DRAM</b>은 삼성전자·SK하이닉스 비중이 높아
-      국내 메모리를 보는 대리지표로 쓸 수 있습니다.
+      <b class="flow-tag exact">정확</b> 운용사가 공시하는 <b>상장주식수</b>의 변화입니다.
+      주식수가 늘면 새 돈이 들어온 것이고 줄면 나간 것이라, 주가와 무관하게 딱 떨어집니다.
+      주식수는 설정단위(보통 5만 주)로만 움직여 <b>변화가 없는 날이 자주 있습니다.</b>
+      <br>
+      <b class="flow-tag est">추정</b> 순자산에서 그날 주가 등락분을 뺀 값입니다.
+      순자산이 며칠 묵어 있을 때가 있어 갱신이 멈추면 계산하지 않습니다.
+      <br>
+      <b>EWY</b>는 한국만 담고, <b>IEMG·EEM</b>은 MSCI 신흥국에서 한국이 약 5분의 1을 차지합니다
+      (FTSE 기준인 VWO에는 한국이 없습니다).
+      <b>DRAM</b>은 삼성전자·SK하이닉스 비중이 높지만 2026년 4월 상장이라
+      아직 자금을 모으는 중이어서, 유입 자체보다 <b>등락률</b>로 보시는 편이 낫습니다.
     </div>
   </div>
 
@@ -697,31 +713,42 @@ async function 자금받기() {
     const d = await r.json();
     if (d.error || !(d.items || []).length) throw new Error("no data");
 
-    const 있는것 = d.items.filter(x => x.flow != null);
-    if (!있는것.length) {
-      몸.innerHTML = `<div class="empty">${d.note || "아직 견줄 어제 자료가 없습니다. 내일부터 나옵니다."}</div>`;
-      document.getElementById("flowMeta").textContent = "";
-      return;
-    }
-    const 최대 = Math.max(...있는것.map(x => Math.abs(x.flow)), 1);
+    // 값이 아직 없는 줄도 지우지 않고 까닭을 적어 보여줍니다.
+    // 그래야 고장인지 기다리는 중인지 한눈에 갈립니다.
+    const 잰것 = d.items.filter(x => x.flow != null);
+    const 최대 = Math.max(...잰것.map(x => Math.abs(x.flow)), 1);
+    // ETF 한 설정단위가 천만 달러 안팎이라, 작은 금액은 백만 달러로 끊어야 읽힙니다.
     const 억달러 = v => {
-      const 억 = v / 1e8;
-      return (억 >= 0 ? "+" : "−") + "$" + Math.abs(억).toFixed(억 >= 10 || 억 <= -10 ? 0 : 1) + "억";
+      const 부호 = v >= 0 ? "+" : "−", a = Math.abs(v);
+      if (a >= 1e8) return 부호 + "$" + (a / 1e8).toFixed(a >= 1e9 ? 0 : 1) + "억";
+      return 부호 + "$" + Math.round(a / 1e6) + "백만";
     };
-    몸.innerHTML = 있는것.map(x => {
+    const 배지 = m => m === "정확" ? `<b class="flow-tag exact">정확</b>`
+                    : m === "추정" ? `<b class="flow-tag est">추정</b>` : "";
+
+    몸.innerHTML = d.items.map(x => {
+      const 이름칸 = `<span class="flow-n"><b>${x.name}</b>` +
+                     `<span>${x.symbol}${배지(x.method)}</span></span>`;
+      if (x.flow == null) {
+        return `<div class="flow-row">${이름칸}` +
+               `<span class="flow-wait">${x.status || x.error || "—"}</span></div>`;
+      }
       const 비율 = Math.min(50, Math.abs(x.flow) / 최대 * 50);
       const 들어옴 = x.flow >= 0;
-      return `<div class="flow-row">
-        <span class="flow-n"><b>${x.name}</b><span>${x.symbol}</span></span>
+      return `<div class="flow-row">${이름칸}
         <span class="flow-bar"><span class="flow-mid"></span>
-          <i style="${들어옴 ? "left:50%" : `right:50%`};width:${비율}%;
+          <i style="${들어옴 ? "left:50%" : "right:50%"};width:${비율}%;
              background:${들어옴 ? UP : DOWN}"></i></span>
         <span class="flow-v" style="color:${들어옴 ? UP : DOWN}">${억달러(x.flow)}</span>
         <span class="flow-p">${x.flowPct == null ? "" : (x.flowPct >= 0 ? "+" : "−") + Math.abs(x.flowPct).toFixed(2) + "%"}</span>
       </div>`;
     }).join("");
+
+    const 꼬리 = [];
+    if (d.exactOk) 꼬리.push(`정확 ${d.exactOk}`);
+    if (d.aumOk) 꼬리.push(`추정 ${d.aumOk}`);
     document.getElementById("flowMeta").textContent =
-      `${있는것.length}개 · ${d.date || ""}` + (d.stale ? " · 지난 값" : "");
+      (꼬리.join(" · ") || `${d.items.length}개`) + ` · ${d.date || ""}` + (d.stale ? " · 지난 값" : "");
   } catch (e) {
     몸.innerHTML = `<div class="empty">자금 자료를 불러오지 못했습니다.</div>`;
     document.getElementById("flowMeta").textContent = "";
