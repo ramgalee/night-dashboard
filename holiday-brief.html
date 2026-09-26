@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>추석 연휴 미국 증시 3일 총정리</title>
+<style>
+  :root {
+    --void:#F2F4F9; --surface:#FFFFFF; --surface2:#F0F2F8; --hair:#E1E5F0;
+    --textPri:#131A2C; --textSec:#5B6483; --textTer:#8B94B0;
+    --up:#E5484D; --down:#2F6FED; --signature:#6D4FE0; --amber:#B8790A;
+    --mono: ui-monospace,'SF Mono','Roboto Mono',Menlo,Consolas,monospace;
+    --sans: -apple-system,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--void); color:var(--textPri); font-family:var(--sans); margin:0; padding:24px 16px; }
+  .wrap { max-width:1180px; margin:0 auto; }
+  .between { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .card { background:var(--surface); border:1px solid var(--hair); border-radius:16px; padding:18px;
+          margin-bottom:16px; box-shadow:0 1px 3px rgba(19,26,44,.06); }
+  .eyebrow { font-size:11px; letter-spacing:2px; color:var(--textTer); font-family:var(--mono); }
+  h1 { font-size:22px; margin:2px 0 0; }
+  h2 { font-size:15px; margin:0 0 12px; }
+  button { background:var(--surface2); border:1px solid var(--hair); color:var(--textSec);
+           padding:8px 14px; border-radius:10px; font-size:12px; cursor:pointer; font-family:var(--sans); }
+  button, .between a button { white-space:nowrap; }
+  .between > div:last-child button { font-size:13px; font-weight:600; }
+
+  .lede { font-size:13.5px; line-height:1.85; color:var(--textSec); }
+  .lede b { color:var(--textPri); }
+  .key { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:1px;
+         background:var(--hair); border:1px solid var(--hair); border-radius:12px; overflow:hidden; margin:14px 0 0; }
+  .key div { background:var(--surface); padding:12px 14px; }
+  .key .k { font-size:10.5px; color:var(--textTer); margin-bottom:4px; }
+  .key .v { font-family:var(--mono); font-size:16px; font-weight:700; }
+  .key .s { font-size:11px; color:var(--textTer); margin-top:3px; }
+
+  .tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; }
+  .tabs button.on { background:var(--signature); border-color:var(--signature); color:#fff; font-weight:600; }
+  .tabs button small { display:block; font-size:10px; opacity:.8; font-weight:400; margin-top:1px; }
+
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .grid2 > div { min-width:0; }        /* 표가 칸을 밀어내지 않게 */
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  th { text-align:right; font-size:11px; font-weight:500; color:var(--textTer);
+       padding:6px 8px; border-bottom:1px solid var(--hair); white-space:nowrap; }
+  td { text-align:right; padding:7px 8px; border-bottom:1px solid var(--surface2);
+       font-family:var(--mono); white-space:nowrap; }
+  th:first-child, td:first-child { text-align:left; font-family:var(--sans); }
+  tbody tr:last-child td { border-bottom:none; }
+  .up { color:var(--up); } .down { color:var(--down); }
+
+  .why { margin-top:6px; }
+  .why-item { padding:11px 0; border-bottom:1px solid var(--surface2); }
+  .why-item:last-child { border-bottom:none; }
+  .why-t { font-size:13px; font-weight:700; margin-bottom:4px; }
+  .why-b { font-size:12.5px; color:var(--textSec); line-height:1.75; }
+
+  .stk { display:flex; flex-wrap:wrap; gap:5px 7px; margin-top:8px; }
+  .stk span { font-size:11.5px; background:var(--surface2); border-radius:6px; padding:3px 8px; color:var(--textSec); }
+  .stk b { font-family:var(--mono); margin-left:4px; }
+
+  .cal-day { border-left:3px solid var(--hair); padding:2px 0 14px 14px; margin-left:4px; }
+  .cal-day:last-child { padding-bottom:0; }
+  .cal-day.big { border-left-color:var(--up); }
+  .cal-d { font-size:13px; font-weight:700; margin-bottom:6px; }
+  .cal-d span { font-size:11px; font-weight:400; color:var(--textTer); margin-left:6px; }
+  .cal-l { font-size:12.5px; color:var(--textSec); line-height:1.85; }
+  .cal-l b { color:var(--textPri); }
+  .tag { font-size:10px; font-family:var(--mono); border-radius:5px; padding:1px 6px; margin-right:5px; }
+  .t-kr { background:#EDE9FB; color:var(--signature); }
+  .t-us { background:#EEF3FE; color:var(--down); }
+  .t-cn { background:#FDEBEC; color:#C0303A; }
+  .t-ev { background:#FEF3E6; color:#9A6210; }
+  .note { font-size:11.5px; color:var(--textTer); line-height:1.8; }
+
+  @media (max-width:860px) { .grid2 { grid-template-columns:1fr; } }
+  @media (max-width:640px) {
+    .between > div:last-child { gap:6px; flex-wrap:wrap; }
+    .between > div:last-child button { font-size:12.5px; padding:8px 11px; }
+    .card { padding:14px; }
+    button { min-height:34px; }
+    table { display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    .key { grid-template-columns:1fr 1fr; }
+    .key .v { font-size:14px; }
+    .cal-day { padding-left:11px; }
+    .stk span { font-size:11px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="between" style="margin-bottom:16px;">
+    <div>
+      <div class="eyebrow">HOLIDAY BRIEF</div>
+      <h1>추석 연휴 미국 증시 3일 총정리</h1>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <a href="/index.html" style="text-decoration:none;"><button>주간 증시</button></a>
+      <a href="/us.html" style="text-decoration:none;"><button>미국 증시</button></a>
+      <a href="/signal.html" style="text-decoration:none;"><button>시장 신호등</button></a>
+      <a href="/calendar.html" style="text-decoration:none;"><button>증시 일정</button></a>
+    </div>
+  </div>
+
+  <!-- 한눈에 -->
+  <div class="card">
+    <h2>한눈에</h2>
+    <div class="lede">
+      한국은 9월 23일 마감 뒤 이틀을 쉬었고, 그사이 미국은 세 번 열렸습니다.
+      사흘을 관통한 하나의 변수는 <b>미 국채 10년물 금리 5%대</b>였습니다.
+      강한 경제지표와 연준 인사들의 추가 인상 발언, 국채 입찰 부진이 겹치며 금리가 올랐고,
+      그때마다 밸류에이션이 높은 AI·반도체가 먼저 밀렸습니다.<br><br>
+      다만 <b>펀더멘털이 훼손된 것은 아니었습니다.</b> 메모리 가격 전망과 AI 투자는 그대로였고,
+      마지막 날에는 미·이란 실무협상 소식에 유가와 금리가 진정되며 반도체가 반등했습니다.
+      한국 관련 지표도 이틀 내리 빠진 뒤 마지막 날 되돌렸습니다.
+    </div>
+    <div class="key">
+      <div><div class="k">미 10년물 금리</div><div class="v up">5.165%</div>
+           <div class="s">연휴 전 5.11 → 장중 5.20 찍고 안정</div></div>
+      <div><div class="k">WTI</div><div class="v">$92.44</div>
+           <div class="s">94.61 까지 올랐다 미·이란 협상에 −2.3%</div></div>
+      <div><div class="k">MSCI 한국 ETF</div><div class="v down">사흘 −2.8%</div>
+           <div class="s">−3.62 → −1.68 → +2.55</div></div>
+      <div><div class="k">필라델피아 반도체</div><div class="v down">사흘 −0.2%</div>
+           <div class="s">−1.23 → −0.33 → +1.41</div></div>
+      <div><div class="k">달러인덱스</div><div class="v">101.03</div>
+           <div class="s">2개월래 최고 찍고 소폭 되돌림</div></div>
+      <div><div class="k">서울 달러/원</div><div class="v">1,358.4원</div>
+           <div class="s">NDF 1개월물 1,356.0 · 엔화 강세 영향</div></div>
+    </div>
+  </div>
+
+  <!-- 사흘 누적 -->
+  <div class="card">
+    <div class="between" style="margin-bottom:12px;">
+      <h2 style="margin:0;">사흘 합치면</h2>
+      <span class="note">일별 등락을 이어 붙여 계산</span>
+    </div>
+    <div class="grid2">
+      <div>
+        <table>
+          <thead><tr><th>지수·ETF</th><th>9/23</th><th>9/24</th><th>9/25</th><th>누적</th></tr></thead>
+          <tbody id="cum1"></tbody>
+        </table>
+      </div>
+      <div>
+        <table>
+          <thead><tr><th>주요 종목</th><th>9/23</th><th>9/24</th><th>9/25</th><th>누적</th></tr></thead>
+          <tbody id="cum2"></tbody>
+        </table>
+        <div class="note" style="margin-top:10px;">
+          하루만 보면 놓치는 게 있습니다. 인텔은 목요일 +3.91%로 튀었다가 금요일에 대부분 반납했고,
+          오라클은 사흘 내리 밀려 −8%를 넘겼습니다. 금요일 반등에도 <b>연휴 손실을 다 되돌리지는 못했습니다.</b>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 밤별 정리 -->
+  <div class="card">
+    <div class="between" style="margin-bottom:12px;">
+      <h2 style="margin:0;">밤별로 무슨 일이 있었나</h2>
+      <span class="note">한국시간 기준 밤~새벽</span>
+    </div>
+    <div class="tabs" id="tabs"></div>
+    <div id="body"></div>
+  </div>
+
+  <!-- 한국 관점 -->
+  <div class="card">
+    <h2>한국 증시 관점</h2>
+    <div class="grid2">
+      <div>
+        <div class="why-item">
+          <div class="why-t">부담 — 금리와 환율</div>
+          <div class="why-b">
+            10년물이 5.11%에서 5.20% 부근까지 올랐고 달러도 2개월래 최고를 찍었습니다.
+            MSCI 한국 ETF는 이틀 연속 빠지며 누적 5%가량 밀렸습니다.
+            외국인 자금에 불리한 환경이 쌓인 셈입니다.
+          </div>
+        </div>
+        <div class="why-item">
+          <div class="why-t">다행 — 마지막 날 되돌림</div>
+          <div class="why-b">
+            금리 상승이 더 확대되지 않았고 MSCI 한국(+2.55%)과 필라델피아 반도체(+1.41%)가
+            함께 반등했습니다. 무엇보다 <b>SK하이닉스 ADR +2.78%, 델 +5.01%, 슈퍼마이크로 +4.22%</b>로
+            메모리와 AI 서버가 동시에 오른 점이 국내 반도체에 우호적입니다.
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="why-item">
+          <div class="why-t">확인할 것 — 대형주는 아직 제한적</div>
+          <div class="why-b">
+            엔비디아 +0.22%, AMD +0.21%, 마이크론 +0.16%처럼 핵심 대형주는 강한 추세 상승이
+            아니라 제한적인 등락에 그쳤습니다. <b>금리 5.2%가 여전히 뚜껑 노릇</b>을 하고 있습니다.
+          </div>
+        </div>
+        <div class="why-item">
+          <div class="why-t">새로 생긴 변수 — 데이터센터 병목</div>
+          <div class="why-b">
+            오라클의 뉴멕시코 데이터센터가 전력 파이프라인 인허가로 6개월가량 지연됐습니다.
+            2025년에만 1,560억 달러 규모 프로젝트가 지연·중단됐다는 집계도 나왔습니다.
+            <b>AI 투자 금액보다 실제 가동 시점</b>이 새 변수로 떠올랐습니다.<br><br>
+            다만 금요일 블룸에너지 +8.27%, 플루언스 +5.23%처럼 <b>전력 쪽은 오히려 되돌림이 빨랐습니다.</b>
+            병목의 원인이 전력이라면 결국 전력 투자가 늘어난다는 쪽으로 읽힌 것으로 보입니다.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 국내 연결 -->
+  <div class="card">
+    <h2>미국에서 본 것을 국내 어디와 이어 볼까</h2>
+    <table>
+      <thead><tr><th>관심 영역</th><th style="text-align:left">확인할 연결고리</th><th style="text-align:left">국내 관찰 대상</th></tr></thead>
+      <tbody>
+        <tr><td>메모리</td>
+            <td style="text-align:left;font-family:var(--sans)">DRAM·NAND 가격, HBM 수요와 공급계획</td>
+            <td style="text-align:left;font-family:var(--sans)">삼성전자 · SK하이닉스</td></tr>
+        <tr><td>CPU·테스트</td>
+            <td style="text-align:left;font-family:var(--sans)">추론 확대가 CPU 물량과 테스트 수요로 이어지는지</td>
+            <td style="text-align:left;font-family:var(--sans)">테스트 소켓·후공정</td></tr>
+        <tr><td>서버·네트워크</td>
+            <td style="text-align:left;font-family:var(--sans)">서버 출하, 고다층 PCB·기판 주문 증가</td>
+            <td style="text-align:left;font-family:var(--sans)">이수페타시스 · 삼성전기 · 대덕전자</td></tr>
+        <tr><td>전력·냉각</td>
+            <td style="text-align:left;font-family:var(--sans)">데이터센터 병목을 풀기 위한 실제 발주</td>
+            <td style="text-align:left;font-family:var(--sans)">전력기기 · 전력 인프라</td></tr>
+      </tbody>
+    </table>
+    <div class="note" style="margin-top:12px;">
+      국내 종목은 <b>연결성을 점검할 관찰 대상</b>입니다. 미국 주가가 올랐다고 해서
+      국내 기업의 수주나 실적이 확정되는 것은 아닙니다.<br><br>
+      전력도 마찬가지입니다. "전력이 부족하니 다 수혜"로 묶기보다
+      <b>발주가 늘어나는 곳과 납품이 늦어지는 곳</b>을 갈라 봐야 합니다.
+      금요일에도 원전(오클로 −0.65%, X Energy −4.07%)과 네오클라우드(코어위브 −2.82%, IREN −4.39%)는
+      반등에서 빠졌습니다.
+    </div>
+  </div>
+
+  <!-- 다음 주 -->
+  <div class="card">
+    <h2>다음 주 관전 포인트</h2>
+    <div class="grid2">
+      <div>
+        <div class="why-item">
+          <div class="why-t">하나 — 물가와 고용</div>
+          <div class="why-b">
+            29일 JOLTS, 30일 ADP 고용과 <b>8월 PCE 물가</b>, 2일 <b>9월 고용보고서</b>까지 이어집니다.
+            근원 PCE가 물가 둔화 기대를 다시 낮추는지가 관건이고, 고용까지 견조하면
+            추가 긴축 기대와 함께 금리가 더 오를 수 있습니다.
+          </div>
+        </div>
+        <div class="why-item">
+          <div class="why-t">둘 — 분기말 리밸런싱 (30일)</div>
+          <div class="why-b">
+            최근 두 분기 동안 주식이 채권을 25%포인트가량 앞섰습니다. 코로나 이후 가장 벌어진 격차라,
+            비중을 맞춰야 하는 연기금·보험이 <b>주식을 팔고 채권을 사는</b> 수급이 나올 수 있습니다.<br><br>
+            <b>28~30일 사이의 변수로 보시는 게 좋습니다.</b> 금리가 내리는데도 주가가 약하면
+            펀더멘털 악화가 아니라 분기말 수급일 가능성이 큽니다.
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="why-item">
+          <div class="why-t">셋 — 마이크론 실적 (30일 장 마감 후)</div>
+          <div class="why-b">
+            숫자보다 <b>HBM4 수요, DRAM·NAND 가격, 장기 계약, 2027년 공급과 설비투자 전망</b>이 중요합니다.
+            대만 노조 문제가 남아 있어 공급 차질 가능성에 대한 회사 설명도 확인할 대목입니다.
+          </div>
+        </div>
+        <div class="why-item">
+          <div class="why-t">넷 — Yotta 2026 (28~30일)</div>
+          <div class="why-b">
+            엔비디아·오픈AI·오라클·이튼 등이 모여 전력과 냉각, 데이터센터 건설 지연과 인프라 병목을
+            다룹니다. 이번 연휴에 불거진 문제를 업계가 어떻게 보는지 드러날 자리입니다.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 일정 -->
+  <div class="card">
+    <h2>요일별 일정 <span class="note">09/28 ~ 10/02</span></h2>
+    <div id="cal"></div>
+  </div>
+
+  <div class="card">
+    <h2>월요일 장에서 볼 순서</h2>
+    <div class="grid2">
+      <div>
+        <div class="why-item"><div class="why-t">첫째 — 환율과 외국인 수급</div>
+          <div class="why-b">한국 ETF 의 누적 −2.82%가 국내 현물·선물 매도로 이어지는지 봅니다.
+            달러/원이 연휴 중 1,358원까지 내려온 점은 다행입니다.</div></div>
+        <div class="why-item"><div class="why-t">둘째 — 삼성전자·SK하이닉스 개장 흐름</div>
+          <div class="why-b">미국 반도체의 상대적 선방(누적 −0.17%)이 국내에서도 이어지는지가 첫 관문입니다.</div></div>
+      </div>
+      <div>
+        <div class="why-item"><div class="why-t">셋째 — 상승이 번지는가</div>
+          <div class="why-b">반도체 대형주만 버티는지, 서버·기판·전력 인프라까지 매수가 퍼지는지 봅니다.
+            <b>시장 신호등의 확산 수치</b>로 확인하실 수 있습니다.</div></div>
+        <div class="why-item"><div class="why-t">넷째 — 협상 뉴스 이후 유가와 금리</div>
+          <div class="why-b">금요일 반등의 배경이 미·이란 협상 기대였습니다. 그 기대가 유지되는지에 따라
+            유가와 금리가 다시 움직일 수 있습니다.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="note">
+      이 화면은 연휴 기간의 해외 시장 흐름을 한 번에 훑기 위해 정리한 것입니다.
+      수치는 각 거래일 종가 기준이며, 특정 종목의 매매를 권하는 내용이 아닙니다.
+    </div>
+  </div>
+</div>
+
+<script>
+const 밤들 = [
+  {
+    키: "n1", 날: "09.24", 라벨: "9/23 밤", 부제: "금리 급등",
+    한줄: "강한 PMI와 연준 이사의 추가 인상 시사로 10년물이 5%를 다시 넘어서자, 그동안 많이 오른 AI·반도체가 먼저 밀렸습니다.",
+    지수: [["다우", -0.68], ["나스닥", -1.13], ["S&P500", -0.75], ["러셀2000", -1.77], ["필라델피아 반도체", -1.23], ["VIX", 6.32]],
+    금리: [["2년물", "4.897%", 14.4], ["10년물", "5.114%", 15.3], ["30년물", "5.399%", 9.9]],
+    상품: [["WTI", "$92.16", 1.81], ["브렌트", "$103.08", 4.27], ["금", "$4,318", -1.33], ["구리", "675.4", -1.21]],
+    한국: [["MSCI 한국", -3.62], ["MSCI 신흥국", -1.63]],
+    이유: [
+      ["미국 PMI가 몇 년 만의 최고치", "9월 서비스업 58.7, 제조업 57.0으로 각각 59개월·52개월 만의 최고입니다. 문제는 물가였습니다. 투입비용 상승률이 2022년 10월 이후 가장 높아, 시장은 '성장도 강하고 물가도 강하다'로 읽었습니다."],
+      ["마이클 바 연준 이사의 발언", "물가가 2% 목표로 충분히 빠르게 내려오지 않는다며 추가 정책 조정이 필요하다고 밝혔습니다. 10월 FOMC 인상 확률이 하루 만에 55.4%에서 68.6%로 뛰었습니다."],
+      ["5년물 입찰 부진", "낙찰금리가 5.033%로 2006년 이후 최고였습니다. 국채를 사려는 수요가 약하다는 뜻이라 금리 상승폭이 더 커졌습니다."],
+      ["이란 대통령의 UN 연설", "핵무기는 원하지 않지만 호르무즈 해협의 권리는 양보할 수 없다고 했습니다. 협상 기대가 후퇴하며 유가가 올랐고, 그것이 다시 금리를 밀어 올렸습니다."]
+    ],
+    종목: { 제목: "메타의 Muse가 만든 지각변동",
+      글: "메타가 공개한 AI 에이전트 Muse가 검색·비교·구매·예약을 한 번에 처리할 수 있다는 점이 부각되며, 그 자리를 뺏길 기업들이 일제히 밀렸습니다.",
+      목록: [["알파벳", -3.58], ["아마존", -2.24], ["메타", 1.02], ["익스피디아", -7.72], ["에어비앤비", -7.56], ["부킹홀딩스", -5.07]] }
+  },
+  {
+    키: "n2", 날: "09.25", 라벨: "9/24 밤", 부제: "미중 정상회담 · 오라클 충격",
+    한줄: "금리는 더 올랐지만 지수는 거의 제자리였습니다. 오라클 데이터센터 지연 소식이 AI 투자심리를 흔든 하루였습니다.",
+    지수: [["다우", -0.31], ["나스닥", 0.01], ["S&P500", -0.02], ["러셀2000", -0.11], ["필라델피아 반도체", -0.33], ["VIX", 3.23]],
+    금리: [["2년물", "4.924%", 2.7], ["10년물", "5.198%", 8.4], ["30년물", "5.476%", 7.7]],
+    상품: [["WTI", "$94.61", 2.66], ["브렌트", "$106.60", 3.66], ["금", "$4,298", -0.47], ["구리", "679.0", 0.54]],
+    한국: [["MSCI 한국", -1.68], ["MSCI 신흥국", -0.68]],
+    이유: [
+      ["미중 정상회담 — 관세 휴전 2개월 연장", "5월 베이징에 이어 워싱턴에서 만났고, 무역 휴전을 내년 1월 10일까지 연장했습니다. AI가 정상급 의제로 올라섰지만 구조적 쟁점은 그대로라, 시장이 기대한 큰 합의는 없었습니다."],
+      ["오라클 데이터센터 6개월 지연", "뉴멕시코 Project Jupiter의 전력용 가스 파이프라인이 인허가로 막혔습니다. 오라클은 일정에 문제없다고 해명했지만, 이 문제가 업계 전반의 병목이라는 점이 드러났습니다. 2025년에만 1,560억 달러 규모가 지연·중단됐습니다."],
+      ["7년물 입찰도 부진", "응찰률 2.42배에 그치며 2009년 이후 최고 금리로 낙찰됐습니다. 재무부 바이백도 기대에 못 미쳐 장기물 수급 부담이 재확인됐습니다."],
+      ["옵션 수급이 기술주를 받쳤다", "QQQ 풋/콜 비율이 1.15에서 0.93으로 낮아졌고, AMD·마이크론 콜옵션이 늘었습니다. 금리 부담에도 반도체가 버틴 배경입니다."]
+    ],
+    종목: { 제목: "오라클에 웃고 운 종목들",
+      글: "데이터센터 지연의 직접 피해주는 밀렸고, AI 수요 자체를 보는 종목은 올랐습니다.",
+      목록: [["메타", 4.50], ["인텔", 3.91], ["AMD", 2.38], ["네비우스", 7.44], ["코어위브", 3.72], ["오라클", -3.47], ["델", -2.51], ["블룸에너지", -3.10], ["바이킹테라퓨틱스", -11.76]] }
+  },
+  {
+    키: "n3", 날: "09.26", 라벨: "9/25 밤", 부제: "미·이란 협상 기대에 반등",
+    한줄: "미국과 이란이 실무협상 단계로 들어갔다는 보도에 유가가 내리고 금리가 진정되자, 반도체가 앞장서 반등했습니다.",
+    지수: [["다우", 0.93], ["나스닥", 0.48], ["S&P500", 0.51], ["러셀2000", 0.07], ["필라델피아 반도체", 1.41]],
+    금리: [["2년물", "4.860%", -3.5], ["10년물", "5.165%", 0.3], ["30년물", "5.490%", 2.8]],
+    상품: [["WTI", "$92.44", -2.29], ["브렌트", "$104.45", -2.02], ["금", "$4,320", 0.52], ["은", "64.71", 1.11]],
+    한국: [["MSCI 한국", 2.55], ["MSCI 신흥국", 1.09]],
+    이유: [
+      ["미·이란, 실무협상 단계로", "단순 외교 접촉을 넘어 기술적·실무적 협상에 들어갔고 이란 측 분위기도 긍정적이라는 보도가 나왔습니다. 유가가 2%대 내렸고 금리 상승폭도 줄었습니다."],
+      ["유가와 금리가 한 몸처럼 움직인다", "요즘은 유가와 장기금리의 연동이 매우 강해졌습니다. 개별 기업 실적보다 '유가 → 금리'의 변화가 장중 방향을 결정하는 모습이 이어지고 있습니다."],
+      ["소비심리는 둔화, 기대인플레는 상승", "소비자심리지수가 51.7에서 48.1로 떨어졌지만, 1년 기대인플레이션은 4.0%에서 4.6%로 올랐습니다. 예비치와 크게 다르지 않아 영향은 제한적이었습니다."],
+      ["엔화가 1% 강세", "베센트 재무장관이 일본의 펀더멘털이 환율에 반영돼야 한다는 취지로 발언하며 엔화가 급등했습니다. 달러가 5거래일 만에 약세로 돌아섰고, 서울 달러/원도 10원 넘게 내렸습니다."]
+    ],
+    종목: { 제목: "메모리·AI 서버와 전력 인프라가 함께 반등",
+      글: "국내 반도체에 가장 직접적으로 닿는 종목들이 동시에 올랐습니다. 특히 블룸에너지는 목요일 오라클 데이터센터 지연에 −3.10% 밀렸다가 하루 만에 8% 넘게 되돌렸습니다. 데이터센터 병목이 곧 전력 인프라 수요라는 쪽으로 읽힌 셈입니다.",
+      목록: [["블룸에너지", 8.27], ["크레도", 7.65], ["온세미컨덕터", 5.54], ["마이크로칩", 5.36],
+              ["플루언스에너지", 5.23], ["델", 5.01], ["슈퍼마이크로", 4.22], ["마이크로소프트", 3.66],
+              ["버티브", 3.25], ["퍼스트솔라", 3.22], ["SK하이닉스 ADR", 2.78], ["램리서치", 2.62],
+              ["메타", -3.33], ["인텔", -3.45], ["IREN", -4.39]] }
+  }
+];
+
+const 일정 = [
+  { 날: "09/28 (월)", 큼: false, 줄: [
+      ["t-cn", "중국", "산업이익 (8월)"],
+      ["t-ev", "행사", "<b>Yotta 2026</b> (~30일) — 엔비디아·오픈AI·오라클·이튼 참여"],
+      ["t-ev", "정치", "EU 외교이사회(국방) · EU 에너지장관회의 (~29일)"],
+      ["t-us", "발언", "영국 재무장관 · 일본 BOJ 통화정책회의록"],
+      ["t-ev", "휴장", "대만"]] },
+  { 날: "09/29 (화)", 큼: false, 줄: [
+      ["t-us", "미국", "<b>JOLTS 구인건수</b> (8월) · 소비자신뢰지수 (9월) · 주택가격 (7월)"],
+      ["t-ev", "유로존", "소비자물가지수 (9월) · 소비자신뢰지수 (9월)"],
+      ["t-us", "발언", "윌리엄스 총재 · 마이클 바 연준 이사"],
+      ["t-ev", "은행", "호주 RBA 통화정책회의"],
+      ["t-us", "실적", "장전 — 카니발(CCL) · 카맥스(KMX)"]] },
+  { 날: "09/30 (수)", 큼: true, 줄: [
+      ["t-us", "미국", "<b>PCE 물가지수 (8월)</b> · ADP 민간고용 (9월) · 개인소득·지출 · GDP (2Q)"],
+      ["t-kr", "한국", "소매판매 (8월) · 광공업생산 (8월)"],
+      ["t-cn", "중국", "제조업·서비스업 PMI (9월)"],
+      ["t-ev", "수급", "<b>분기말 연기금 주식·채권 리밸런싱</b>"],
+      ["t-us", "실적", "장후 — <b>마이크론(MU)</b> · 프로그래스 소프트웨어 / 장전 — 자빌 · 콘아그라"],
+      ["t-us", "발언", "굴스비 총재"]] },
+  { 날: "10/01 (목)", 큼: false, 줄: [
+      ["t-us", "미국", "ISM 제조업 지수 (9월) · 건설지출 (8월)"],
+      ["t-kr", "한국", "수출입통계 (9월)"],
+      ["t-us", "발언", "윌리엄스 총재 · 쿡 연준 이사"],
+      ["t-ev", "기업", "테슬라 로드스터 공개"],
+      ["t-us", "실적", "장후 — 나이키(NKE) / 장전 — 엑센츄어(ACN)"],
+      ["t-ev", "휴장", "중국 · 홍콩"]] },
+  { 날: "10/02 (금)", 큼: true, 줄: [
+      ["t-us", "미국", "<b>9월 고용보고서</b>"],
+      ["t-kr", "한국", "소비자물가지수 (9월)"],
+      ["t-ev", "유로존", "소비자물가지수 (9월)"],
+      ["t-ev", "휴장", "중국 · 인도"]] }
+];
+
+// 사흘 누적 — 일별 등락을 이어 붙여 계산 (복리)
+const 누적지수 = [
+  ["다우", -0.68, -0.31, 0.93], ["나스닥", -1.13, 0.01, 0.48],
+  ["S&P500", -0.75, -0.02, 0.51], ["러셀2000", -1.77, -0.11, 0.07],
+  ["필라델피아 반도체", -1.23, -0.33, 1.41], ["MSCI 한국 ETF", -3.62, -1.68, 2.55],
+];
+const 누적종목 = [
+  ["AMD", -1.47, 2.38, 0.22], ["인텔", -1.02, 3.91, -3.45],
+  ["마이크론", -2.22, 0.81, 0.16], ["오라클", -3.11, -3.47, -1.75],
+];
+const 이어붙이기 = a => (a.reduce((v, x) => v * (1 + x / 100), 1) - 1) * 100;
+function 누적그리기() {
+  const 줄 = (목록, 곳) => {
+    document.getElementById(곳).innerHTML = 목록.map(([이름, ...v]) => {
+      const 합 = 이어붙이기(v);
+      return `<tr><td>${이름}</td>` + v.map(x => `<td class="${색(x)}">${부호(x)}</td>`).join("") +
+        `<td class="${색(합)}" style="font-weight:700">${부호(합)}</td></tr>`;
+    }).join("");
+  };
+  줄(누적지수, "cum1"); 줄(누적종목, "cum2");
+}
+
+let 탭 = "n1";
+const 부호 = v => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2) + "%";
+const bp = v => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(1) + "bp";
+const 색 = v => v >= 0 ? "up" : "down";
+
+function 그리기() {
+  document.getElementById("tabs").innerHTML = 밤들.map(n =>
+    `<button data-t="${n.키}" class="${n.키 === 탭 ? "on" : ""}">${n.라벨}<small>${n.부제}</small></button>`).join("");
+  document.querySelectorAll("[data-t]").forEach(b =>
+    b.onclick = () => { 탭 = b.dataset.t; 그리기(); });
+
+  const n = 밤들.find(x => x.키 === 탭);
+  document.getElementById("body").innerHTML = `
+    <div class="lede" style="margin-bottom:14px;">${n.한줄}</div>
+    <div class="grid2">
+      <div>
+        <table>
+          <thead><tr><th>지수</th><th>등락</th><th>국채</th><th>금리</th><th>변화</th></tr></thead>
+          <tbody>${n.지수.map((x, i) => {
+            const g = n.금리[i];
+            return `<tr><td>${x[0]}</td><td class="${색(x[1])}">${부호(x[1])}</td>
+              <td style="font-family:var(--sans);color:var(--textTer)">${g ? g[0] : ""}</td>
+              <td>${g ? g[1] : ""}</td>
+              <td class="${g ? 색(g[2]) : ""}">${g ? bp(g[2]) : ""}</td></tr>`;
+          }).join("")}</tbody>
+        </table>
+        <table style="margin-top:14px;">
+          <thead><tr><th>원자재·환율</th><th>값</th><th>등락</th></tr></thead>
+          <tbody>${n.상품.map(x =>
+            `<tr><td>${x[0]}</td><td>${x[1]}</td><td class="${색(x[2])}">${부호(x[2])}</td></tr>`).join("")}
+            ${n.한국.map(x =>
+            `<tr><td>${x[0]}</td><td></td><td class="${색(x[1])}">${부호(x[1])}</td></tr>`).join("")}
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <div class="why">${n.이유.map(([t, b]) =>
+          `<div class="why-item"><div class="why-t">${t}</div><div class="why-b">${b}</div></div>`).join("")}</div>
+      </div>
+    </div>
+    <div class="why-item" style="margin-top:8px;border-top:1px solid var(--surface2);border-bottom:none;padding-top:14px;">
+      <div class="why-t">${n.종목.제목}</div>
+      <div class="why-b">${n.종목.글}</div>
+      <div class="stk">${n.종목.목록.map(([이름, v]) =>
+        `<span>${이름}<b class="${색(v)}">${부호(v)}</b></span>`).join("")}</div>
+    </div>`;
+}
+
+누적그리기();
+document.getElementById("cal").innerHTML = 일정.map(d => `
+  <div class="cal-day ${d.큼 ? "big" : ""}">
+    <div class="cal-d">${d.날}${d.큼 ? `<span>중요</span>` : ""}</div>
+    <div class="cal-l">${d.줄.map(([색깔, 종류, 글]) =>
+      `<div><span class="tag ${색깔}">${종류}</span>${글}</div>`).join("")}</div>
+  </div>`).join("");
+
+그리기();
+</script>
+</body>
+</html>
