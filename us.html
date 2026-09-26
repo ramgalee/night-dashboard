@@ -189,6 +189,36 @@
   .flow-tag.exact { background:#E8F3EC; color:#1F6D4A; }
   .flow-tag.est   { background:var(--surface2); color:var(--textTer); }
   .flow-wait { flex:1; font-size:11.5px; color:var(--textTer); }
+
+  /* 미국 ETF 의 한국 주식 매매 */
+  .krf-top { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px; }
+  .krf-big { font-family:var(--mono); font-size:30px; font-weight:800; letter-spacing:-0.5px; }
+  .krf-sub { font-size:11.5px; color:var(--textTer); }
+  .krf-read { font-size:11.5px; color:var(--textSec); font-family:var(--mono); min-height:18px; margin:6px 0 4px; }
+  .krf-chart { position:relative; width:100%; height:150px; touch-action:pan-y; }
+  .krf-chart svg { display:block; width:100%; height:100%; }
+  .krf-months { position:relative; height:16px; font-size:10px; color:var(--textTer); font-family:var(--mono); }
+  .krf-months span { position:absolute; transform:translateX(-50%); white-space:nowrap; }
+  .krf-cols { display:grid; grid-template-columns:1fr 1fr; gap:10px 22px; margin-top:14px; }
+  .krf-h { font-size:12px; font-weight:700; color:var(--textSec); margin-bottom:4px; }
+  .krf-row { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--surface2); font-size:12.5px; }
+  .krf-row:last-child { border-bottom:none; }
+  .krf-rk { width:14px; font-family:var(--mono); font-size:10.5px; color:var(--textTer); flex:none; }
+  .krf-nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .krf-q { font-family:var(--mono); font-size:10.5px; color:var(--textTer); flex:none; }
+  .krf-v { font-family:var(--mono); font-weight:700; width:72px; text-align:right; flex:none; }
+  .krf-funds { margin-top:14px; border-top:1px solid var(--hair); padding-top:10px; }
+  .krf-fund { display:flex; align-items:center; gap:10px; padding:5px 0; font-size:12px; }
+  .krf-fund b { width:44px; font-family:var(--mono); flex:none; }
+  .krf-fund .krf-fn { width:84px; color:var(--textTer); flex:none; }
+  .krf-fund .krf-fv { font-family:var(--mono); font-weight:700; width:76px; text-align:right; flex:none; }
+  .krf-fund .krf-fx { flex:1; color:var(--textTer); font-size:11px; font-family:var(--mono); text-align:right; }
+  @media (max-width:640px) {
+    .krf-big { font-size:25px; }
+    .krf-cols { grid-template-columns:1fr; }
+    .krf-fund .krf-fn { display:none; }
+    .krf-fund .krf-fx { font-size:10px; }
+  }
   @media (max-width:640px) {
     .flow-tag { font-size:9px; }
     .flow-wait { font-size:10.5px; }
@@ -277,6 +307,22 @@
       (FTSE 기준인 VWO에는 한국이 없습니다).
       <b>DRAM</b>은 삼성전자·SK하이닉스 비중이 높지만 2026년 4월 상장이라
       아직 자금을 모으는 중이어서, 유입 자체보다 <b>등락률</b>로 보시는 편이 낫습니다.
+    </div>
+  </div>
+
+  <div class="card" id="krfCard">
+    <div class="between" style="margin-bottom:10px;">
+      <div style="font-size:13px;color:var(--textSec);">미국 ETF의 한국 주식 매매
+        <span style="font-size:11px;color:var(--textTer);">EWY · IEMG · EEM 보유내역 기준</span></div>
+      <span id="krfMeta" style="font-size:10.5px;color:var(--textTer);font-family:var(--mono);"></span>
+    </div>
+    <div id="krfBody"><div class="empty">불러오는 중...</div></div>
+    <div style="font-size:11px;color:var(--textTer);line-height:1.75;margin-top:12px;">
+      iShares 가 날마다 공개하는 보유내역에서 <b>한국 종목의 보유 주식수 변화 × 주가 × 환율</b>을 더한 값입니다.
+      설정·환매로 들어온 돈이든 비중 조정이든 실제로 사고판 한국 주식은 모두 잡힙니다.
+      기준일은 펀드 보유내역 날짜(미국 날짜)라 한국 시장 체결일과 하루 어긋날 수 있습니다.
+      주식 분할처럼 매매 없이 주식수가 바뀐 경우는 뺍니다.
+      다른 운용사(뱅가드 등)의 ETF 와 액티브 펀드는 들어 있지 않아 시장 전체 숫자보다 작습니다.
     </div>
   </div>
 
@@ -755,7 +801,141 @@ async function 자금받기() {
   }
 }
 
-업종받기(); 자금받기();
+// ── 미국 ETF 의 한국 주식 매매 ──────────────────────
+function 억원(v) {
+  const a = Math.abs(v) / 1e8, s = v >= 0 ? "+" : "−";
+  if (a >= 10000) return s + (a / 10000).toFixed(2) + "조";
+  if (a >= 100) return s + Math.round(a).toLocaleString("ko-KR") + "억";
+  return s + a.toFixed(1) + "억";
+}
+function 주수(q) {
+  const a = Math.abs(q), s = q >= 0 ? "+" : "−";
+  return a >= 10000 ? s + (a / 10000).toFixed(1) + "만주" : s + a.toLocaleString("ko-KR") + "주";
+}
+function 월일(d) { return (+d.slice(4, 6)) + "/" + (+d.slice(6, 8)); }
+
+async function 한국매매받기() {
+  const 몸 = document.getElementById("krfBody");
+  const 꼬리 = document.getElementById("krfMeta");
+  try {
+    const r = await fetch("/api/kr-etf-flow", { cache: "no-store" });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    const 줄 = d.series || [];
+    if (!줄.length || !d.today) {
+      const 모임 = d.collected ? Object.entries(d.collected).map(([k, v]) => `${k} ${v}일`).join(" · ") : "";
+      몸.innerHTML = `<div class="empty">${d.collecting
+        ? "과거 자료를 받는 중입니다. 처음 한 번 10분 안팎 걸립니다. 잠시 뒤 새로고침하세요."
+        : "아직 견줄 자료가 없습니다."}${모임 ? "<br><span style='font-family:var(--mono);font-size:11px;'>" + 모임 + "</span>" : ""}</div>`;
+      꼬리.textContent = "";
+      return;
+    }
+
+    const t = d.today, 색 = v => v >= 0 ? UP : DOWN;
+    const 펀드줄 = t.funds.map(f => f.missing
+      ? `<div class="krf-fund"><b>${f.symbol}</b><span class="krf-fn">${f.name}</span><span class="krf-fx" style="text-align:left;">자료 없음</span></div>`
+      : `<div class="krf-fund"><b>${f.symbol}</b><span class="krf-fn">${f.name}</span>
+           <span class="krf-fv" style="color:${색(f.krw)}">${억원(f.krw)}</span>
+           <span class="krf-fx">주식수 ${f.sharesChg >= 0 ? "+" : "−"}${Math.abs(f.sharesChg).toLocaleString("ko-KR")} · 한국 ${f.krWeight == null ? "—" : f.krWeight + "%"}</span></div>`
+    ).join("");
+    const 목록 = (arr) => arr.length
+      ? arr.slice(0, 5).map((x, i) => `<div class="krf-row"><span class="krf-rk">${i + 1}</span>
+          <span class="krf-nm">${x.name}</span><span class="krf-q">${주수(x.qty)}</span>
+          <span class="krf-v" style="color:${색(x.krw)}">${억원(x.krw)}</span></div>`).join("")
+      : `<div class="krf-row" style="color:var(--textTer);">없음</div>`;
+
+    // 막대그래프 — 라이브러리 없이 SVG 로 그립니다
+    const n = 줄.length, 칸폭 = 10, 높이 = 150;
+    const 값 = 줄.map(x => x.total);
+    let 위 = Math.max(0, ...값), 아래 = Math.min(0, ...값);
+    if (위 === 아래) 위 = 1;
+    const 여백 = (위 - 아래) * 0.06;
+    위 += 여백; 아래 -= 아래 < 0 ? 여백 : 0;
+    const y = v => (위 - v) / (위 - 아래) * 높이;
+    const 영 = y(0);
+    const 막대 = 줄.map((x, i) => {
+      const a = y(Math.max(0, x.total)), b = y(Math.min(0, x.total));
+      return `<rect x="${i * 칸폭 + 1.5}" y="${a.toFixed(2)}" width="${칸폭 - 3}" height="${Math.max(0.6, b - a).toFixed(2)}"
+               fill="${색(x.total)}" opacity="${i === n - 1 ? 1 : 0.72}"/>`;
+    }).join("");
+    // 달이 바뀌는 자리에 표시합니다. 너무 붙으면(짧은 달) 앞의 것을 뺍니다.
+    const 월자리 = [];
+    for (let i = 0; i < n; i++) {
+      if (i === 0 || 줄[i].date.slice(4, 6) !== 줄[i - 1].date.slice(4, 6)) 월자리.push(i);
+    }
+    const 최소간격 = 판폭 => Math.max(6, 42 / Math.max(판폭, 1) * 100);   // 글자 폭 약 42px
+    const 월표그리기 = 판폭 => {
+      const 간격 = 최소간격(판폭), 고른 = [];
+      for (const i of 월자리) {
+        const 자리 = (i + 0.5) / n * 100;
+        if (자리 > 97) continue;
+        if (고른.length && 자리 - 고른[고른.length - 1][1] < 간격) 고른.pop();
+        고른.push([i, 자리]);
+      }
+      return 고른.map(([i, 자리]) => 자리 < 3
+        ? `<span style="left:0;transform:none">${+줄[i].date.slice(4, 6)}월</span>`
+        : `<span style="left:${자리.toFixed(2)}%">${+줄[i].date.slice(4, 6)}월</span>`).join("");
+    };
+
+    몸.innerHTML = `
+      <div class="krf-top">
+        <span class="krf-big" style="color:${색(t.total)}">${억원(t.total)}원</span>
+        <span class="krf-sub">${월일(t.date)} 미국 기준 · 세 펀드의 한국 주식 순매수</span>
+      </div>
+      <div class="krf-read" id="krfRead"></div>
+      <div class="krf-chart" id="krfChart">
+        <svg viewBox="0 0 ${n * 칸폭} ${높이}" preserveAspectRatio="none" aria-label="날짜별 한국 주식 순매수 막대그래프">
+          <line x1="0" x2="${n * 칸폭}" y1="${영.toFixed(2)}" y2="${영.toFixed(2)}" stroke="#C3C2B7" stroke-width="1" vector-effect="non-scaling-stroke"/>
+          ${막대}
+          <rect id="krfHi" x="0" y="0" width="${칸폭}" height="${높이}" fill="var(--textPri)" opacity="0"/>
+        </svg>
+      </div>
+      <div class="krf-months" id="krfMonths"></div>
+      <div class="krf-cols">
+        <div><div class="krf-h">한국 주식 유입 상위</div>${목록(t.buys)}</div>
+        <div><div class="krf-h">한국 주식 유출 상위</div>${목록(t.sells)}</div>
+      </div>
+      <div class="krf-funds">${펀드줄}</div>`;
+
+    // 막대 위에 손을 올리면 그날 숫자를 보여줍니다
+    const 판 = document.getElementById("krfChart"), 읽기 = document.getElementById("krfRead"),
+          불 = document.getElementById("krfHi");
+    const 보이기 = i => {
+      const x = 줄[i];
+      const 쪼갬 = d.funds.map(f => x[f.symbol] == null ? null : `${f.symbol} ${억원(x[f.symbol])}`).filter(Boolean).join(" · ");
+      읽기.innerHTML = `<b style="color:${색(x.total)}">${월일(x.date)} ${억원(x.total)}</b>  <span style="color:var(--textTer)">${쪼갬}</span>`;
+      불.setAttribute("x", i * 칸폭); 불.setAttribute("opacity", i === n - 1 ? 0 : 0.06);
+    };
+    const 짚기 = e => {
+      const b = 판.getBoundingClientRect();
+      const px = (e.touches ? e.touches[0].clientX : e.clientX) - b.left;
+      보이기(Math.max(0, Math.min(n - 1, Math.floor(px / b.width * n))));
+    };
+    판.addEventListener("mousemove", 짚기);
+    판.addEventListener("touchstart", 짚기, { passive: true });
+    판.addEventListener("touchmove", 짚기, { passive: true });
+    판.addEventListener("mouseleave", () => 보이기(n - 1));
+    보이기(n - 1);
+    const 달칸 = document.getElementById("krfMonths");
+    const 달맞춤 = () => { 달칸.innerHTML = 월표그리기(판.clientWidth); };
+    달맞춤();
+    if (!window.__krf달) {                      // 새로고침마다 쌓이지 않게 한 번만
+      window.__krf달 = true;
+      window.addEventListener("resize", () => requestAnimationFrame(() => {
+        const 칸 = document.getElementById("krfMonths");
+        if (칸 && window.__krf달맞춤) window.__krf달맞춤();
+      }));
+    }
+    window.__krf달맞춤 = 달맞춤;
+
+    꼬리.textContent = `${n}거래일` + (d.collecting ? " · 과거 받는 중" : "");
+  } catch (e) {
+    몸.innerHTML = `<div class="empty">한국 주식 매매 자료를 불러오지 못했습니다.</div>`;
+    꼬리.textContent = "";
+  }
+}
+
+업종받기(); 자금받기(); 한국매매받기();
 setInterval(업종받기, 5 * 60 * 1000);
 
 </script>
