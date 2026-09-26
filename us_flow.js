@@ -29,6 +29,38 @@ const fs = require('fs');
 
 const 신선 = 5 * 60 * 1000;
 const 자금파일 = '/root/app/us_flow_history.json';
+// kr_etf_flow.js 가 모아둔 iShares 날짜별 보유내역 (EWY · IEMG · EEM 의 상장주식수가 들어 있음)
+const 보유파일 = '/root/app/kr_etf_history.json';
+
+function 보유읽기() {
+  try { return JSON.parse(fs.readFileSync(보유파일, 'utf8')); } catch (e) { return null; }
+}
+const ymd = 날 => String(날 || '').replace(/-/g, '');
+const 대시 = d => `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`;
+
+// 기준일보다 앞선 가장 최근 상장주식수
+function 보유앞날(보유, 기호, 날) {
+  const days = 보유 && 보유[기호] && 보유[기호].days;
+  if (!days) return null;
+  const 기준 = ymd(날);
+  const 앞 = Object.keys(days).filter(d => d < 기준 && days[d] && days[d].sh).sort().pop();
+  return 앞 ? { date: 대시(앞), sh: days[앞].sh } : null;
+}
+
+// 최근 n 거래일 누적 유출입 (달러) — 날마다 (주식수 변화 × 그날 NAV) 를 더합니다
+function 보유누적(보유, 기호, n) {
+  const days = 보유 && 보유[기호] && 보유[기호].days;
+  if (!days) return null;
+  const 날들 = Object.keys(days).filter(d => days[d] && days[d].sh && days[d].mv).sort();
+  if (날들.length < 2) return null;
+  const 끝 = 날들.slice(-(n + 1));
+  let 합 = 0;
+  for (let i = 1; i < 끝.length; i++) {
+    const a = days[끝[i - 1]], b = days[끝[i]];
+    합 += (b.sh - a.sh) * (b.mv / b.sh);
+  }
+  return { usd: Math.round(합), days: 끝.length - 1, to: 끝[끝.length - 1] };
+}
 const 보관일수 = 400;
 
 // ── 업종 11개 (+ 참고) ───────────────────────────────
@@ -272,6 +304,7 @@ async function 자금받기() {
   if (자금캐시.data && Date.now() - 자금캐시.at < 30 * 60 * 1000) return 자금캐시.data;
 
   const 이력 = 이력읽기();
+  const 보유 = 보유읽기();
   const 줄들 = [];
   let 정확수 = 0, 추정수 = 0;
 
@@ -311,8 +344,12 @@ async function 자금받기() {
     // 1) 정확 — 주식수가 있는 가장 최근 날과 견줍니다
     if (칸.sh) {
       앞날 = 앞날들.filter(d => 이력[d][기호] && 이력[d][기호].sh).pop() || null;
-      if (앞날) {
-        const 어제 = 이력[앞날][기호];
+      let 어제 = 앞날 ? 이력[앞날][기호] : null;
+      if (!어제) {                                   // 자기 기록이 없으면 보유내역 이력에서
+        const k = 보유앞날(보유, 기호, 날);
+        if (k) { 앞날 = k.date; 어제 = { sh: k.sh }; }
+      }
+      if (어제) {
         const 주식차 = 칸.sh - 어제.sh;
         const nav = 칸.nav || s.price;
         유출입 = 주식차 * nav;
@@ -320,7 +357,7 @@ async function 자금받기() {
         방식 = '정확';
         if (주식차 === 0) 상태 = '설정·환매 없음';
       } else {
-        방식 = '정확'; 상태 = '첫날 — 내일부터 비교됩니다';
+        방식 = '정확'; 상태 = '첫날 — 다음 거래일부터 비교됩니다';
       }
     // 2) 추정 — 순자산에서 가격 상승분을 뺍니다
     } else if (칸.a) {
@@ -338,7 +375,7 @@ async function 자금받기() {
           if (비율 != null && Math.abs(비율) > 15) 상태 = '값이 튐 — 참고만';
         }
       } else {
-        방식 = '추정'; 상태 = '첫날 — 내일부터 비교됩니다';
+        방식 = '추정'; 상태 = '첫날 — 다음 거래일부터 비교됩니다';
       }
     } else {
       상태 = '순자산을 받지 못했습니다';
@@ -356,6 +393,9 @@ async function 자금받기() {
       flow: 유출입 == null ? null : Math.round(유출입),
       flowPct: 비율 == null ? null : Math.round(비율 * 1000) / 1000,
       prevDate: 앞날,
+      // 정확 갈래만 — 보유내역 이력으로 최근 5일 · 20일 누적
+      sum5: 방식 === '정확' ? 보유누적(보유, 기호, 5) : null,
+      sum20: 방식 === '정확' ? 보유누적(보유, 기호, 20) : null,
     });
   }
   이력쓰기(이력);

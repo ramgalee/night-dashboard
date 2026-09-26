@@ -186,9 +186,14 @@
             color:var(--textTer); flex:none; }
   .flow-tag { display:inline-block; font-size:9.5px; font-family:var(--sans); font-weight:700;
               border-radius:4px; padding:1px 4px; margin-left:4px; vertical-align:1px; }
+  .flow-n .flow-tag { display:inline-block; font-size:9.5px; margin-left:4px; }   /* 이름 굵게 규칙(.flow-n b)을 이깁니다 */
   .flow-tag.exact { background:#E8F3EC; color:#1F6D4A; }
   .flow-tag.est   { background:var(--surface2); color:var(--textTer); }
   .flow-wait { flex:1; font-size:11.5px; color:var(--textTer); }
+  .flow-sub { font-size:11px; color:var(--textTer); font-family:var(--mono); padding:0 0 9px 128px;
+              margin-top:-4px; border-bottom:1px solid var(--surface2); }
+  .flow-row.has-sub { border-bottom:none; }
+  @media (max-width:640px) { .flow-sub { padding-left:94px; font-size:10.5px; } }
 
   /* 미국 ETF 의 한국 주식 매매 */
   .krf-top { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px; }
@@ -772,22 +777,31 @@ async function 자금받기() {
     const 배지 = m => m === "정확" ? `<b class="flow-tag exact">정확</b>`
                     : m === "추정" ? `<b class="flow-tag est">추정</b>` : "";
 
+    // 정확 갈래는 보유내역 이력으로 최근 5일 · 20일 누적을 한 줄 더 붙입니다
+    const 누적줄 = x => {
+      const 칸 = [];
+      if (x.sum5 && x.sum5.days) 칸.push(`최근 ${x.sum5.days}일 <b style="color:${x.sum5.usd >= 0 ? UP : DOWN}">${억달러(x.sum5.usd)}</b>`);
+      if (x.sum20 && x.sum20.days) 칸.push(`${x.sum20.days}일 <b style="color:${x.sum20.usd >= 0 ? UP : DOWN}">${억달러(x.sum20.usd)}</b>`);
+      return 칸.length ? `<div class="flow-sub">${칸.join(" · ")}</div>` : "";
+    };
+
     몸.innerHTML = d.items.map(x => {
       const 이름칸 = `<span class="flow-n"><b>${x.name}</b>` +
                      `<span>${x.symbol}${배지(x.method)}</span></span>`;
-      if (x.flow == null) {
-        return `<div class="flow-row">${이름칸}` +
-               `<span class="flow-wait">${x.status || x.error || "—"}</span></div>`;
+      const 아래 = 누적줄(x), 줄칸 = 아래 ? "flow-row has-sub" : "flow-row";
+      if (x.flow == null || (x.flow === 0 && x.status)) {
+        return `<div class="${줄칸}">${이름칸}` +
+               `<span class="flow-wait">${x.status || x.error || "—"}</span></div>` + 아래;
       }
       const 비율 = Math.min(50, Math.abs(x.flow) / 최대 * 50);
       const 들어옴 = x.flow >= 0;
-      return `<div class="flow-row">${이름칸}
+      return `<div class="${줄칸}">${이름칸}
         <span class="flow-bar"><span class="flow-mid"></span>
           <i style="${들어옴 ? "left:50%" : "right:50%"};width:${비율}%;
              background:${들어옴 ? UP : DOWN}"></i></span>
         <span class="flow-v" style="color:${들어옴 ? UP : DOWN}">${억달러(x.flow)}</span>
         <span class="flow-p">${x.flowPct == null ? "" : (x.flowPct >= 0 ? "+" : "−") + Math.abs(x.flowPct).toFixed(2) + "%"}</span>
-      </div>`;
+      </div>` + 아래;
     }).join("");
 
     const 꼬리 = [];
