@@ -152,7 +152,38 @@
     button, .between a button { min-height: 34px; }
     /* 카드 안쪽 여백 줄여 화면을 넓게 */
     .card { padding: 14px; }
+    /* 업종·자금 카드 */
+    .sec-grid { grid-template-columns:repeat(auto-fit,minmax(96px,1fr)); gap:5px; }
+    .sec-box { padding:8px 9px; }
+    .sec-v { font-size:13.5px; }
+    .sec-t { font-size:10.5px !important; }
+    .sec-n { font-size:11px; }
+    .flow-n { width:84px; }
+    .flow-n b { font-size:12px; }
+    .flow-n span { font-size:10.5px !important; }
+    .flow-v { width:68px; font-size:11.5px; }
+    .flow-p { display:none; }
   }
+  /* 미국 업종 · 자금 흐름 */
+  .sec-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(112px,1fr)); gap:6px; }
+  .sec-box { border-radius:10px; padding:10px 11px; color:#fff; }
+  .sec-n { font-size:11.5px; opacity:.92; }
+  .sec-v { font-family:var(--mono); font-size:15px; font-weight:700; margin-top:3px; }
+  .sec-t { font-size:9.5px; opacity:.75; font-family:var(--mono); margin-top:1px; }
+  .flow-row { display:flex; align-items:center; gap:10px; padding:10px 0;
+              border-bottom:1px solid var(--surface2); font-size:12.5px; }
+  .flow-row:last-child { border-bottom:none; }
+  .flow-n { width:118px; flex:none; }
+  .flow-n b { display:block; font-size:13px; }
+  .flow-n span { font-size:10.5px; color:var(--textTer); font-family:var(--mono); }
+  .flow-bar { flex:1; height:18px; background:var(--surface2); border-radius:5px;
+              position:relative; overflow:hidden; min-width:60px; }
+  .flow-bar i { position:absolute; top:0; bottom:0; }
+  .flow-mid { position:absolute; top:0; bottom:0; left:50%; width:1px; background:var(--hair); }
+  .flow-v { width:84px; text-align:right; font-family:var(--mono); font-size:12.5px;
+            font-weight:700; flex:none; }
+  .flow-p { width:58px; text-align:right; font-family:var(--mono); font-size:11.5px;
+            color:var(--textTer); flex:none; }
 </style>
 </head>
 <body>
@@ -207,6 +238,30 @@
       <ul id="aiNewsList"></ul>
     </details>
   </div>
+  </div>
+
+  <div class="card">
+    <div class="between" style="margin-bottom:12px;">
+      <div style="font-size:13px;color:var(--textSec);">업종별 등락
+        <span style="font-size:11px;color:var(--textTer);">섹터 ETF 11개 · 어느 업종으로 돈이 갔나</span></div>
+      <span id="secMeta" style="font-size:10.5px;color:var(--textTer);font-family:var(--mono);"></span>
+    </div>
+    <div id="secBody"><div class="empty">불러오는 중...</div></div>
+  </div>
+
+  <div class="card">
+    <div class="between" style="margin-bottom:12px;">
+      <div style="font-size:13px;color:var(--textSec);">ETF 자금 흐름
+        <span style="font-size:11px;color:var(--textTer);">주가 상승분을 뺀 실제 유출입</span></div>
+      <span id="flowMeta" style="font-size:10.5px;color:var(--textTer);font-family:var(--mono);"></span>
+    </div>
+    <div id="flowBody"><div class="empty">불러오는 중...</div></div>
+    <div style="font-size:11px;color:var(--textTer);line-height:1.75;margin-top:12px;">
+      순자산 변화에서 그날 주가 등락분을 빼서 계산합니다. 주가가 올라 덩치가 커진 것과
+      실제로 돈이 들어온 것을 가른 값입니다.
+      <b>EWY</b>는 외국인이 한국을 어떻게 보는지, <b>DRAM</b>은 삼성전자·SK하이닉스 비중이 높아
+      국내 메모리를 보는 대리지표로 쓸 수 있습니다.
+    </div>
   </div>
 
   <div class="card">
@@ -596,6 +651,85 @@ async function tl받기() {
 }
 tl받기();
 setInterval(tl받기, 180000);
+
+
+// ── 미국 업종별 등락 ────────────────────────────
+async function 업종받기() {
+  const 몸 = document.getElementById("secBody");
+  try {
+    const r = await fetch("/api/us-sectors", { cache: "no-store" });
+    const d = await r.json();
+    if (d.error || !(d.sectors || []).length) throw new Error("no data");
+
+    // 등락률에 따라 색 진하기를 바꿉니다
+    const 최대 = Math.max(1.2, ...d.sectors.map(x => Math.abs(x.changePct)));
+    const 색 = v => {
+      const 진하기 = Math.min(1, Math.abs(v) / 최대) * 0.72 + 0.18;
+      return v >= 0 ? `rgba(229,72,77,${진하기})` : `rgba(47,111,237,${진하기})`;
+    };
+    const 퍼 = v => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2) + "%";
+
+    몸.innerHTML = `<div class="sec-grid">${d.sectors.map(x => `
+      <div class="sec-box" style="background:${색(x.changePct)}">
+        <div class="sec-n">${x.name}</div>
+        <div class="sec-v">${퍼(x.changePct)}</div>
+        <div class="sec-t">${x.symbol}</div>
+      </div>`).join("")}</div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:11.5px;color:var(--textSec);">
+        ${(d.others || []).filter(x => x.changePct != null).map(x =>
+          `<span>${x.name} <b style="font-family:var(--mono);color:${x.changePct >= 0 ? UP : DOWN}">${퍼(x.changePct)}</b></span>`).join("")}
+      </div>`;
+
+    document.getElementById("secMeta").textContent =
+      `평균 ${퍼(d.avg)} · 가장 강한 ${d.best.name} ${퍼(d.best.changePct)}` +
+      (d.stale ? " · 지난 값" : "");
+  } catch (e) {
+    몸.innerHTML = `<div class="empty">업종 자료를 불러오지 못했습니다.</div>`;
+    document.getElementById("secMeta").textContent = "";
+  }
+}
+
+// ── ETF 자금 흐름 ──────────────────────────────
+async function 자금받기() {
+  const 몸 = document.getElementById("flowBody");
+  try {
+    const r = await fetch("/api/us-flow", { cache: "no-store" });
+    const d = await r.json();
+    if (d.error || !(d.items || []).length) throw new Error("no data");
+
+    const 있는것 = d.items.filter(x => x.flow != null);
+    if (!있는것.length) {
+      몸.innerHTML = `<div class="empty">${d.note || "아직 견줄 어제 자료가 없습니다. 내일부터 나옵니다."}</div>`;
+      document.getElementById("flowMeta").textContent = "";
+      return;
+    }
+    const 최대 = Math.max(...있는것.map(x => Math.abs(x.flow)), 1);
+    const 억달러 = v => {
+      const 억 = v / 1e8;
+      return (억 >= 0 ? "+" : "−") + "$" + Math.abs(억).toFixed(억 >= 10 || 억 <= -10 ? 0 : 1) + "억";
+    };
+    몸.innerHTML = 있는것.map(x => {
+      const 비율 = Math.min(50, Math.abs(x.flow) / 최대 * 50);
+      const 들어옴 = x.flow >= 0;
+      return `<div class="flow-row">
+        <span class="flow-n"><b>${x.name}</b><span>${x.symbol}</span></span>
+        <span class="flow-bar"><span class="flow-mid"></span>
+          <i style="${들어옴 ? "left:50%" : `right:50%`};width:${비율}%;
+             background:${들어옴 ? UP : DOWN}"></i></span>
+        <span class="flow-v" style="color:${들어옴 ? UP : DOWN}">${억달러(x.flow)}</span>
+        <span class="flow-p">${x.flowPct == null ? "" : (x.flowPct >= 0 ? "+" : "−") + Math.abs(x.flowPct).toFixed(2) + "%"}</span>
+      </div>`;
+    }).join("");
+    document.getElementById("flowMeta").textContent =
+      `${있는것.length}개 · ${d.date || ""}` + (d.stale ? " · 지난 값" : "");
+  } catch (e) {
+    몸.innerHTML = `<div class="empty">자금 자료를 불러오지 못했습니다.</div>`;
+    document.getElementById("flowMeta").textContent = "";
+  }
+}
+
+업종받기(); 자금받기();
+setInterval(업종받기, 5 * 60 * 1000);
 
 </script>
 </body>
