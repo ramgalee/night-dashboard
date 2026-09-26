@@ -3,6 +3,7 @@
 //
 //   시장(코스피·코스닥)   서버 /flow-history   키움 ka10051 · 억원
 //   종목(삼성·하이닉스·인버스2X)  서버 /stock-flow  키움 ka10059 · 백만원
+//   거래대금(코스피·코스닥) 서버 /index-daily  키움 ka20006 · 억원
 //   선물                  flow_diary.json(엑셀 씨앗) — 키움 창구를 찾기 전까지
 //
 //   씨앗 파일을 바탕에 깔고, 서버 자료가 있는 날은 서버 값으로 덮어씁니다.
@@ -30,10 +31,12 @@ const 주말 = d => { const w = new Date(Date.UTC(+d.slice(0, 4), +d.slice(4, 6)
 export default async function handler(req, res) {
   try {
     const 코드 = [...Object.keys(종목들), 곱버스].join(",");
-    const [씨앗, 흐름, 종목] = await Promise.all([
+    const [씨앗, 흐름, 종목, 대금피, 대금닥] = await Promise.all([
       받기(씨앗주소, 15).catch(() => null),
       받기(`${서버}/flow-history?from=${시작}`).catch(() => null),
       받기(`${서버}/stock-flow?codes=${코드}&from=${시작}`).catch(() => null),
+      받기(`${서버}/index-daily?code=001&from=${시작}`, 20).catch(() => null),
+      받기(`${서버}/index-daily?code=101&from=${시작}`, 20).catch(() => null),
     ]);
 
     const out = 씨앗 ? JSON.parse(JSON.stringify(씨앗)) : {};
@@ -63,12 +66,26 @@ export default async function handler(req, res) {
           };
           if (앞 && 앞.index && x.index) { 칸.chg = 둘째(x.index - 앞.index); 칸.pct = 둘째((x.index / 앞.index - 1) * 100); }
           const 기존 = out.market[m][r.date] || {};
-          out.market[m][r.date] = { ...기존, ...칸 };       // 거래대금(amt)은 씨앗에 있는 날만 남습니다
+          out.market[m][r.date] = { ...기존, ...칸 };       // 거래대금(amt)은 아래 /index-daily 로 채웁니다
           앞 = { 지문, index: x.index };
           if (!끝날 || r.date > 끝날) 끝날 = r.date;
         }
       }
     }
+
+    // ── 거래대금 ─────────────────────────────────
+    //   투자자 자료가 있는 날에만 붙입니다(휴장일 줄을 새로 만들지 않게).
+    let 대금썼다 = false;
+    for (const [m, 자] of [["KOSPI", 대금피], ["KOSDAQ", 대금닥]]) {
+      for (const r of (자 && 자.rows) || []) {
+        const 칸 = out.market[m][r.date];
+        if (!칸 || r.amt == null || !r.amt) continue;
+        칸.amt = r.amt;
+        if (칸.close == null && r.close) 칸.close = r.close;
+        대금썼다 = true;
+      }
+    }
+    if (대금썼다) 쓴곳.push("키움 거래대금");
 
     // ── 종목 ─────────────────────────────────────
     const 자료 = 종목 && 종목.data;
