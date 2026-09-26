@@ -617,33 +617,43 @@ let SUPPLY_TAB = null;
 // supply_rank.json 에 "이 종목이 순매수받은 날들 중 오늘이 몇 번째로 컸나" 가 들어 있습니다.
 // 시장 전체 순위(1위, 2위)와 달리, 그 종목에게 오늘이 이례적인 날인지를 알려 줍니다.
 let RANK = null;
-function 순위표(코드, sign) {
-  if (!RANK || !코드 || sign < 0) return "";
+// 이 화면의 탭 이름 → supply_rank.json 의 투자자 이름
+const 순위이름 = { "외국인": "외국인", "외국합": "외국인", "외국인합계": "외국인", "외국인계": "외국인",
+  "기관합계": "기관", "기관계": "기관", "기관": "기관", "금융투자": "금융투자", "투신": "투신",
+  "연기금": "연기금", "연기금등": "연기금", "사모": "사모펀드", "사모펀드": "사모펀드" };
+// ★ 는 ① 지금 보고 있는 탭의 투자자 기준으로만, ② 순위 파일과 같은 날짜의 목록에만 붙입니다.
+//   (예전에는 탭과 상관없이 아무 투자자의 ★나 붙였고, 장중 목록에 전날 ★가 붙기도 했습니다)
+function 순위표(코드, sign, 탭, 날짜) {
+  if (!RANK || !코드 || sign < 0 || !날짜 || 날짜 !== RANK.date) return "";
   const 위 = RANK.topRank || 5;
-  for (const 누구 of (RANK.investors || [])) {
-    const x = (RANK.data[누구] || []).find(v => v.code === 코드);
-    if (x && x.rank && x.rank <= 위) {
+  const 후보 = 탭 === 양매수탭 ? ["외국인", "기관"] : [순위이름[탭]];
+  for (const 누구 of 후보) {
+    const x = 누구 && (RANK.data[누구] || []).find(v => v.code === 코드);
+    if (x && x.rank && x.rank <= 위 && !x.few) {
       return `<span class="rk ${x.rank === 1 ? "" : x.rank <= 3 ? "r2" : "r3"}"` +
-             ` title="${누구} 기준 · 최근 ${x.days}일 중 ${x.rank}번째로 큰 순매수">★${x.rank}</span>`;
+             ` title="${누구} 기준 · 순매수한 ${x.days}일 중 ${x.rank}번째로 큰 날">★${x.rank}</span>`;
     }
   }
   return "";
 }
+// 장중 목록의 날짜 (조회 시각의 한국 날짜)
+const 한국날 = iso => { const t = new Date(iso); if (isNaN(t)) return "";
+  return new Date(t.getTime() + 9 * 3600e3).toISOString().slice(0, 10).replace(/-/g, ""); };
 async function 순위받기() {
   try {
     const r = await fetch("/supply_rank.json", { cache: "no-store" });
     const d = await r.json();
-    if (d && d.data) { RANK = d; paintSupply(); }
+    if (d && d.data) { RANK = d; paintSupply(); paintFinal(); }
   } catch (e) {}
 }
 
-function supRows(list, sign) {
+function supRows(list, sign, 탭, 날짜) {
   if (!list || !list.length) return `<div class="news-empty" style="padding-top:10px;">데이터가 없습니다.</div>`;
   const color = sign > 0 ? T.up : T.down;
   return list.map((it, i) => `
     <div class="sup-row">
       <span class="sup-no">${i + 1}</span>
-      <span class="sup-name" data-stk="${it.code || ""}" data-nm="${it.name}">${it.name}<span class="sup-mkt">${it.market === "KOSPI" ? "KP" : "KQ"}</span>${순위표(it.code, sign)}</span>
+      <span class="sup-name" data-stk="${it.code || ""}" data-nm="${it.name}">${it.name}<span class="sup-mkt">${it.market === "KOSPI" ? "KP" : "KQ"}</span>${순위표(it.code, sign, 탭, 날짜)}</span>
       <span class="sup-net">${Math.round(it.net / 100).toLocaleString("ko-KR")}억</span>
       <span class="sup-ratio" style="color:${color}">${it.ratio >= 0 ? "+" : "−"}${Math.abs(it.ratio).toFixed(2)}%</span>
     </div>`).join("");
@@ -700,11 +710,11 @@ function paintSupply() {
   body.innerHTML = `<div class="sup-grid">
     <div>
       <div class="sup-head" style="color:${T.up}">${SUPPLY_TAB === 양매수탭 ? "외국인+기관 양매수" : "순매수 상위"}</div>
-      <div class="sup-scroll">${supRows(d.buy, 1)}</div>
+      <div class="sup-scroll">${supRows(d.buy, 1, SUPPLY_TAB, 한국날(SUPPLY.generatedAt))}</div>
     </div>
     <div>
       <div class="sup-head" style="color:${T.down}">${SUPPLY_TAB === 양매수탭 ? "외국인+기관 양매도" : "순매도 상위"}</div>
-      <div class="sup-scroll">${supRows(d.sell, -1)}</div>
+      <div class="sup-scroll">${supRows(d.sell, -1, SUPPLY_TAB, 한국날(SUPPLY.generatedAt))}</div>
     </div>
   </div>`;
 
@@ -758,11 +768,11 @@ function paintFinal() {
   body.innerHTML = `<div class="sup-grid">
     <div>
       <div class="sup-head" style="color:${T.up}">${FINAL_TAB === 양매수탭 ? "외국인+기관 양매수" : "순매수 상위"}</div>
-      <div class="sup-scroll">${supRows(d.buy, 1)}</div>
+      <div class="sup-scroll">${supRows(d.buy, 1, FINAL_TAB, FINAL.date)}</div>
     </div>
     <div>
       <div class="sup-head" style="color:${T.down}">${FINAL_TAB === 양매수탭 ? "외국인+기관 양매도" : "순매도 상위"}</div>
-      <div class="sup-scroll">${supRows(d.sell, -1)}</div>
+      <div class="sup-scroll">${supRows(d.sell, -1, FINAL_TAB, FINAL.date)}</div>
     </div>
   </div>`;
 
