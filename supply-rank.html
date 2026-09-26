@@ -109,6 +109,10 @@
       <b>★ 표시가 이 화면의 핵심입니다.</b> 그 종목이 최근 순매수받은 날들 가운데
       오늘이 몇 번째로 큰 규모였는지를 뜻합니다. <b>★1위</b>면 그동안 중 가장 크게 들어온 날이고,
       표시가 없으면 이 종목에는 흔히 있는 일이라는 뜻입니다.<br><br>
+      <b>"순매수 ○일 중"</b>의 날수가 종목마다 다른 것은 정상입니다. 같은 기간(오른쪽 위 "최근 ○일") 안에서
+      그 투자자가 <b>그 종목을 순매수한 날만</b> 세기 때문입니다. 외국인이 자주 사는 종목은 100일이 넘고,
+      가끔 사는 종목은 20~30일입니다. 순매수한 날이 20일도 안 되면 1위가 쉽게 나오므로
+      ★ 대신 회색으로 <b>표본 적음</b>을 붙입니다. <b>자료 ○일</b>은 상장한 지 얼마 안 돼 기간 전체 자료가 없는 종목입니다.<br><br>
       같은 1위라도 <b>늘 있는 일인지, 처음 있는 일인지</b>를 가려 보시라고 만든 화면입니다.
       종목명을 누르면 그 자리에서 캔들 차트와 수급오실레이터를 볼 수 있습니다.<br><br>
       시가총액 <span id="minCap">1,000억</span> 미만 종목은 뺐습니다. 작은 종목은 비율이 쉽게 튀기 때문입니다.<br><br>
@@ -227,6 +231,7 @@ function 그리기() {
   const 투자자들 = DATA.investors || Object.keys(DATA.data);
   if (!TAB || !DATA.data[TAB]) TAB = 투자자들[0];
   const 위 = DATA.topRank || 5;
+  const 별감 = x => x.rank && x.rank <= 위 && !x.few;      // 순매수한 날이 적은 종목(few)은 ★ 대신 회색
   // 투자자마다 견준 날수가 다를 수 있어 탭을 바꿀 때마다 윗줄 설명을 고칩니다
   const 보기 = s => s && s.length === 8 ? `${s.slice(0, 4)}.${s.slice(4, 6)}.${s.slice(6, 8)}` : s;
   const 날수 = (DATA.daysBy && DATA.daysBy[TAB]) || DATA.days;
@@ -234,14 +239,14 @@ function 그리기() {
 
   document.getElementById("tabs").innerHTML = 투자자들.map(누구 => {
     const a = DATA.data[누구] || [];
-    const n = a.filter(x => x.rank && x.rank <= 위).length;
+    const n = a.filter(별감).length;
     return `<button data-t="${누구}" class="${누구 === TAB ? "on" : ""}">${누구}<b>★${n}</b></button>`;
   }).join("");
   document.querySelectorAll("[data-t]").forEach(b =>
     b.onclick = () => { TAB = b.dataset.t; 그리기(); });
 
   let 줄 = DATA.data[TAB] || [];
-  if (별만) 줄 = 줄.filter(x => x.rank && x.rank <= 위);
+  if (별만) 줄 = 줄.filter(별감);
   if (!줄.length) { 몸.innerHTML = `<div class="empty">해당하는 종목이 없습니다.</div>`; return; }
 
   몸.innerHTML = `<table>
@@ -250,10 +255,11 @@ function 그리기() {
       <th>시총 대비</th><th>이 종목 안에서</th>
     </tr></thead>
     <tbody>${줄.map(x => {
-      const 별 = x.rank && x.rank <= 위
+      const 새내기 = x.hist && x.hist < 날수 * 0.8 ? ` · 자료 ${x.hist}일` : "";
+      const 별 = 별감(x)
         ? `<span class="star ${x.rank === 1 ? "" : x.rank <= 3 ? "s2" : "s3"}">★ ${x.rank}위</span>` +
-          `<span class="days">/ ${x.days}일 중</span>`
-        : (x.rank ? `<span class="days">${x.rank}위 / ${x.days}일 중</span>` : "");
+          `<span class="days">/ 순매수 ${x.days}일 중${새내기}</span>`
+        : (x.rank ? `<span class="days" title="${x.few ? "이 투자자가 순매수한 날이 적어 ★를 붙이지 않았습니다" : ""}">${x.rank}위 / 순매수 ${x.days}일 중${x.few ? " · 표본 적음" : ""}${새내기}</span>` : "");
       return `<tr>
         <td class="no">${x.todayRank}</td>
         <td><span class="nm" data-stk="${x.code}" data-nm="${x.name}">${x.name}</span><span class="cd">${x.code}</span></td>
