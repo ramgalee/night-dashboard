@@ -4,7 +4,8 @@
 //   시장(코스피·코스닥)   서버 /flow-history   키움 ka10051 · 억원
 //   종목(삼성·하이닉스·인버스2X)  서버 /stock-flow  키움 ka10059 · 백만원
 //   거래대금(코스피·코스닥) 서버 /index-daily  키움 ka20006 · 억원
-//   선물                  flow_diary.json(엑셀 씨앗) — 키움 창구를 찾기 전까지
+//   선물                  서버 /fut-flow  네이버 증권(키움에 선물 자료가 없어서) · 억원
+//                         서버에 없는 옛날은 flow_diary.json(엑셀 씨앗)
 //
 //   씨앗 파일을 바탕에 깔고, 서버 자료가 있는 날은 서버 값으로 덮어씁니다.
 //   그래서 서버가 멈춰도 씨앗으로 화면이 나오고, 서버가 돌면 매일 새 날이 붙습니다.
@@ -31,12 +32,13 @@ const 주말 = d => { const w = new Date(Date.UTC(+d.slice(0, 4), +d.slice(4, 6)
 export default async function handler(req, res) {
   try {
     const 코드 = [...Object.keys(종목들), 곱버스].join(",");
-    const [씨앗, 흐름, 종목, 대금피, 대금닥] = await Promise.all([
+    const [씨앗, 흐름, 종목, 대금피, 대금닥, 선물] = await Promise.all([
       받기(씨앗주소, 15).catch(() => null),
       받기(`${서버}/flow-history?from=${시작}`).catch(() => null),
       받기(`${서버}/stock-flow?codes=${코드}&from=${시작}`).catch(() => null),
       받기(`${서버}/index-daily?code=001&from=${시작}`, 20).catch(() => null),
       받기(`${서버}/index-daily?code=101&from=${시작}`, 20).catch(() => null),
+      받기(`${서버}/fut-flow?from=${시작}`, 15).catch(() => null),
     ]);
 
     const out = 씨앗 ? JSON.parse(JSON.stringify(씨앗)) : {};
@@ -87,6 +89,15 @@ export default async function handler(req, res) {
     }
     if (대금썼다) 쓴곳.push("키움 거래대금");
 
+    // ── 선물 ─────────────────────────────────────
+    let 선물썼다 = false;
+    for (const r of (선물 && 선물.rows) || []) {
+      if (!r.date || 주말(r.date) || r.외국인 == null) continue;
+      out.futures[r.date] = { ...(out.futures[r.date] || {}), 개인: r.개인, 외국인: r.외국인, 기관계: r.기관계 };
+      선물썼다 = true;
+    }
+    if (선물썼다) 쓴곳.push("네이버 선물");
+
     // ── 종목 ─────────────────────────────────────
     const 자료 = 종목 && 종목.data;
     if (자료) {
@@ -120,7 +131,7 @@ export default async function handler(req, res) {
     for (const c of Object.keys(out.stocks)) out.stocks[c].days = 정렬(out.stocks[c].days);
 
     out.generatedAt = new Date().toISOString();
-    out.source = 쓴곳.length ? `${쓴곳.join(" · ")} · 선물은 엑셀` : (씨앗 ? "엑셀 씨앗" : "자료 없음");
+    out.source = 쓴곳.length ? 쓴곳.join(" · ") + (선물썼다 ? "" : " · 선물은 엑셀") : (씨앗 ? "엑셀 씨앗" : "자료 없음");
     out.serverLast = 끝날;
     if (!out.market || !Object.keys(out.market.KOSPI).length) return res.status(502).json({ error: "자료를 받지 못했습니다" });
 
