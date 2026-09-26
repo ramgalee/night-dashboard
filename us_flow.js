@@ -15,6 +15,9 @@
 //     상장주식수는 설정단위(보통 5만 주) 로만 움직여서 변화가 0 인 날이 자주 있습니다.
 //     고장이 아니라 그날 신규 설정·환매가 없었다는 뜻입니다.
 //
+//  1-2) 정확 — State Street 공시 (SPY · 섹터 SPDR 11개)
+//     설정일부터의 NAV · 상장주식수를 엑셀로 받아 같은 방식으로 셉니다. 과거까지 바로 나옵니다.
+//
 //  2) 추정  — 야후 순자산 (나머지)
 //     운용사마다 공시 형식이 달라 전부 읽으려면 파서가 다섯 개 필요합니다.
 //     그래서 나머지는 순자산에서 가격 상승분을 빼는 표준 추정식을 씁니다.
@@ -247,6 +250,157 @@ async function 아이셰어즈받기(기호) {
   return { shares: 주식수.value, netAssets: 순 ? 순.value : null, nav, asOf: 주식수.asOf || null };
 }
 
+// ── State Street 공시 (SPY · 섹터 SPDR 11개) ─────────────
+//   운용사가 설정일부터의 NAV · 상장주식수를 엑셀로 공개합니다.
+//     https://www.ssga.com/library-content/products/fund-data/etfs/us/navhist-us-en-<티커>.xlsx
+//   서버가 뜨고 1분 뒤, 그다음 6시간마다 받아 /root/app/ssga_nav.json 에 저장합니다.
+//   유출입 = (그날 상장주식수 − 전날 상장주식수) × 그날 NAV  — iShares 와 같은 정확한 방식
+const zlib = require('zlib');
+const 스테이트 = ['SPY', 'XLK', 'XLC', 'XLY', 'XLF', 'XLV', 'XLI', 'XLP', 'XLE', 'XLU', 'XLB', 'XLRE'];
+const 스테이트파일 = '/root/app/ssga_nav.json';
+const 스테이트보관 = 400;
+const 스테이트주소 = t =>
+  `https://www.ssga.com/library-content/products/fund-data/etfs/us/navhist-us-en-${t.toLowerCase()}.xlsx`;
+
+// 엑셀(.xlsx) 읽기 — 설치 없이 zlib 만 씁니다. xlsx 는 zip 안에 xml 이 든 파일입니다.
+function zip풀기(buf) {
+  const e = buf.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+  if (e < 0) throw new Error('엑셀 파일이 아님');
+  const 개수 = buf.readUInt16LE(e + 10);
+  let p = buf.readUInt32LE(e + 16);
+  const 파일 = {};
+  for (let i = 0; i < 개수; i++) {
+    if (buf.readUInt32LE(p) !== 0x02014b50) break;
+    const 방식 = buf.readUInt16LE(p + 10), 크기 = buf.readUInt32LE(p + 20);
+    const n = buf.readUInt16LE(p + 28), x = buf.readUInt16LE(p + 30), c = buf.readUInt16LE(p + 32);
+    const 위치 = buf.readUInt32LE(p + 42);
+    const 이름 = buf.slice(p + 46, p + 46 + n).toString('utf8');
+    p += 46 + n + x + c;
+    const ln = buf.readUInt16LE(위치 + 26), lx = buf.readUInt16LE(위치 + 28);
+    const 몸 = buf.slice(위치 + 30 + ln + lx, 위치 + 30 + ln + lx + 크기);
+    파일[이름] = 방식 === 8 ? zlib.inflateRawSync(몸) : 몸;
+  }
+  return 파일;
+}
+const 엑셀풀이 = t => t.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+  .replace(/&apos;/g, "'").replace(/&#(\d+);/g, (_, d) => String.fromCharCode(+d)).replace(/&amp;/g, '&');
+function 엑셀읽기(buf) {
+  const f = zip풀기(buf);
+  const 공유 = [];
+  if (f['xl/sharedStrings.xml']) {
+    for (const m of f['xl/sharedStrings.xml'].toString('utf8').matchAll(/<si>([\s\S]*?)<\/si>/g)) {
+      공유.push([...m[1].matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map(x => 엑셀풀이(x[1])).join(''));
+    }
+  }
+  const 시트 = Object.keys(f).filter(k => /^xl\/worksheets\/sheet\d+\.xml$/.test(k)).sort()[0];
+  if (!시트) throw new Error('시트가 없음');
+  const 열번호 = r => { let n = 0; for (const ch of r.match(/^[A-Z]+/)[0]) n = n * 26 + ch.charCodeAt(0) - 64; return n - 1; };
+  const 줄들 = [];
+  for (const 줄 of f[시트].toString('utf8').matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>/g)) {
+    const 칸들 = [];
+    for (const c of 줄[1].matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+      const 속 = c[1], 안 = c[2] || '';
+      const r = (속.match(/\br="([A-Z]+\d+)"/) || [])[1];
+      const t = (속.match(/\bt="(\w+)"/) || [])[1];
+      const v = (안.match(/<v>([\s\S]*?)<\/v>/) || [])[1];
+      let 값 = null;
+      if (t === 's') 값 = v != null ? 공유[+v] : null;
+      else if (t === 'inlineStr') 값 = 엑셀풀이(((안.match(/<t[^>]*>([\s\S]*?)<\/t>/) || [])[1]) || '');
+      else if (t === 'str' || t === 'e') 값 = v != null ? 엑셀풀이(v) : null;
+      else 값 = v != null ? Number(v) : null;
+      칸들[r ? 열번호(r) : 칸들.length] = 값;
+    }
+    for (let i = 0; i < 칸들.length; i++) if (칸들[i] === undefined) 칸들[i] = null;
+    줄들.push(칸들);
+  }
+  return 줄들;
+}
+
+const 영달 = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06',
+              Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
+function 날짜풀기(v) {                        // "24-Sep-2026" 또는 엑셀 날짜 숫자 → "20260924"
+  if (typeof v === 'number' && v > 20000 && v < 80000) {
+    return new Date(Date.UTC(1899, 11, 30) + v * 864e5).toISOString().slice(0, 10).replace(/-/g, '');
+  }
+  const m = String(v || '').trim().match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+  return m && 영달[m[2]] ? m[3] + 영달[m[2]] + m[1].padStart(2, '0') : null;
+}
+
+function 스테이트파일읽기() {
+  try { return JSON.parse(fs.readFileSync(스테이트파일, 'utf8')); } catch (e) { return {}; }
+}
+let 스테이트저장 = 스테이트파일읽기();
+const 스테이트상태 = { 모으는중: false, 마지막: null, 됨: 0, 오류: null };
+
+async function 스테이트한개(기호) {
+  const ac = new AbortController();
+  const 시계 = setTimeout(() => ac.abort(), 30000);
+  try {
+    const r = await fetch(스테이트주소(기호), { signal: ac.signal, headers: { 'User-Agent': 머리['User-Agent'] } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const 줄 = 엑셀읽기(Buffer.from(await r.arrayBuffer()));
+    const 머리줄 = 줄.findIndex(x => String(x[0] || '').trim() === 'Date');
+    if (머리줄 < 0) throw new Error('머리글 없음');
+    const 열 = 줄[머리줄].map(x => String(x || '').trim());
+    const iN = 열.indexOf('NAV'), iS = 열.indexOf('Shares Outstanding');
+    if (iN < 0 || iS < 0) throw new Error('열 이름이 바뀜');
+    const 표 = {};
+    for (const x of 줄.slice(머리줄 + 1)) {
+      const d = 날짜풀기(x[0]), nav = Number(x[iN]), sh = Number(x[iS]);
+      if (d && nav > 0 && sh > 0) 표[d] = [Math.round(nav * 1e6) / 1e6, sh];
+    }
+    const 날들 = Object.keys(표).sort();
+    if (!날들.length) throw new Error('자료 없음');
+    const 남길 = {};
+    for (const d of 날들.slice(-스테이트보관)) 남길[d] = 표[d];
+    return 남길;
+  } finally { clearTimeout(시계); }
+}
+
+async function 스테이트모으기() {
+  if (스테이트상태.모으는중) return;
+  스테이트상태.모으는중 = true; 스테이트상태.됨 = 0; 스테이트상태.오류 = null;
+  const 새 = { ...스테이트저장 };
+  for (const 기호 of 스테이트) {
+    try { 새[기호] = await 스테이트한개(기호); 스테이트상태.됨++; }
+    catch (e) { 스테이트상태.오류 = `${기호} ${(e && e.message) || e}`; }
+    await new Promise(r => setTimeout(r, 800));
+  }
+  스테이트저장 = 새;
+  try {
+    const 임시 = 스테이트파일 + '.tmp';
+    fs.writeFileSync(임시, JSON.stringify(새), 'utf8');
+    fs.renameSync(임시, 스테이트파일);
+  } catch (e) {}
+  스테이트상태.모으는중 = false;
+  스테이트상태.마지막 = new Date().toISOString();
+  업종캐시.at = 0; 자금캐시.at = 0;             // 새 자료로 다시 계산하게
+  console.log('[us_flow] State Street', 스테이트상태.됨 + '/' + 스테이트.length, 스테이트상태.오류 || '');
+}
+
+// 한 종목의 최근 유출입 · 5일 · 20일 (달러)
+function 스테이트흐름(기호) {
+  const h = 스테이트저장[기호];
+  if (!h) return null;
+  const a = Object.keys(h).sort();
+  if (a.length < 2) return null;
+  const 합 = n => {
+    const 끝 = a.slice(-(n + 1));
+    let t = 0;
+    for (let i = 1; i < 끝.length; i++) t += (h[끝[i]][1] - h[끝[i - 1]][1]) * h[끝[i]][0];
+    return { usd: Math.round(t), days: 끝.length - 1, to: 끝[끝.length - 1] };
+  };
+  const 끝 = h[a[a.length - 1]], 앞 = h[a[a.length - 2]];
+  return {
+    date: a[a.length - 1], prev: a[a.length - 2],
+    shares: 끝[1], sharesChg: 끝[1] - 앞[1], nav: 끝[0],
+    aum: Math.round(끝[0] * 끝[1]),
+    flow: Math.round((끝[1] - 앞[1]) * 끝[0]),
+    flowPct: 앞[1] ? Math.round((끝[1] - 앞[1]) / 앞[1] * 100000) / 1000 : null,
+    sum5: 합(5), sum20: 합(20),
+  };
+}
+
 // ── 업종 ────────────────────────────────────────────
 const 업종캐시 = { at: 0, data: null };
 async function 업종받기() {
@@ -271,6 +425,15 @@ async function 업종받기() {
   const 쓸것 = 업종.filter(x => x.changePct != null);
   쓸것.sort((a, b) => b.changePct - a.changePct);
 
+  // 섹터별 자금 (State Street 공시 상장주식수)
+  let 자금날 = null;
+  for (const x of [...쓸것, ...참고]) {
+    const f = 스테이트.includes(x.symbol) ? 스테이트흐름(x.symbol) : null;
+    if (!f) continue;
+    x.fund = { date: f.date, flow: f.flow, sharesChg: f.sharesChg, aum: f.aum, sum5: f.sum5, sum20: f.sum20 };
+    if (!자금날 || f.date > 자금날) 자금날 = f.date;
+  }
+
   const out = {
     generatedAt: new Date().toISOString(),
     date: (업종.find(x => x.date) || {}).date || null,
@@ -279,6 +442,7 @@ async function 업종받기() {
     best: 쓸것[0] || null,
     worst: 쓸것[쓸것.length - 1] || null,
     avg: 쓸것.length ? Math.round(쓸것.reduce((a, x) => a + x.changePct, 0) / 쓸것.length * 100) / 100 : null,
+    fundDate: 자금날,
   };
   업종캐시.at = Date.now();          // ★ const 라 통째로 대입하면 안 됩니다
   업종캐시.data = out;
@@ -319,6 +483,23 @@ async function 자금받기() {
     이력[날] = 이력[날] || {};
     const 칸 = 이력[날][기호] = 이력[날][기호] || {};
     칸.p = s.price;
+
+    // State Street (SPY · XLK) — 공시 상장주식수로 정확하게, 과거까지
+    const 스 = 스테이트.includes(기호) ? 스테이트흐름(기호) : null;
+    if (스) {
+      정확수 += 1;
+      줄들.push({
+        symbol: 기호, name: 이름, note: 메모,
+        price: s.price,
+        changePct: s.changePct == null ? null : Math.round(s.changePct * 100) / 100,
+        aum: 스.aum, shares: 스.shares, asOf: 대시(스.date),
+        method: '정확',
+        status: 스.sharesChg === 0 ? '설정·환매 없음' : null,
+        flow: 스.flow, flowPct: 스.flowPct, prevDate: 대시(스.prev),
+        sum5: 스.sum5, sum20: 스.sum20,
+      });
+      continue;
+    }
 
     let 정확 = null;
     if (아이셰어즈[기호]) {
@@ -418,6 +599,21 @@ async function 자금받기() {
 }
 
 module.exports = (app) => {
+  setTimeout(스테이트모으기, 60 * 1000);            // 서버가 뜨고 1분 뒤
+  setInterval(스테이트모으기, 6 * 3600 * 1000);     // 그다음 6시간마다
+
+  // State Street 자료가 모였는지 확인용
+  app.get('/us-flow/ssga', (req, res) => {
+    const 요약 = {};
+    for (const 기호 of 스테이트) {
+      const h = 스테이트저장[기호], a = h ? Object.keys(h).sort() : [];
+      const f = 스테이트흐름(기호);
+      요약[기호] = a.length ? `${a.length}일 (${a[0]}~${a[a.length - 1]})`
+        + (f ? ` · 5일 ${(f.sum5.usd / 1e8).toFixed(1)}억$ · 20일 ${(f.sum20.usd / 1e8).toFixed(1)}억$` : '') : '없음';
+    }
+    res.json({ ...스테이트상태, 요약 });
+  });
+
   app.get('/us-sectors', async (req, res) => {
     try {
       res.setHeader('Cache-Control', 'no-store');

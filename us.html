@@ -195,6 +195,28 @@
   .flow-row.has-sub { border-bottom:none; }
   @media (max-width:640px) { .flow-sub { padding-left:94px; font-size:10.5px; } }
 
+  /* 업종별 자금 표 */
+  .sf-head { display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap;
+             margin:16px 0 4px; padding-top:12px; border-top:1px solid var(--hair); }
+  .sf-head b { font-size:12.5px; color:var(--textSec); }
+  .sf-head span { font-size:10.5px; color:var(--textTer); font-family:var(--mono); }
+  .sf-row { display:grid; grid-template-columns:104px 1fr 64px 64px 70px 52px; gap:8px; align-items:center;
+            padding:6px 0; border-bottom:1px solid var(--surface2); font-size:12px; }
+  .sf-row.sf-cap { font-size:10.5px; color:var(--textTer); border-bottom:1px solid var(--hair); padding:4px 0; }
+  .sf-row:last-child { border-bottom:none; }
+  .sf-n b { font-weight:600; } .sf-n span { font-family:var(--mono); font-size:10px; color:var(--textTer); margin-left:4px; }
+  .sf-bar { height:12px; background:var(--surface2); border-radius:4px; position:relative; overflow:hidden; }
+  .sf-bar i { position:absolute; top:0; bottom:0; }
+  .sf-bar em { position:absolute; top:0; bottom:0; left:50%; width:1px; background:var(--hair); }
+  .sf-v { font-family:var(--mono); text-align:right; font-weight:600; }
+  .sf-p { font-family:var(--mono); text-align:right; font-size:11px; color:var(--textTer); }
+  .sf-foot { font-size:11px; color:var(--textSec); margin-top:8px; }
+  @media (max-width:640px) {
+    .sf-row { grid-template-columns:78px 1fr 58px 62px 46px; gap:6px; font-size:11px; }
+    .sf-row > .sf-d1 { display:none; }
+    .sf-n span { display:none; }
+  }
+
   /* 미국 ETF 의 한국 주식 매매 */
   .krf-top { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px; }
   .krf-big { font-family:var(--mono); font-size:30px; font-weight:800; letter-spacing:-0.5px; }
@@ -734,6 +756,41 @@ setInterval(tl받기, 180000);
 
 
 // ── 미국 업종별 등락 ────────────────────────────
+// 업종별 자금 — State Street 공시 상장주식수로 잰 설정·환매 (섹터 SPDR 11개)
+function 업종자금표(d) {
+  const 줄 = (d.sectors || []).filter(x => x.fund && x.fund.sum20);
+  if (!줄.length) return "";
+  const 달러 = v => {
+    const 부호 = v > 0 ? "+" : v < 0 ? "−" : "", a = Math.abs(v);
+    if (a >= 1e8) return 부호 + "$" + (a / 1e8).toFixed(a >= 1e9 ? 0 : 1) + "억";
+    return 부호 + "$" + Math.round(a / 1e6) + "백만";
+  };
+  const 색 = v => v > 0 ? UP : v < 0 ? DOWN : "#8B94B0";
+  // 20일 금액 순으로 세웁니다. 업종마다 덩치가 달라 오른쪽에 순자산 대비 비율을 함께 둡니다.
+  const 비율 = x => x.fund.aum ? x.fund.sum20.usd / x.fund.aum * 100 : 0;
+  줄.sort((a, b) => b.fund.sum20.usd - a.fund.sum20.usd);
+  const 최대 = Math.max(...줄.map(x => Math.abs(x.fund.sum20.usd)), 1);
+  const 날 = d.fundDate ? (+d.fundDate.slice(4, 6)) + "/" + (+d.fundDate.slice(6, 8)) : "";
+  const spy = (d.others || []).find(x => x.symbol === "SPY" && x.fund);
+  return `
+    <div class="sf-head"><b>업종별 자금 흐름</b><span>${날} 기준 · 운용사 공시 상장주식수로 잰 설정·환매</span></div>
+    <div class="sf-row sf-cap"><span>업종</span><span>20일</span><span class="sf-v sf-d1" style="font-weight:400">하루</span>
+      <span class="sf-v" style="font-weight:400">5일</span><span class="sf-v" style="font-weight:400">20일</span><span class="sf-p">순자산비</span></div>
+    ${줄.map(x => {
+      const f = x.fund, w = Math.min(50, Math.abs(f.sum20.usd) / 최대 * 50), 들 = f.sum20.usd >= 0;
+      return `<div class="sf-row">
+        <span class="sf-n"><b>${x.name}</b><span>${x.symbol}</span></span>
+        <span class="sf-bar"><em></em><i style="${들 ? "left:50%" : "right:50%"};width:${w}%;background:${색(f.sum20.usd)}"></i></span>
+        <span class="sf-v sf-d1" style="color:${색(f.flow)}">${f.sharesChg === 0 ? "—" : 달러(f.flow)}</span>
+        <span class="sf-v" style="color:${색(f.sum5.usd)}">${달러(f.sum5.usd)}</span>
+        <span class="sf-v" style="color:${색(f.sum20.usd)}">${달러(f.sum20.usd)}</span>
+        <span class="sf-p">${(비율(x) >= 0 ? "+" : "−") + Math.abs(비율(x)).toFixed(1)}%</span>
+      </div>`;
+    }).join("")}
+    ${spy ? `<div class="sf-foot">S&amp;P500 SPY — 5일 <b style="font-family:var(--mono);color:${색(spy.fund.sum5.usd)}">${달러(spy.fund.sum5.usd)}</b>
+      · 20일 <b style="font-family:var(--mono);color:${색(spy.fund.sum20.usd)}">${달러(spy.fund.sum20.usd)}</b></div>` : ""}`;
+}
+
 async function 업종받기() {
   const 몸 = document.getElementById("secBody");
   try {
@@ -758,7 +815,7 @@ async function 업종받기() {
       <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:11.5px;color:var(--textSec);">
         ${(d.others || []).filter(x => x.changePct != null).map(x =>
           `<span>${x.name} <b style="font-family:var(--mono);color:${x.changePct >= 0 ? UP : DOWN}">${퍼(x.changePct)}</b></span>`).join("")}
-      </div>`;
+      </div>${업종자금표(d)}`;
 
     document.getElementById("secMeta").textContent =
       `평균 ${퍼(d.avg)} · 가장 강한 ${d.best.name} ${퍼(d.best.changePct)}` +
