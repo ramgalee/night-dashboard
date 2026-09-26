@@ -12,6 +12,12 @@
 //   서버가 뜨고 45초 뒤 과거를 채우고(처음 한 번 10분 안팎), 그다음 3시간마다 새 날만 받습니다.
 //   화면 요청에는 저장된 파일로 즉시 답합니다.
 //
+// ── 두 가지 숫자 ──────────────────────────────────────
+//   현물 매매   보유 주식수 변화로 잰 값 — 펀드가 한국 시장에서 실제로 사고판 현물
+//   투자자 자금  상장주식수 변화 × NAV × 한국 비중 — 투자자가 넣고 뺀 돈 중 한국 몫
+//   보통은 비슷하지만, 비중 한도(EWY 25/50) 때문에 현물을 덜어내 현금·선물로 옮기면
+//   현물 매매가 더 크게 나옵니다. 2026년 9월 EWY 가 하이닉스를 덜어낼 때 3주간 1.2조원 차이가 났습니다.
+//
 // ── 알아둘 것 ─────────────────────────────────────────
 //   · 기준일은 펀드 보유내역 날짜(미국 날짜)입니다. 한국 시장 체결일과 하루 어긋날 수 있습니다.
 //   · 주식 분할처럼 매매 없이 주식수가 바뀐 경우는 가격과 반대로 크게 움직인 것을 보고 뺍니다.
@@ -206,6 +212,11 @@ async function 모으기(까닭) {
           연속실패 = 0;
           continue;
         }
+        if (r.오류 === '머리글을 못 읽음' && 날 < 가까운날) {
+          f.빈날[날] = 1;                        // 휴장일인데 '-' 대신 다른 모양으로 온 경우 (6/19 준틴스 등)
+          연속실패 = 0;
+          continue;
+        }
         if (r.오류) {
           상태.오류 = `${기호} ${날} ${r.오류}`;
           if (++연속실패 >= 6) throw new Error('연속 실패 — 이번 차례는 멈추고 다음에 다시 시도합니다');
@@ -252,7 +263,7 @@ async function 계산() {
 
       const 환율 = b.fx || a.fx;
       if (!환율) continue;
-      const 칸 = 날별[d] = 날별[d] || { total: 0, 펀드: {}, 종목: {} };
+      const 칸 = 날별[d] = 날별[d] || { total: 0, inv: 0, 펀드: {}, 종목: {} };
       let 합 = 0, 한국평가 = 0;
       const 코드들 = new Set([...Object.keys(a.kr), ...Object.keys(b.kr)]);
       for (const c of 코드들) {
@@ -272,9 +283,14 @@ async function 계산() {
         const s = 칸.종목[c] = 칸.종목[c] || [0, 0];
         s[0] += 원; s[1] += dq;
       }
+      // 투자자 자금 = 상장주식수 변화 × NAV × 한국 비중 (그 펀드에 들어온 돈 중 한국 몫)
+      const 한국비중 = b.mv ? 한국평가 / b.mv : 0;
+      const 자금 = (b.sh - a.sh) * (b.mv / b.sh) * 환율 * 한국비중;
       칸.total += 합;
+      칸.inv += 자금;
       칸.펀드[기호] = {
         krw: Math.round(합),
+        invKrw: Math.round(자금),
         sharesChg: b.sh - a.sh,
         shares: b.sh,
         creationUsd: Math.round((b.sh - a.sh) * (b.mv / b.sh)),
@@ -286,7 +302,7 @@ async function 계산() {
 
   const 날들 = Object.keys(날별).sort();
   const series = 날들.map(d => {
-    const x = 날별[d], o = { date: d, total: Math.round(x.total) };
+    const x = 날별[d], o = { date: d, total: Math.round(x.total), inv: Math.round(x.inv) };
     for (const [기호] of 펀드들) o[기호] = x.펀드[기호] ? x.펀드[기호].krw : null;
     return o;
   });
@@ -304,11 +320,17 @@ async function 계산() {
     today = {
       date: d,
       total: Math.round(x.total),
+      inv: Math.round(x.inv),
       funds: 펀드들.map(([기호, , 설명]) => ({ symbol: 기호, name: 설명, ...(x.펀드[기호] || { missing: true }) })),
       buys: 줄.filter(r => r.krw > 0).sort((p, q) => q.krw - p.krw).slice(0, 10),
       sells: 줄.filter(r => r.krw < 0).sort((p, q) => p.krw - q.krw).slice(0, 10),
     };
   }
+
+  const 누적 = n => {
+    const 끝 = series.slice(-n);
+    return { days: 끝.length, total: 끝.reduce((a, x) => a + x.total, 0), inv: 끝.reduce((a, x) => a + x.inv, 0) };
+  };
 
   const 모인날 = {};
   for (const [기호] of 펀드들) 모인날[기호] = Object.keys((h[기호] && h[기호].days) || {}).length;
@@ -318,6 +340,8 @@ async function 계산() {
     funds: 펀드들.map(([s, , n]) => ({ symbol: s, name: n })),
     series,
     today,
+    sum5: 누적(5),
+    sum20: 누적(20),
     collected: 모인날,
     collecting: 상태.모으는중,
     splitSkipped: 분할의심,

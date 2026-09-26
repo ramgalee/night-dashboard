@@ -199,6 +199,10 @@
   .krf-top { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:4px; }
   .krf-big { font-family:var(--mono); font-size:30px; font-weight:800; letter-spacing:-0.5px; }
   .krf-sub { font-size:11.5px; color:var(--textTer); }
+  .krf-sums { display:flex; gap:6px 18px; flex-wrap:wrap; font-size:11.5px; color:var(--textSec); margin-top:2px; }
+  .krf-sums em { font-style:normal; color:var(--textTer); margin-right:3px; }
+  .krf-sums b { font-family:var(--mono); }
+  .krf-fund .krf-fx b { font-family:var(--mono); }
   .krf-read { font-size:11.5px; color:var(--textSec); font-family:var(--mono); min-height:18px; margin:6px 0 4px; }
   .krf-chart { position:relative; width:100%; height:150px; touch-action:pan-y; }
   .krf-chart svg { display:block; width:100%; height:100%; }
@@ -221,8 +225,9 @@
   @media (max-width:640px) {
     .krf-big { font-size:25px; }
     .krf-cols { grid-template-columns:1fr; }
+    .krf-fund { flex-wrap:wrap; row-gap:2px; }
     .krf-fund .krf-fn { display:none; }
-    .krf-fund .krf-fx { font-size:10px; }
+    .krf-fund .krf-fx { flex-basis:100%; text-align:left; padding-left:54px; font-size:10.5px; }
   }
   @media (max-width:640px) {
     .flow-tag { font-size:9px; }
@@ -323,11 +328,18 @@
     </div>
     <div id="krfBody"><div class="empty">불러오는 중...</div></div>
     <div style="font-size:11px;color:var(--textTer);line-height:1.75;margin-top:12px;">
-      iShares 가 날마다 공개하는 보유내역에서 <b>한국 종목의 보유 주식수 변화 × 주가 × 환율</b>을 더한 값입니다.
-      설정·환매로 들어온 돈이든 비중 조정이든 실제로 사고판 한국 주식은 모두 잡힙니다.
-      기준일은 펀드 보유내역 날짜(미국 날짜)라 한국 시장 체결일과 하루 어긋날 수 있습니다.
-      주식 분할처럼 매매 없이 주식수가 바뀐 경우는 뺍니다.
-      다른 운용사(뱅가드 등)의 ETF 와 액티브 펀드는 들어 있지 않아 시장 전체 숫자보다 작습니다.
+      <b>현물</b> iShares 가 날마다 공개하는 보유내역에서 한국 종목의 <b>보유 주식수 변화 × 주가 × 환율</b>을 더한 값입니다.
+      펀드가 한국 시장에서 실제로 사고판 현물이라, 외국 ETF 의 <b>매수·매도 압력</b>은 이쪽으로 봅니다.
+      <br>
+      <b>자금</b> 투자자가 넣고 뺀 돈 중 한국 몫(상장주식수 변화 × NAV × 한국 비중)입니다.
+      <br>
+      둘은 보통 비슷하지만 <b>현물이 더 크게 나오는 때</b>가 있습니다. EWY 는 한 종목 25%·큰 종목 합 50% 한도가 있어,
+      삼성전자·SK하이닉스가 급등하면 한도에 맞춰 현물을 덜어내고 현금·선물로 채웁니다.
+      2026년 9월 3주간 투자자 자금은 약 2.3조원 빠졌는데 현물은 3.5조원이 팔렸고, 차이의 대부분이 SK하이닉스였습니다.
+      또 MSCI 정기변경 날에는 자금 변화 없이 현물만 크게 오갑니다.
+      <br>
+      기준일은 펀드 보유내역 날짜(미국 날짜)라 한국 체결일과 하루 어긋날 수 있고, 주식 분할처럼 매매 없이 주식수가 바뀐 경우는 뺍니다.
+      다른 운용사(뱅가드 등)와 액티브 펀드는 들어 있지 않아 시장 전체 숫자보다 작습니다.
     </div>
   </div>
 
@@ -850,7 +862,9 @@ async function 한국매매받기() {
       ? `<div class="krf-fund"><b>${f.symbol}</b><span class="krf-fn">${f.name}</span><span class="krf-fx" style="text-align:left;">자료 없음</span></div>`
       : `<div class="krf-fund"><b>${f.symbol}</b><span class="krf-fn">${f.name}</span>
            <span class="krf-fv" style="color:${색(f.krw)}">${억원(f.krw)}</span>
-           <span class="krf-fx">주식수 ${f.sharesChg >= 0 ? "+" : "−"}${Math.abs(f.sharesChg).toLocaleString("ko-KR")} · 한국 ${f.krWeight == null ? "—" : f.krWeight + "%"}</span></div>`
+           <span class="krf-fx">자금 <b style="color:${색(f.invKrw || 0)}">${f.invKrw == null ? "—" : 억원(f.invKrw)}</b>
+             · 주식수 ${f.sharesChg >= 0 ? "+" : "−"}${Math.abs(f.sharesChg).toLocaleString("ko-KR")}
+             · 한국 ${f.krWeight == null ? "—" : f.krWeight + "%"}</span></div>`
     ).join("");
     const 목록 = (arr) => arr.length
       ? arr.slice(0, 5).map((x, i) => `<div class="krf-row"><span class="krf-rk">${i + 1}</span>
@@ -894,8 +908,11 @@ async function 한국매매받기() {
     몸.innerHTML = `
       <div class="krf-top">
         <span class="krf-big" style="color:${색(t.total)}">${억원(t.total)}원</span>
-        <span class="krf-sub">${월일(t.date)} 미국 기준 · 세 펀드의 한국 주식 순매수</span>
+        <span class="krf-sub">${월일(t.date)} 미국 기준 · 세 펀드가 한국 현물을 사고판 금액</span>
       </div>
+      <div class="krf-sums">${[["5", d.sum5], ["20", d.sum20]].filter(([, v]) => v && v.days).map(([n, v]) =>
+        `<span><em>최근 ${v.days}일</em> 현물 <b style="color:${색(v.total)}">${억원(v.total)}</b>
+         · 자금 <b style="color:${색(v.inv)}">${억원(v.inv)}</b></span>`).join("")}</div>
       <div class="krf-read" id="krfRead"></div>
       <div class="krf-chart" id="krfChart">
         <svg viewBox="0 0 ${n * 칸폭} ${높이}" preserveAspectRatio="none" aria-label="날짜별 한국 주식 순매수 막대그래프">
@@ -917,7 +934,8 @@ async function 한국매매받기() {
     const 보이기 = i => {
       const x = 줄[i];
       const 쪼갬 = d.funds.map(f => x[f.symbol] == null ? null : `${f.symbol} ${억원(x[f.symbol])}`).filter(Boolean).join(" · ");
-      읽기.innerHTML = `<b style="color:${색(x.total)}">${월일(x.date)} ${억원(x.total)}</b>  <span style="color:var(--textTer)">${쪼갬}</span>`;
+      const 자금칸 = x.inv == null ? "" : ` · 자금 <b style="color:${색(x.inv)}">${억원(x.inv)}</b>`;
+      읽기.innerHTML = `<b style="color:${색(x.total)}">${월일(x.date)} 현물 ${억원(x.total)}</b>${자금칸}  <span style="color:var(--textTer)">${쪼갬}</span>`;
       불.setAttribute("x", i * 칸폭); 불.setAttribute("opacity", i === n - 1 ? 0 : 0.06);
     };
     const 짚기 = e => {
