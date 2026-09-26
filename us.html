@@ -338,7 +338,8 @@
       2026년 9월 3주간 투자자 자금은 약 2.3조원 빠졌는데 현물은 3.5조원이 팔렸고, 차이의 대부분이 SK하이닉스였습니다.
       또 MSCI 정기변경 날에는 자금 변화 없이 현물만 크게 오갑니다.
       <br>
-      기준일은 펀드 보유내역 날짜(미국 날짜)라 한국 체결일과 하루 어긋날 수 있고, 주식 분할처럼 매매 없이 주식수가 바뀐 경우는 뺍니다.
+      날짜는 한국 거래일과 같습니다(2026년 추석: 한국 휴장 9/24 는 0, 전날 9/23 은 매매 있음). 한국 휴장일은 0 막대로 나옵니다.
+      주식 분할처럼 매매 없이 주식수가 바뀐 경우는 뺍니다.
       다른 운용사(뱅가드 등)와 액티브 펀드는 들어 있지 않아 시장 전체 숫자보다 작습니다.
     </div>
   </div>
@@ -857,7 +858,10 @@ async function 한국매매받기() {
       return;
     }
 
-    const t = d.today, 색 = v => v >= 0 ? UP : DOWN;
+    const t = d.today, 색 = v => v > 0 ? UP : v < 0 ? DOWN : "#8B94B0";   // 0 은 회색
+    // 세 펀드가 한 주도 안 움직인 날 — 한국 휴장이거나 설정·환매가 없던 날
+    const 쉼 = t.total === 0 && !t.buys.length && !t.sells.length &&
+               t.funds.every(f => f.missing || (!f.krw && !f.sharesChg));
     const 펀드줄 = t.funds.map(f => f.missing
       ? `<div class="krf-fund"><b>${f.symbol}</b><span class="krf-fn">${f.name}</span><span class="krf-fx" style="text-align:left;">자료 없음</span></div>`
       : `<div class="krf-fund"><b>${f.symbol}</b><span class="krf-fn">${f.name}</span>
@@ -870,7 +874,7 @@ async function 한국매매받기() {
       ? arr.slice(0, 5).map((x, i) => `<div class="krf-row"><span class="krf-rk">${i + 1}</span>
           <span class="krf-nm">${x.name}</span><span class="krf-q">${주수(x.qty)}</span>
           <span class="krf-v" style="color:${색(x.krw)}">${억원(x.krw)}</span></div>`).join("")
-      : `<div class="krf-row" style="color:var(--textTer);">없음</div>`;
+      : `<div class="krf-row" style="color:var(--textTer);">${쉼 ? "매매 없음" : "없음"}</div>`;
 
     // 막대그래프 — 라이브러리 없이 SVG 로 그립니다
     const n = 줄.length, 칸폭 = 10, 높이 = 150;
@@ -907,8 +911,11 @@ async function 한국매매받기() {
 
     몸.innerHTML = `
       <div class="krf-top">
-        <span class="krf-big" style="color:${색(t.total)}">${억원(t.total)}원</span>
-        <span class="krf-sub">${월일(t.date)} 미국 기준 · 세 펀드가 한국 현물을 사고판 금액</span>
+        ${쉼
+          ? `<span class="krf-big" style="color:var(--textTer)">0원</span>
+             <span class="krf-sub">${월일(t.date)} · 매매 없음 — 한국 휴장이거나 설정·환매가 없던 날</span>`
+          : `<span class="krf-big" style="color:${색(t.total)}">${억원(t.total)}원</span>
+             <span class="krf-sub">${월일(t.date)} · 세 펀드가 한국 현물을 사고판 금액</span>`}
       </div>
       <div class="krf-sums">${[["5", d.sum5], ["20", d.sum20]].filter(([, v]) => v && v.days).map(([n, v]) =>
         `<span><em>최근 ${v.days}일</em> 현물 <b style="color:${색(v.total)}">${억원(v.total)}</b>
