@@ -115,7 +115,12 @@
       표시가 없으면 이 종목에는 흔히 있는 일이라는 뜻입니다.<br><br>
       같은 1위라도 <b>늘 있는 일인지, 처음 있는 일인지</b>를 가려 보시라고 만든 화면입니다.
       종목명을 누르면 그 자리에서 캔들 차트와 수급오실레이터를 볼 수 있습니다.<br><br>
-      시가총액 500억 미만 종목은 뺐습니다. 작은 종목은 비율이 쉽게 튀기 때문입니다.
+      시가총액 <span id="minCap">1,000억</span> 미만 종목은 뺐습니다. 작은 종목은 비율이 쉽게 튀기 때문입니다.<br><br>
+      <b>투자자 구분</b> · <b>기관</b>은 아래 기관들을 모두 더한 것입니다.
+      <b>금융투자</b>는 증권사 자기매매(차익·헤지 물량이 많아 하루 단위로 크게 튑니다),
+      <b>투신</b>은 공모펀드·ETF 운용사, <b>연기금</b>은 국민연금 등 연금·공제회,
+      <b>사모펀드</b>는 사모 운용사입니다.
+      연기금·투신처럼 느리게 움직이는 돈이 자기 기록(★)을 세우면 특히 눈여겨볼 만합니다.
     </div>
   </div>
 </div>
@@ -226,6 +231,10 @@ function 그리기() {
   const 투자자들 = DATA.investors || Object.keys(DATA.data);
   if (!TAB || !DATA.data[TAB]) TAB = 투자자들[0];
   const 위 = DATA.topRank || 5;
+  // 투자자마다 견준 날수가 다를 수 있어 탭을 바꿀 때마다 윗줄 설명을 고칩니다
+  const 보기 = s => s && s.length === 8 ? `${s.slice(0, 4)}.${s.slice(4, 6)}.${s.slice(6, 8)}` : s;
+  const 날수 = (DATA.daysBy && DATA.daysBy[TAB]) || DATA.days;
+  document.getElementById("meta").textContent = `${보기(DATA.date)} 기준 · ${TAB} · 최근 ${날수}일과 견줌`;
 
   document.getElementById("tabs").innerHTML = 투자자들.map(누구 => {
     const a = DATA.data[누구] || [];
@@ -271,9 +280,7 @@ async function 받기() {
     const d = await r.json();
     if (d.error || !d.data) throw new Error("no data");
     DATA = d;
-    const 보기 = s => s && s.length === 8 ? `${s.slice(0, 4)}.${s.slice(4, 6)}.${s.slice(6, 8)}` : s;
-    document.getElementById("meta").textContent =
-      `${보기(DATA.date)} 기준 · 최근 ${DATA.days}일과 견줌`;
+    if (d.minCap) document.getElementById("minCap").textContent = d.minCap.toLocaleString("ko-KR") + "억";
   } catch (e) {
     DATA = null;
     document.getElementById("meta").textContent = "자료를 불러오지 못했습니다";
