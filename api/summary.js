@@ -223,7 +223,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model,
-        max_tokens: 지표냐 ? 400 : 900,
+        max_tokens: 지표냐 ? 1500 : 3000,   // 넉넉히 — 새 모델은 글을 쓰기 전에 생각에 토큰을 먼저 쓸 수 있어, 모자라면 빈 답이 옵니다
         system: 지표냐 ? 지표규칙 : 규칙,
         messages: [{ role: "user", content: 머리 + 본문 }],
       }),
@@ -233,9 +233,16 @@ export default async function handler(req, res) {
 
   try {
     let r, j;
-    for (const m of (쓰는모델 ? [쓰는모델] : 모델후보)) {
+    const 글뽑기 = j => (j.content || []).filter(x => x.type === "text").map(x => x.text).join("\n").trim();
+    let 빈이유 = null;
+    const 차례 = 쓰는모델 ? [쓰는모델, ...모델후보.filter(x => x !== 쓰는모델)] : 모델후보;
+    for (const m of 차례) {
       ({ r, j } = await 부르기(m));
-      if (r.ok) { 쓰는모델 = m; break; }
+      if (r.ok && 글뽑기(j)) { 쓰는모델 = m; break; }
+      if (r.ok) {                                   // 답은 왔는데 글이 없음 → 이유를 적고 다음 모델로
+        빈이유 = `${m}: stop=${j.stop_reason} · 블록=${(j.content || []).map(x => x.type).join(",") || "없음"}`;
+        continue;
+      }
       const 말 = String((j.error && j.error.message) || "");
       if (!/model/i.test(말) && r.status !== 404) break;   // 모델 이름 문제일 때만 다음 후보로
     }
@@ -245,8 +252,8 @@ export default async function handler(req, res) {
         tried: 쓰는모델 ? [쓰는모델] : 모델후보,
       });
     }
-    const text = (j.content || []).filter(x => x.type === "text").map(x => x.text).join("\n").trim();
-    if (!text) return res.status(502).json({ error: "빈 응답" });
+    const text = 글뽑기(j);
+    if (!text) return res.status(502).json({ error: "빈 응답" + (빈이유 ? ` (${빈이유})` : "") });
     const at = Date.now();
     캐시.set(열쇠, { text, at });
     if (캐시.size > 40) 캐시.delete(캐시.keys().next().value);
