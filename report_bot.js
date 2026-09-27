@@ -196,7 +196,8 @@ async function 처리(메시지, 채널, 재시도) {
     source: '텔레그램 · AI 요약', model: a._model,
   };
   const d = 읽기();
-  d.items = (d.items || []).filter(x => x.id !== 항목.id).concat(항목);
+  // 같은 파일을 다시 보내면 예전 요약을 새 것으로 바꿉니다 (한 줄만 남게)
+  d.items = (d.items || []).filter(x => x.id !== 항목.id && !(x.fileName && x.fileName === 항목.fileName)).concat(항목);
   쓰기(d);
   상태.done += 1;
   if (!채널) {
