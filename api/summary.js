@@ -6,8 +6,8 @@
 // 값을 새로 받아오지 않고 화면이 준 숫자만 쓰므로, 요약과 화면이 어긋나지 않습니다.
 // 계정마다 쓸 수 있는 모델 이름이 달라, 앞에서부터 되는 것을 씁니다.
 // 한 번 성공하면 그 이름을 기억해 다음부터는 바로 씁니다.
+// Sonnet 5 를 먼저 씁니다(2026-09-27). temperature 는 Sonnet 5 부터 받지 않아 뺐습니다 — 넣으면 400 으로 거절됩니다.
 const 모델후보 = [
-  "claude-opus-5-5",              // 계정에서 쓸 수 있는 것이 확인된 이름
   "claude-sonnet-5",
   "claude-sonnet-4-5",
   "claude-haiku-4-5-20251001",
@@ -224,7 +224,6 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model,
         max_tokens: 지표냐 ? 400 : 900,
-        temperature: 0.3,
         system: 지표냐 ? 지표규칙 : 규칙,
         messages: [{ role: "user", content: 머리 + 본문 }],
       }),
