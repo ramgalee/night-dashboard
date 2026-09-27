@@ -150,14 +150,14 @@ async function AI읽기(원본pdf) {
 const 숫자 = v => { const n = Number(String(v ?? '').replace(/[^\d.\-]/g, '')); return v == null || v === '' || !Number.isFinite(n) ? null : n; };
 
 // ── PDF 한 건 처리 ───────────────────────────────────
-async function 처리(메시지, 채널) {
+async function 처리(메시지, 채널, 재시도) {
   const 문서 = 메시지.document, chat = 메시지.chat;
   const 이름 = 문서.file_name || 'report.pdf';
   if (문서.file_size && 문서.file_size > 최대크기) {
     if (!채널) await 답장(chat.id, 메시지.message_id, `⚠ ${이름}: 20MB 가 넘어 봇이 받을 수 없습니다.`);
     return;
   }
-  if (!채널) await 답장(chat.id, 메시지.message_id, `📄 ${이름} 읽는 중… (30초~1분)`);
+  if (!채널 && !재시도) await 답장(chat.id, 메시지.message_id, `📄 ${이름} 읽는 중… (30초~1분)`);
   const pdf = await 파일받기(문서.file_id);
   const a = await AI읽기(pdf);
   const [code, market] = a.type === '종목' || !a.type ? await 코드찾기(a.name) : [null, null];
@@ -216,21 +216,56 @@ async function 처리(메시지, 채널) {
 // ── 받기 순서 (한 번에 하나씩) ───────────────────────
 const 줄 = [];
 let 처리중 = false;
+// 크레딧 부족·한도 초과·AI 혼잡처럼 '기다리면 풀리는' 실패는 따로 적어 두었다가
+// 30분마다 다시 시도합니다. 충전하면 밀린 PDF 가 저절로 요약됩니다(최대 3일, 20번).
+const 다시될오류 = /credit|balance|billing|limit|quota|overload|rate|529|503|502|500|timeout|ETIMEDOUT|ECONNRESET|fetch failed/i;
+function 밀린것저장(m, 채널, 오류) {
+  const d = 읽기(); d.retry = d.retry || [];
+  const id = `${m.chat.id}_${m.message_id}`, 기존 = d.retry.find(x => x.id === id);
+  if (기존) { 기존.tries += 1; 기존.error = 오류; 기존.at = new Date().toISOString(); }
+  else d.retry.push({ id, m, 채널, tries: 1, error: 오류, first: new Date().toISOString(), at: new Date().toISOString() });
+  d.retry = d.retry.filter(x => x.tries <= 20 && Date.now() - new Date(x.first).getTime() < 3 * 86400e3);
+  쓰기(d);
+}
+function 밀린것지우기(m) {
+  const d = 읽기(); const id = `${m.chat.id}_${m.message_id}`;
+  if ((d.retry || []).some(x => x.id === id)) { d.retry = d.retry.filter(x => x.id !== id); 쓰기(d); return true; }
+  return false;
+}
+
 async function 돌리기() {
   if (처리중) return;
   처리중 = true;
   while (줄.length) {
-    const [m, 채널] = 줄.shift();
+    const [m, 채널, 재시도] = 줄.shift();
     상태.queue = 줄.length;
-    try { await 처리(m, 채널); }
-    catch (e) {
-      상태.failed += 1; 상태.lastError = `${new Date().toISOString()} ${String(e.message || e)}`;
-      if (!채널) await 답장(m.chat.id, m.message_id, `⚠ 요약하지 못했습니다: ${String(e.message || e).slice(0, 200)}`);
+    try {
+      await 처리(m, 채널, 재시도);
+      if (밀린것지우기(m) && !채널) await 답장(m.chat.id, m.message_id, '↻ 밀려 있던 리포트를 다시 시도해 요약했습니다.');
+    } catch (e) {
+      const 오류 = String(e.message || e);
+      상태.failed += 1; 상태.lastError = `${new Date().toISOString()} ${오류}`;
+      if (다시될오류.test(오류)) {
+        밀린것저장(m, 채널, 오류);
+        if (!채널 && !재시도) await 답장(m.chat.id, m.message_id,
+          `⏸ 지금은 요약하지 못했습니다 (${오류.slice(0, 120)}).\n` +
+          `크레딧 충전·한도 문제라면 충전 후 30분 안에 저절로 다시 시도합니다. 바로 하려면 /retry 를 보내 주세요.`);
+      } else if (!채널) {
+        await 답장(m.chat.id, m.message_id, `⚠ 요약하지 못했습니다: ${오류.slice(0, 200)}`);
+      }
     }
     await 쉬기(1500);
   }
   처리중 = false;
 }
+
+function 밀린것다시() {
+  const d = 읽기();
+  for (const x of d.retry || []) if (!줄.some(([m]) => `${m.chat.id}_${m.message_id}` === x.id)) 줄.push([x.m, x.채널, true]);
+  돌리기();
+  return (d.retry || []).length;
+}
+setInterval(() => { try { 밀린것다시(); } catch (e) {} }, 30 * 60 * 1000);
 
 async function 듣기() {
   if (!환경('TELEGRAM_BOT_TOKEN')) { 상태.lastError = 'TELEGRAM_BOT_TOKEN 이 .env 에 없습니다'; return; }
@@ -252,6 +287,9 @@ async function 듣기() {
         if (문서 && /pdf$/i.test(문서.mime_type || 문서.file_name || '')) {
           if (허락) 줄.push([m, 채널]);
           else if (!채널) await 답장(m.chat.id, m.message_id, `이 대화방(${m.chat.id})은 아직 허락되지 않았습니다. 서버 .env 의 REPORT_CHAT_IDS 에 이 번호를 넣어 주세요.`);
+        } else if (!채널 && 허락 && m.text && /^\/retry/.test(m.text)) {
+          const n = 밀린것다시();
+          await 답장(m.chat.id, m.message_id, n ? `↻ 밀린 리포트 ${n}건을 다시 시도합니다.` : '밀린 리포트가 없습니다.');
         } else if (!채널 && m.text && /^\/(start|id)/.test(m.text)) {
           await 답장(m.chat.id, m.message_id, `이 대화방 번호: ${m.chat.id}\n${허락 ? '✅ 허락됨 — PDF 를 보내 주세요.' : '서버 .env 의 REPORT_CHAT_IDS 에 이 번호를 넣으면 PDF 요약을 시작합니다.'}`);
         }
@@ -275,7 +313,8 @@ module.exports = (app) => {
   });
   app.get('/report-bot/status', (req, res) => {
     const d = 읽기();
-    res.json({ ...상태, token: !!환경('TELEGRAM_BOT_TOKEN'), allowed: 환경('REPORT_CHAT_IDS') || '',
+    res.json({ ...상태, retry: (d.retry || []).map(x => ({ id: x.id, file: x.m.document && x.m.document.file_name, tries: x.tries, error: x.error })),
+               token: !!환경('TELEGRAM_BOT_TOKEN'), allowed: 환경('REPORT_CHAT_IDS') || '',
                anthropic: !!환경('ANTHROPIC_API_KEY'), stored: (d.items || []).length,
                last: (d.items || []).slice(-1)[0] || null });
   });
