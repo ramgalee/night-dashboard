@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>리포트 요약</title>
+<style>
+  :root {
+    --void:#F2F4F9; --surface:#FFFFFF; --surface2:#F0F2F8; --hair:#E1E5F0;
+    --textPri:#131A2C; --textSec:#5B6483; --textTer:#8B94B0;
+    --up:#E5484D; --down:#2F6FED; --signature:#6D4FE0;
+    --mono: ui-monospace,'SF Mono','Roboto Mono',Menlo,Consolas,monospace;
+    --sans: -apple-system,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--void); color:var(--textPri); font-family:var(--sans); margin:0; padding:24px 16px; }
+  .wrap { max-width:1180px; margin:0 auto; }
+  .between { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .card { background:var(--surface); border:1px solid var(--hair); border-radius:16px; padding:18px;
+          margin-bottom:16px; box-shadow:0 1px 3px rgba(19,26,44,.06); }
+  .eyebrow { font-size:11px; letter-spacing:2px; color:var(--textTer); font-family:var(--mono); }
+  h1 { font-size:22px; margin:2px 0 0; }
+  h2 { font-size:14px; margin:0; color:var(--textSec); font-weight:600; }
+  button, select, input { font-family:var(--sans); }
+  button { background:var(--surface2); border:1px solid var(--hair); color:var(--textSec);
+           padding:8px 14px; border-radius:10px; font-size:12px; cursor:pointer; white-space:nowrap; }
+  .between > div:last-child button { font-size:13px; font-weight:600; }
+  .meta { font-size:10.5px; color:var(--textTer); font-family:var(--mono); }
+  .up { color:var(--up); } .down { color:var(--down); }
+
+  /* 날짜 넘기기 */
+  .datebar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .datebar select { padding:7px 10px; border-radius:10px; border:1px solid var(--hair); background:#fff; font-size:13px; font-weight:600; }
+  .datebar button { padding:7px 11px; }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; }
+  .chip { padding:6px 11px; border-radius:999px; border:1px solid var(--hair); background:var(--surface2);
+          font-size:12px; color:var(--textSec); cursor:pointer; user-select:none; }
+  .chip b { font-family:var(--mono); margin-left:4px; }
+  .chip.on { background:var(--signature); border-color:var(--signature); color:#fff; }
+  .chip.c-up b { color:var(--up); } .chip.c-down b { color:var(--down); }
+  .chip.on b { color:#fff; }
+
+  /* 목표가·EPS 변화 네 칸 */
+  .grid4 { display:grid; grid-template-columns:repeat(4, 1fr); gap:14px; margin-top:12px; }
+  .grid4 > div { min-width:0; }
+  .chg-h { font-size:12.5px; font-weight:700; margin-bottom:6px; }
+  .chg-row { display:grid; grid-template-columns:1fr auto; gap:2px 8px; padding:7px 0; border-bottom:1px solid var(--surface2); font-size:12.5px; }
+  .chg-row:last-child { border-bottom:none; }
+  .chg-nm { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chg-pct { font-family:var(--mono); font-weight:700; text-align:right; }
+  .chg-sub { grid-column:1 / -1; font-size:11px; color:var(--textTer); font-family:var(--mono);
+             overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .empty { font-size:12.5px; color:var(--textTer); padding:12px 0; }
+
+  /* 거르기 */
+  .tools { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:4px 0 10px; }
+  .tools input { flex:1 1 220px; min-width:160px; padding:8px 12px; border:1px solid var(--hair); border-radius:10px; font-size:13px; }
+  .tools select { padding:8px 10px; border:1px solid var(--hair); border-radius:10px; background:#fff; font-size:13px; }
+  .tools label { font-size:12px; color:var(--textSec); display:flex; align-items:center; gap:5px; cursor:pointer; }
+  .tools label input { flex:none; min-width:0; width:15px; height:15px; accent-color:var(--signature); }
+
+  /* 리포트 줄 */
+  .rep { border-top:1px solid var(--hair); }
+  .row { position:relative; display:grid; grid-template-columns:170px 1fr 150px 90px 120px; gap:12px;
+         padding:11px 8px; border-bottom:1px solid var(--surface2); align-items:start; cursor:default; }
+  .row:hover { background:#FAFBFE; }
+  .r-name { font-weight:700; font-size:13.5px; }
+  .r-name .nm.link { cursor:pointer; } .r-name .nm.link:hover { color:var(--signature); text-decoration:underline; }
+  .r-code { display:block; font-family:var(--mono); font-size:10.5px; color:var(--textTer); font-weight:400; margin-top:2px; }
+  .badges { display:flex; gap:4px; flex-wrap:wrap; margin-top:5px; }
+  .bdg { font-family:var(--mono); font-size:10.5px; font-weight:700; border-radius:6px; padding:2px 6px; }
+  .bdg.u { background:#FDEBEC; color:#C0303A; } .bdg.d { background:#E8EFFD; color:#2458C9; }
+  .bdg.ai { background:#EEEAFB; color:#5B3FD0; font-size:10px; vertical-align:1px; }
+  .bdg.ind { background:#E7F6EF; color:#1D7A52; font-size:10px; vertical-align:1px; }
+  .kinds { display:flex; gap:0; margin-bottom:14px; border-bottom:1px solid var(--hair); }
+  .kinds button { background:transparent; border:none; border-bottom:2px solid transparent; border-radius:0;
+                  padding:9px 16px; font-size:14px; font-weight:600; color:var(--textTer); }
+  .kinds button b { font-family:var(--mono); font-size:12px; margin-left:5px; font-weight:600; }
+  .kinds button.on { color:var(--textPri); border-bottom-color:var(--signature); }
+  .sum .body { margin-top:8px; line-height:1.65; white-space:pre-line; }
+  .r-title { font-size:13.5px; line-height:1.5; }
+  .r-title .hint { font-size:10.5px; color:var(--textTer); margin-left:6px; white-space:nowrap; }
+  .r-broker { font-size:12.5px; } .r-broker small { display:block; color:var(--textTer); font-size:11px; margin-top:2px; }
+  .r-op { font-size:12px; font-weight:700; color:var(--textSec); }
+  .r-tp { font-family:var(--mono); font-size:13px; text-align:right; }
+  .r-tp small { display:block; font-size:10.5px; color:var(--textTer); }
+
+  /* 요약 — 마우스를 올리면 뜨고(PC), 누르면 펼쳐집니다(휴대폰) */
+  .sum { display:none; }
+  .sum ul { margin:0; padding-left:18px; } .sum li { margin:3px 0; line-height:1.55; }
+  .row.open .sum, .all-open .sum { display:block; grid-column:1 / -1; font-size:13px; color:var(--textSec);
+                                   background:var(--surface2); border-radius:10px; padding:10px 12px; }
+  @media (hover:hover) {
+    .all-open .row:hover .sum { position:static; box-shadow:none; }
+    .rep:not(.all-open) .row:not(.open):hover .sum {
+      display:block; position:absolute; z-index:20; left:180px; right:24px; top:calc(100% - 6px);
+      background:#fff; border:1px solid var(--hair); border-radius:12px; padding:12px 14px;
+      box-shadow:0 10px 30px rgba(19,26,44,.16); font-size:13px; color:var(--textSec); }
+  }
+  .note { font-size:11.5px; color:var(--textTer); line-height:1.75; }
+
+  /* 종목 차트 창 */
+  #modal { position:fixed; inset:0; background:rgba(19,26,44,.45); display:none; align-items:center; justify-content:center; padding:24px; z-index:50; }
+  #modal.on { display:flex; }
+  .modal-box { background:var(--surface); border-radius:16px; width:100%; max-width:960px; max-height:92vh; overflow:auto; padding:18px 20px; box-shadow:0 12px 40px rgba(19,26,44,.25); }
+  .modal-x { background:transparent; border:none; font-size:20px; line-height:1; color:var(--textTer); cursor:pointer; padding:2px 6px; }
+  #mChart { width:100%; height:320px; } #mOsc { width:100%; height:150px; }
+
+  @media (max-width:1000px) { .grid4 { grid-template-columns:1fr 1fr; } }
+  @media (max-width:760px) {
+    .row { grid-template-columns:1fr auto; gap:4px 10px; }
+    .r-name { order:1; } .r-tp { order:2; }
+    .r-title { grid-column:1 / -1; order:3; }
+    .r-broker { order:4; } .r-op { order:5; text-align:right; }
+    .row .sum { order:9; }
+    .r-title .hint { display:none; }
+  }
+  @media (max-width:640px) {
+    body { padding:16px 12px; } .card { padding:14px; }
+    .grid4 { grid-template-columns:1fr; }
+    #modal { padding:10px; } .modal-box { padding:14px; } #mChart { height:240px; } #mOsc { height:120px; }
+    button { min-height:34px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="between" style="margin-bottom:16px;">
+    <div>
+      <div class="eyebrow">REPORT SUMMARY</div>
+      <h1>리포트 요약</h1>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <span id="hgMenu" style="display:contents"></span><script src="/menu.js"></script>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="between">
+      <div class="datebar">
+        <button id="prev" title="이전 날">◀</button>
+        <select id="dateSel"></select>
+        <button id="next" title="다음 날">▶</button>
+      </div>
+      <span class="meta" id="meta">불러오는 중...</span>
+    </div>
+    <div class="grid4" id="changes"></div>
+  </div>
+
+  <div class="card">
+    <div class="kinds" id="kinds"></div>
+    <div class="between" style="margin-bottom:8px;">
+      <h2>리포트 <span class="meta" id="count"></span></h2>
+      <div class="chips" id="chips"></div>
+    </div>
+    <div class="tools">
+      <input id="q" type="search" placeholder="종목 · 증권사 · 제목 · 요약에서 찾기" />
+      <select id="broker"><option value="">증권사 전체</option></select>
+      <label><input type="checkbox" id="krOnly"> 국내 상장만</label>
+      <label><input type="checkbox" id="allOpen"> 요약 모두 펼치기</label>
+    </div>
+    <div class="rep" id="list"><div class="empty">불러오는 중...</div></div>
+  </div>
+
+  <div class="card">
+    <div class="note">
+      <b>제목에 마우스를 올리면 요약</b>이 뜹니다. 휴대폰에서는 줄을 누르면 펼쳐집니다.
+      종목명을 누르면 그 자리에서 캔들 차트와 수급오실레이터를 볼 수 있습니다(국내 상장 종목).<br>
+      <b>목표가 ▲▼</b>는 같은 증권사의 직전 목표가 대비, <b>EPS ▲▼</b>는 그 증권사가 올린 추정 EPS의 변화입니다.<br>
+      <b>종목 리포트 / 산업·시황 리포트</b> 탭으로 나눠 볼 수 있습니다. 텔레그램으로 올린 리포트는 AI가 종류를 가르고,
+      엑셀로 들어온 것은 종목코드가 있으면 종목, 이름이 업종명(반도체·조선·은행 등)이면 산업으로 봅니다.<br>
+      <span class="bdg ai">AI</span> 표시는 리포트 원문을 AI가 읽고 요약한 것입니다. 숫자는 원문으로 한 번 더 확인하세요.<br>
+      각 증권사 리포트를 요약·정리한 참고 자료이며, 특정 종목의 매매를 권하는 내용이 아닙니다.
+      원문과 세부 내용은 각 증권사 리포트를 확인하세요.
+    </div>
+  </div>
+</div>
+
+<div id="modal">
+  <div class="modal-box">
+    <div class="between" style="margin-bottom:10px;">
+      <div><div style="font-size:15px;font-weight:600;" id="mName">종목</div><div class="meta" id="mMeta"></div></div>
+      <button class="modal-x" id="mClose">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--textSec);margin-bottom:6px;">캔들 차트 <span style="color:var(--textTer)">빨간 실선은 수급오실레이터</span></div>
+    <div id="mChart"></div>
+    <div style="font-size:12px;color:var(--textSec);margin:12px 0 6px;">수급오실레이터</div>
+    <div id="mOsc"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<script>
+const UP = "#E5484D", DOWN = "#2F6FED";
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const 콤마 = v => v == null ? "" : Number(v).toLocaleString("ko-KR");
+const 날보기 = d => `${d.slice(0, 4)}.${d.slice(4, 6)}.${d.slice(6, 8)} (${"일월화수목금토"[new Date(+d.slice(0,4), +d.slice(4,6)-1, +d.slice(6,8)).getDay()]})`;
+const 퍼 = v => v == null ? "" : (v > 0 ? "▲" : v < 0 ? "▼" : "") + Math.abs(v).toFixed(1) + "%";
+
+let DATA = null, 날 = null, 거르기 = "all", 종류 = "all";
+
+// 종목 / 산업 가르기 — 봇(AI)은 type 을 알려 주고, 엑셀은 이름으로 짐작합니다
+const 업종말 = new Set(("반도체 메모리 디스플레이 2차전지 이차전지 배터리 자동차 자동차부품 조선 기계 방산 방위산업 항공 해운 운송 물류 " +
+  "건설 건자재 철강 비철금속 화학 정유 에너지 유틸리티 전력 원전 신재생 태양광 풍력 수소 은행 보험 증권 금융 지주 " +
+  "유통 음식료 화장품 의류 섬유 필수소비재 소비재 게임 엔터 엔터테인먼트 미디어 광고 통신 인터넷 플랫폼 소프트웨어 IT " +
+  "IT하드웨어 전기전자 전자부품 바이오 제약 헬스케어 의료기기 로봇 AI 우주 부동산 리츠 산업 업종 시황 전략 투자전략 " +
+  "매크로 경제 채권 퀀트 파생 ETF 스몰캡 중소형주").split(" "));
+function 종류of(x) {
+  if (x.type === "산업" || x.type === "시황" || x.type === "기타") return "산업";
+  if (x.type === "종목" || x.code) return "종목";
+  const n = String(x.name || "").replace(/\s/g, "");
+  return 업종말.has(n) || /(업종|산업|섹터|시황|전략)$/.test(n) ? "산업" : "종목";
+}
+
+// ── 목표가·EPS 변화 네 칸 ──
+function 변화칸() {
+  const D = DATA.days[날] || {};
+  const 칸 = [["tpUp", "목표주가 상향", "up"], ["tpDown", "목표주가 하향", "down"], ["epsUp", "EPS 상향", "up"], ["epsDown", "EPS 하향", "down"]];
+  document.getElementById("changes").innerHTML = 칸.map(([k, 이름, c]) => {
+    const a = (D[k] || []).slice().sort((x, y) => Math.abs(y.pct ?? 0) - Math.abs(x.pct ?? 0));
+    return `<div><div class="chg-h ${c}">${이름} <span class="meta">${a.length}건</span></div>` +
+      (a.length ? a.map(x => `<div class="chg-row">
+          <span class="chg-nm">${x.code ? `<span class="nm link" data-stk="${x.code}" data-nm="${esc(x.name)}">${esc(x.name)}</span>` : esc(x.name)}</span>
+          <span class="chg-pct ${c}">${x.pct == null ? "—" : 퍼(x.pct)}</span>
+          <span class="chg-sub" title="${esc(x.title)}">${x.ai ? `<span class="bdg ai">AI</span> ` : ""}${esc(x.broker)} · ${콤마(x.prev)} → ${콤마(x.now)}</span>
+        </div>`).join("") : `<div class="empty">없음</div>`) + `</div>`;
+  }).join("");
+}
+
+// ── 리포트 목록 ──
+function 목록() {
+  const D = DATA.days[날] || {}, 전부 = D.reports || [];
+  const q = document.getElementById("q").value.trim().toLowerCase();
+  const 증권사 = document.getElementById("broker").value;
+  const 국내만 = document.getElementById("krOnly").checked;
+  const 조건 = {
+    all: () => true,
+    tpUp: x => x.tpPct > 0, tpDown: x => x.tpPct < 0,
+    epsUp: x => x.epsPct > 0 || (x.epsNow != null && x.epsPrev != null && x.epsNow > x.epsPrev && x.epsPct == null),
+    epsDown: x => x.epsPct < 0 || (x.epsNow != null && x.epsPrev != null && x.epsNow < x.epsPrev && x.epsPct == null),
+  }[거르기];
+  // 종목 / 산업 탭 (개수는 날 전체 기준)
+  const 종류수 = { all: 전부.length, 종목: 전부.filter(x => 종류of(x) === "종목").length, 산업: 전부.filter(x => 종류of(x) === "산업").length };
+  document.getElementById("kinds").innerHTML = [["all", "전체"], ["종목", "종목 리포트"], ["산업", "산업·시황 리포트"]].map(([k, n]) =>
+    `<button data-k="${k}" class="${종류 === k ? "on" : ""}">${n}<b>${종류수[k]}</b></button>`).join("");
+  document.querySelectorAll("[data-k]").forEach(el => el.onclick = () => { 종류 = el.dataset.k; 목록(); });
+  const 이종류 = x => 종류 === "all" || 종류of(x) === 종류;
+
+  const 줄 = 전부.filter(x => 이종류(x) && 조건(x) && (!증권사 || x.broker === 증권사) && (!국내만 || x.code) &&
+    (!q || [x.name, x.broker, x.author, x.title, x.body, ...(x.summary || [])].join(" ").toLowerCase().includes(q)));
+
+  // 칩 — 개수는 날 전체 기준
+  const 셈 = k => 전부.filter(이종류).filter({ all: () => true, tpUp: x => x.tpPct > 0, tpDown: x => x.tpPct < 0,
+    epsUp: x => x.epsNow > x.epsPrev, epsDown: x => x.epsNow < x.epsPrev }[k]).length;
+  document.getElementById("chips").innerHTML = [["all", "전체", ""], ["tpUp", "목표가 ▲", "c-up"], ["tpDown", "목표가 ▼", "c-down"],
+    ["epsUp", "EPS ▲", "c-up"], ["epsDown", "EPS ▼", "c-down"]].map(([k, n, c]) =>
+    `<span class="chip ${c} ${거르기 === k ? "on" : ""}" data-f="${k}">${n}<b>${셈(k)}</b></span>`).join("");
+  document.querySelectorAll("[data-f]").forEach(el => el.onclick = () => { 거르기 = el.dataset.f; 목록(); });
+  document.getElementById("count").textContent = `${줄.length} / ${전부.filter(이종류).length}건`;
+
+  const 틀 = document.getElementById("list");
+  틀.classList.toggle("all-open", document.getElementById("allOpen").checked);
+  if (!줄.length) { 틀.innerHTML = `<div class="empty">해당하는 리포트가 없습니다.</div>`; return; }
+  틀.innerHTML = 줄.map(x => {
+    const 배지 = [];
+    if (x.tpPct != null) 배지.push(`<span class="bdg ${x.tpPct > 0 ? "u" : "d"}">목표가 ${퍼(x.tpPct)}</span>`);
+    if (x.epsNow != null && x.epsPrev != null && x.epsNow !== x.epsPrev)
+      배지.push(`<span class="bdg ${x.epsNow > x.epsPrev ? "u" : "d"}">EPS ${x.epsPct != null ? 퍼(x.epsPct) : x.epsNow > x.epsPrev ? "▲" : "▼"}</span>`);
+    const 목표 = x.target != null
+      ? `${콤마(x.target)}${x.tpPrev != null && x.tpPrev !== x.target ? `<small>이전 ${콤마(x.tpPrev)}</small>` : ""}` : `<span style="color:var(--textTer)">—</span>`;
+    const 요약 = (x.summary || []).length || x.body
+      ? `<div class="sum">${(x.summary || []).length ? `<ul>${x.summary.map(s => `<li>${esc(s)}</li>`).join("")}</ul>` : ""}` +
+        (x.body ? `<div class="body">${esc(x.body)}</div>` : "") +
+        (x.epsPrev != null ? `<div class="meta" style="margin-top:6px;">EPS${x.epsYear ? `(${x.epsYear})` : ""} ${콤마(x.epsPrev)} → ${콤마(x.epsNow)}${x.epsFrom && x.epsFrom !== "리포트" ? ` · ${esc(x.epsFrom)} 대비` : ""}</div>` : "") +
+        (x.tpPrevFrom && x.tpPrevFrom !== "리포트" ? `<div class="meta">목표가 이전 값: ${esc(x.tpPrevFrom)}</div>` : "") +
+        (x.src === "tg" || x.ai ? `<div class="meta" style="margin-top:6px;">AI 요약${x.fileName ? " · " + esc(x.fileName) : ""} — 숫자는 원문으로 확인하세요</div>` : "") + `</div>`
+      : "";
+    const 시장 = x.market === "KOSPI" ? "코스피" : x.market === "KOSDAQ" ? "코스닥" : "";
+    return `<div class="row">
+      <div class="r-name">${x.code ? `<span class="nm link" data-stk="${x.code}" data-nm="${esc(x.name)}">${esc(x.name)}</span>` : esc(x.name)}
+        <span class="r-code">${x.code ? `${x.code} · ${시장}` : 종류of(x) === "산업" ? (x.type === "시황" ? "시황 리포트" : "산업 리포트") : "해외·비상장"}</span>
+        ${배지.length ? `<div class="badges">${배지.join("")}</div>` : ""}</div>
+      <div class="r-title">${종류of(x) === "산업" ? `<span class="bdg ind">${x.type === "시황" ? "시황" : "산업"}</span> ` : ""}${x.src === "tg" ? `<span class="bdg ai">AI</span> ` : ""}${esc(x.title || x.fileName || "")}${요약 ? `<span class="hint">${x.body ? "요약 · 본문" : `요약 ${x.summary.length}줄`}</span>` : ""}</div>
+      <div class="r-broker">${esc(x.broker)}<small>${esc(x.author)}</small></div>
+      <div class="r-op">${esc(x.opinion || "")}</div>
+      <div class="r-tp">${목표}</div>
+      ${요약}
+    </div>`;
+  }).join("");
+}
+
+// 휴대폰 — 줄을 누르면 요약 펼치기 (종목명 누르면 차트)
+document.getElementById("list").addEventListener("click", e => {
+  if (e.target.closest("[data-stk]")) return;
+  const r = e.target.closest(".row"); if (r) r.classList.toggle("open");
+});
+document.addEventListener("click", e => {
+  const s = e.target.closest("[data-stk]"); if (s) openStock(s.dataset.stk, s.dataset.nm);
+});
+
+function 그리기() {
+  if (!DATA) return;
+  const i = DATA.dates.indexOf(날);
+  document.getElementById("dateSel").value = 날;
+  document.getElementById("prev").disabled = i <= 0;
+  document.getElementById("next").disabled = i >= DATA.dates.length - 1;
+  // 증권사 목록
+  const D = DATA.days[날] || {};
+  const 목록들 = [...new Set((D.reports || []).map(x => x.broker).filter(Boolean))].sort();
+  const sel = document.getElementById("broker"), 전 = sel.value;
+  sel.innerHTML = `<option value="">증권사 전체</option>` + 목록들.map(b => `<option>${esc(b)}</option>`).join("");
+  sel.value = 목록들.includes(전) ? 전 : "";
+  const n = (D.reports || []).length;
+  document.getElementById("meta").textContent = `${날보기(날)} · 리포트 ${n}건 · ${DATA.dates.length}일치 보관`;
+  변화칸(); 목록();
+}
+
+// 텔레그램 봇이 AI 로 요약한 리포트를 날짜별로 끼워 넣습니다.
+// 엑셀(FnGuide)에 같은 종목·증권사 리포트가 있으면 새로 만들지 않고 본문 요약만 붙입니다.
+function 봇합치기(items) {
+  const 빈날 = () => ({ reports: [], tpUp: [], tpDown: [], epsUp: [], epsDown: [] });
+  const 같은가 = (a, b) => a.name && b.name && a.name.replace(/\s/g, "") === b.name.replace(/\s/g, "") &&
+                           (a.broker || "").replace(/증권|투자|\s/g, "") === (b.broker || "").replace(/증권|투자|\s/g, "");
+  for (const x of items || []) {
+    if (!x.date) continue;
+    const D = DATA.days[x.date] = DATA.days[x.date] || 빈날();
+    const 짝 = D.reports.find(y => 같은가(x, y));
+    if (짝) {                                   // 엑셀이 우선 — 빈 칸만 봇 값으로 채움
+      if (x.body && !짝.body) 짝.body = x.body;
+      for (const k of ["tpPrev", "tpPct", "epsPrev", "epsNow", "epsPct", "epsYear"]) if (짝[k] == null && x[k] != null) 짝[k] = x[k];
+      짝.ai = true;
+    } else D.reports.unshift({ ...x, src: "tg" });
+    const 넣기 = (칸, prev, now, pct) => { if (!칸.some(y => 같은가(x, y)))
+      칸.push({ name: x.name, code: x.code, broker: x.broker, title: x.title, prev, now, pct, ai: true }); };
+    if (x.tpPct != null && x.tpPct !== 0) 넣기(x.tpPct > 0 ? D.tpUp : D.tpDown, x.tpPrev, x.target, x.tpPct);
+    if (x.epsPrev != null && x.epsNow != null && x.epsPrev !== x.epsNow)
+      넣기(x.epsNow > x.epsPrev ? D.epsUp : D.epsDown, x.epsPrev, x.epsNow, x.epsPct);
+  }
+  DATA.dates = Object.keys(DATA.days).sort().slice(-60);
+  DATA.last = DATA.dates[DATA.dates.length - 1];
+}
+
+async function 받기() {
+  try {
+    const [엑셀, 봇] = await Promise.all([
+      fetch("/reports.json", { cache: "no-store" }).then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch("/api/report-bot", { cache: "no-store" }).then(r => r.ok ? r.json() : null).catch(() => null),
+    ]);
+    DATA = 엑셀 && 엑셀.days ? 엑셀 : { days: {}, dates: [] };
+    봇합치기(봇 && 봇.items);
+    if (!DATA.dates || !DATA.dates.length) throw new Error("no data");
+    const 주소날 = new URLSearchParams(location.search).get("d");
+    날 = DATA.dates.includes(주소날) ? 주소날 : DATA.last || DATA.dates[DATA.dates.length - 1];
+    document.getElementById("dateSel").innerHTML = DATA.dates.slice().reverse().map(d => `<option value="${d}">${날보기(d)}</option>`).join("");
+    그리기();
+  } catch (e) {
+    document.getElementById("meta").textContent = "자료를 불러오지 못했습니다";
+    document.getElementById("list").innerHTML = `<div class="empty">reports.json 이 아직 없습니다. 주피터 칸 38 로 만들어 올려 주세요.</div>`;
+  }
+}
+const 옮기기 = k => { const i = DATA.dates.indexOf(날) + k; if (i >= 0 && i < DATA.dates.length) { 날 = DATA.dates[i]; 그리기(); } };
+document.getElementById("prev").onclick = () => 옮기기(-1);
+document.getElementById("next").onclick = () => 옮기기(1);
+document.getElementById("dateSel").onchange = e => { 날 = e.target.value; 그리기(); };
+["q", "broker", "krOnly", "allOpen"].forEach(id => document.getElementById(id).addEventListener("input", 목록));
+
+// ── 종목 차트 창 (순매수 순위 페이지와 같음) ──
+let mChart = null, mOsc = null, mCandle = null, mOscBars = null, mOverlay = null;
+function initModal() {
+  if (mChart || typeof LightweightCharts === "undefined") return;
+  const base = { layout: { background: { color: "#FFFFFF" }, textColor: "#5B6483" },
+    grid: { vertLines: { color: "#E1E5F0" }, horzLines: { color: "#E1E5F0" } },
+    timeScale: { borderColor: "#E1E5F0" }, rightPriceScale: { borderColor: "#E1E5F0" } };
+  mChart = LightweightCharts.createChart(document.getElementById("mChart"), base);
+  mCandle = mChart.addCandlestickSeries({ upColor: UP, downColor: DOWN, borderUpColor: UP, borderDownColor: DOWN, wickUpColor: UP, wickDownColor: DOWN });
+  mOverlay = mChart.addLineSeries({ color: UP, lineWidth: 2, priceScaleId: "osc-overlay", priceLineVisible: false, lastValueVisible: false });
+  mChart.priceScale("osc-overlay").applyOptions({ scaleMargins: { top: 0.1, bottom: 0.1 }, visible: false });
+  mOsc = LightweightCharts.createChart(document.getElementById("mOsc"), base);
+  mOscBars = mOsc.addHistogramSeries({ color: "#6D4FE0" });
+  mChart.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) mOsc.timeScale().setVisibleLogicalRange(r); });
+  mOsc.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) mChart.timeScale().setVisibleLogicalRange(r); });
+}
+async function openStock(code, name) {
+  document.getElementById("modal").classList.add("on");
+  document.getElementById("mName").textContent = `${name} (${code})`;
+  document.getElementById("mMeta").textContent = "불러오는 중...";
+  initModal();
+  if (!mChart) { document.getElementById("mMeta").textContent = "차트를 불러오지 못했습니다."; return; }
+  try {
+    const d = await (await fetch(`/api/flow-oscillator?code=${code}`, { cache: "no-store" })).json();
+    const s = d.series || []; if (!s.length) throw new Error();
+    const fd = x => x.slice(0, 4) + "-" + x.slice(4, 6) + "-" + x.slice(6, 8);
+    mCandle.setData(s.map(x => ({ time: fd(x.date), open: x.open, high: x.high, low: x.low, close: x.close })));
+    mOverlay.setData(s.map(x => ({ time: fd(x.date), value: x.oscillator })));
+    mOscBars.setData(s.map(x => ({ time: fd(x.date), value: x.oscillator, color: x.oscillator >= 0 ? UP : DOWN })));
+    requestAnimationFrame(() => { const range = { from: Math.max(0, s.length - 120), to: s.length + 2 };
+      mChart.timeScale().setVisibleLogicalRange(range); mOsc.timeScale().setVisibleLogicalRange(range); });
+    document.getElementById("mMeta").textContent = `${s.length}거래일 · 최근 6개월`;
+  } catch (e) { document.getElementById("mMeta").textContent = "데이터를 불러오지 못했습니다."; }
+}
+const 닫기 = () => document.getElementById("modal").classList.remove("on");
+document.getElementById("mClose").onclick = 닫기;
+document.getElementById("modal").addEventListener("click", e => { if (e.target.id === "modal") 닫기(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") 닫기(); });
+
+받기();
+</script>
+</body>
+</html>
