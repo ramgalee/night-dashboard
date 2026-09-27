@@ -133,6 +133,7 @@ async function AI읽기(원본pdf) {
     const j = await r.json();
     if (!r.ok) {
       마지막오류 = (j.error && j.error.message) || String(r.status);
+      상태.modelNote = `${new Date().toISOString()} ${model} → ${r.status} ${마지막오류}`.slice(0, 400);   // 왜 다음 모델로 넘어갔나
       if (/model/i.test(마지막오류) || r.status === 404) continue;     // 없는 모델이면 다음 후보
       throw new Error(마지막오류);
     }
