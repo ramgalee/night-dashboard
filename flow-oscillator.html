@@ -425,25 +425,46 @@ function paintPick() {
     samo: "마감 확정 · 시총대비 순매수 순",
     rs: "상대강도 상위 · 오른쪽은 3개월 수익률" + (RS_DATE ? " · " + RS_DATE : ""),
   };
-  document.getElementById("pickMeta").textContent = (notes[PICK_SRC] || "") + extra;
+  const 때 = (PICK_SRC === "up" || PICK_SRC === "prog" || PICK_SRC === "orgn") && PICK_AT ? " · " + PICK_AT + " 갱신" : "";
+  document.getElementById("pickMeta").textContent = (notes[PICK_SRC] || "") + extra + 때;
 }
 
 // ETF·상장지수·스팩·리츠는 종목 고르는 목록에서 뺍니다.
 const ETF꼴 = /(^|\s)(KODEX|TIGER|PLUS|ACE|SOL|RISE|HANARO|KOSEF|ARIRANG|TIMEFOLIO|KIWOOM|SMART|FOCUS|BNK|WOORI|마이다스|히어로즈|파워|TREX|UNICORN|VITA|이지스|하이|마이티)\s|(레버리지|인버스|선물\s?ETN|\bETN\b|스팩|리츠)/i;
 const ETF빼기 = a => (a || []).filter(x => !ETF꼴.test(x.name || ""));
 
-async function loadPicks() {
+// 장중 목록(등락률·프로그램·기관)만 다시 받습니다. 못 받으면 먼저 받은 목록을 그대로 둡니다.
+let PICK_AT = "";
+async function loadLivePicks() {
   // 1) 거래대금 상위 150 중 등락률 상위 50 (하락장이면 덜 빠진 순)
   try {
     const d = await (await fetch("/api/trade-rank", { cache: "no-store" })).json();
-    PICK.up = ETF빼기((d.up50 || []).map(r => ({ code: r.code, name: r.name, market: r.market, value: r.changePct })));
-  } catch (e) { PICK.up = []; }
+    const a = ETF빼기((d.up50 || []).map(r => ({ code: r.code, name: r.name, market: r.market, value: r.changePct })));
+    if (a.length || !PICK.up) PICK.up = a;
+  } catch (e) { PICK.up = PICK.up || []; }
 
   // 2) 장중 · 시총대비 프로그램 순매수 상위 50
   try {
     const p = await (await fetch("/api/program-flow", { cache: "no-store" })).json();
-    PICK.prog = ETF빼기((p.buy || []).map(r => ({ code: r.code, name: r.name, market: r.market, value: r.ratio })));
-  } catch (e) { PICK.prog = []; }
+    const a = ETF빼기((p.buy || []).map(r => ({ code: r.code, name: r.name, market: r.market, value: r.ratio })));
+    if (a.length || !PICK.prog) PICK.prog = a;
+  } catch (e) { PICK.prog = PICK.prog || []; }
+
+  // 3) 장중 잠정 · 기관합계 시총대비 순매수
+  try {
+    const g = await (await fetch("/api/supply-ratio", { cache: "no-store" })).json();
+    const side = (g.data && g.data["기관합계"]) || {};
+    const a = ETF빼기((side.buy || [])
+      .map(r => ({ code: r.code, name: r.name, market: r.market, value: r.ratio }))).slice(0, 30);
+    if (a.length || !PICK.orgn) PICK.orgn = a;
+  } catch (e) { PICK.orgn = PICK.orgn || []; }
+
+  const t = new Date(Date.now() + 9 * 3600e3);
+  PICK_AT = String(t.getUTCHours()).padStart(2, "0") + ":" + String(t.getUTCMinutes()).padStart(2, "0");
+}
+
+async function loadPicks() {
+  await loadLivePicks();
 
   // 0) RS (하루 한 번 갱신되는 파일)
   try {
@@ -461,14 +482,6 @@ async function loadPicks() {
     RS_ALL = list.sort((a, b) => b.value - a.value || b.m3 - a.m3);
     PICK.rs = applyRsFilter();
   } catch (e) { PICK.rs = []; }
-
-  // 3) 장중 잠정 · 기관합계 시총대비 순매수
-  try {
-    const g = await (await fetch("/api/supply-ratio", { cache: "no-store" })).json();
-    const side = (g.data && g.data["기관합계"]) || {};
-    PICK.orgn = ETF빼기((side.buy || [])
-      .map(r => ({ code: r.code, name: r.name, market: r.market, value: r.ratio }))).slice(0, 30);
-  } catch (e) { PICK.orgn = []; }
 
   // 4) 마감 확정 · 사모펀드 시총대비 순매수 상위 20
   try {
@@ -489,6 +502,23 @@ document.getElementById("pickTabs").addEventListener("click", (e) => {
 });
 
 loadPicks();
+
+// ── 장중에는 목록을 1분마다 새로 받습니다 ──────────────
+//  예전에는 페이지를 열 때 한 번만 받아서, 새로고침하기 전까지 목록이 그대로였습니다.
+//  평일 08:00~20:00(프리·정규·애프터), 이 탭을 보고 있을 때만. 차트와 고른 종목은 그대로 둡니다.
+function 장시간() {
+  const t = new Date(Date.now() + 9 * 3600e3), 요일 = t.getUTCDay(), 분 = t.getUTCHours() * 60 + t.getUTCMinutes();
+  return 요일 >= 1 && 요일 <= 5 && 분 >= 8 * 60 && 분 < 20 * 60;
+}
+async function 목록새로() {
+  if (document.hidden || !장시간()) return;
+  const el = document.getElementById("pickList"), 위치 = el ? el.scrollTop : 0;
+  await loadLivePicks();
+  paintPick();
+  if (el) el.scrollTop = 위치;
+}
+setInterval(목록새로, 60000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) 목록새로(); });
 
 document.getElementById('fitBtn').addEventListener('click', () => {
   chart.timeScale().fitContent();
