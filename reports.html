@@ -223,7 +223,7 @@ function 변화칸() {
       (a.length ? a.map(x => `<div class="chg-row">
           <span class="chg-nm">${x.code ? `<span class="nm link" data-stk="${x.code}" data-nm="${esc(x.name)}">${esc(x.name)}</span>` : esc(x.name)}</span>
           <span class="chg-pct ${c}">${x.pct == null ? "—" : 퍼(x.pct)}</span>
-          <span class="chg-sub" title="${esc(x.title)}">${esc(x.broker)} · ${콤마(x.prev)} → ${콤마(x.now)}</span>
+          <span class="chg-sub" title="${esc(x.title)}">${x.ai ? `<span class="bdg ai">AI</span> ` : ""}${esc(x.broker)} · ${콤마(x.prev)} → ${콤마(x.now)}</span>
         </div>`).join("") : `<div class="empty">없음</div>`) + `</div>`;
   }).join("");
 }
@@ -272,7 +272,8 @@ function 목록() {
     const 요약 = (x.summary || []).length || x.body
       ? `<div class="sum">${(x.summary || []).length ? `<ul>${x.summary.map(s => `<li>${esc(s)}</li>`).join("")}</ul>` : ""}` +
         (x.body ? `<div class="body">${esc(x.body)}</div>` : "") +
-        (x.epsPrev != null ? `<div class="meta" style="margin-top:6px;">EPS ${콤마(x.epsPrev)} → ${콤마(x.epsNow)}</div>` : "") +
+        (x.epsPrev != null ? `<div class="meta" style="margin-top:6px;">EPS${x.epsYear ? `(${x.epsYear})` : ""} ${콤마(x.epsPrev)} → ${콤마(x.epsNow)}${x.epsFrom && x.epsFrom !== "리포트" ? ` · ${esc(x.epsFrom)} 대비` : ""}</div>` : "") +
+        (x.tpPrevFrom && x.tpPrevFrom !== "리포트" ? `<div class="meta">목표가 이전 값: ${esc(x.tpPrevFrom)}</div>` : "") +
         (x.src === "tg" || x.ai ? `<div class="meta" style="margin-top:6px;">AI 요약${x.fileName ? " · " + esc(x.fileName) : ""} — 숫자는 원문으로 확인하세요</div>` : "") + `</div>`
       : "";
     const 시장 = x.market === "KOSPI" ? "코스피" : x.market === "KOSDAQ" ? "코스닥" : "";
@@ -325,12 +326,16 @@ function 봇합치기(items) {
     if (!x.date) continue;
     const D = DATA.days[x.date] = DATA.days[x.date] || 빈날();
     const 짝 = D.reports.find(y => 같은가(x, y));
-    if (짝) { if (x.body && !짝.body) 짝.body = x.body; 짝.ai = true; continue; }
-    D.reports.unshift({ ...x, src: "tg" });
-    if (x.tpPct != null && x.tpPct !== 0) {
-      const 칸 = x.tpPct > 0 ? D.tpUp : D.tpDown;
-      if (!칸.some(y => 같은가(x, y))) 칸.push({ name: x.name, code: x.code, broker: x.broker, title: x.title, prev: x.tpPrev, now: x.target, pct: x.tpPct });
-    }
+    if (짝) {                                   // 엑셀이 우선 — 빈 칸만 봇 값으로 채움
+      if (x.body && !짝.body) 짝.body = x.body;
+      for (const k of ["tpPrev", "tpPct", "epsPrev", "epsNow", "epsPct", "epsYear"]) if (짝[k] == null && x[k] != null) 짝[k] = x[k];
+      짝.ai = true;
+    } else D.reports.unshift({ ...x, src: "tg" });
+    const 넣기 = (칸, prev, now, pct) => { if (!칸.some(y => 같은가(x, y)))
+      칸.push({ name: x.name, code: x.code, broker: x.broker, title: x.title, prev, now, pct, ai: true }); };
+    if (x.tpPct != null && x.tpPct !== 0) 넣기(x.tpPct > 0 ? D.tpUp : D.tpDown, x.tpPrev, x.target, x.tpPct);
+    if (x.epsPrev != null && x.epsNow != null && x.epsPrev !== x.epsNow)
+      넣기(x.epsNow > x.epsPrev ? D.epsUp : D.epsDown, x.epsPrev, x.epsNow, x.epsPct);
   }
   DATA.dates = Object.keys(DATA.days).sort().slice(-60);
   DATA.last = DATA.dates[DATA.dates.length - 1];

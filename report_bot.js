@@ -21,6 +21,9 @@ const 저장파일 = '/root/app/report_bot.json';
 const 보관수 = 600;
 const 모델후보 = ['claude-sonnet-5', 'claude-sonnet-4-5', 'claude-haiku-4-5-20251001'];
 const 최대크기 = 20 * 1024 * 1024;      // 텔레그램 봇이 받을 수 있는 한도
+// 앞쪽 몇 쪽만 AI 에 보냅니다 — 요약·목표가·추정치 변경 표는 대개 앞 3~6쪽에 있고, 비용은 쪽수에 비례합니다.
+// (서버에 pdf-lib 이 있을 때만 잘라 보냅니다. 없으면 통째로 보냅니다: cd /root/app && npm install pdf-lib)
+const 최대쪽 = () => Number(환경('REPORT_MAX_PAGES') || 6);
 
 function 환경(이름) {
   if (process.env[이름]) return process.env[이름];
@@ -88,12 +91,30 @@ const 지시 = `당신은 증권사 리포트를 정리하는 애널리스트 �
  "title": 리포트 제목,
  "opinion": 투자의견 (예: BUY, 매수, HOLD, 없으면 null),
  "target": 목표주가 숫자(원, 없으면 null), "targetPrev": 이전 목표주가 숫자(명시된 경우만, 없으면 null),
+ "epsYear": 아래 EPS 의 기준 연도 (예: 2026). 올해 연간 추정치를 우선, 올해가 없으면 내년,
+ "epsPrev": '실적 추정치 변경'·'추정 변경' 표의 변경 전 EPS (원, 숫자). 표가 없으면 null,
+ "epsNow":  같은 표의 변경 후 EPS. 표가 없으면 리포트의 해당 연도 EPS 추정치, 그것도 없으면 null,
  "summary": [핵심 3줄. 각 줄 60자 안팎, 숫자 근거 포함],
  "body": 본문 요약 5~8문장. 실적 전망·투자 포인트·리스크를 리포트에 적힌 내용만으로
 }
-규칙: 리포트에 없는 내용·숫자는 지어내지 마세요. 확실하지 않은 칸은 null. 한국어로.`;
+규칙: 리포트에 없는 내용·숫자는 지어내지 마세요. 확실하지 않은 칸은 null. EPS 는 지배주주 EPS 를 우선. 한국어로.`;
 
-async function AI읽기(pdf) {
+async function 앞쪽만(pdf) {
+  let lib;
+  try { lib = require('pdf-lib'); } catch (e) { return { pdf, pages: null, cut: false }; }
+  try {
+    const 원본 = await lib.PDFDocument.load(pdf, { ignoreEncryption: true });
+    const 전체 = 원본.getPageCount(), n = Math.min(전체, 최대쪽());
+    if (n >= 전체) return { pdf, pages: 전체, cut: false };
+    const 새 = await lib.PDFDocument.create();
+    const 쪽들 = await 새.copyPages(원본, [...Array(n).keys()]);
+    쪽들.forEach(p => 새.addPage(p));
+    return { pdf: Buffer.from(await 새.save()), pages: 전체, cut: n };
+  } catch (e) { return { pdf, pages: null, cut: false }; }
+}
+
+async function AI읽기(원본pdf) {
+  const { pdf, pages, cut } = await 앞쪽만(원본pdf);
   const 키 = 환경('ANTHROPIC_API_KEY');
   if (!키) throw new Error('ANTHROPIC_API_KEY 가 없습니다');
   let 마지막오류 = null;
@@ -119,7 +140,7 @@ async function AI읽기(pdf) {
     const m = 글.match(/\{[\s\S]*\}/);
     if (!m) throw new Error('AI 답이 JSON 이 아닙니다');
     const 결과 = JSON.parse(m[0]);
-    결과._model = model;
+    결과._model = model; 결과._pages = pages; 결과._cut = cut;
     결과._tokens = j.usage ? (j.usage.input_tokens || 0) + (j.usage.output_tokens || 0) : null;
     return 결과;
   }
@@ -140,7 +161,23 @@ async function 처리(메시지, 채널) {
   const pdf = await 파일받기(문서.file_id);
   const a = await AI읽기(pdf);
   const [code, market] = a.type === '종목' || !a.type ? await 코드찾기(a.name) : [null, null];
-  const 목표 = 숫자(a.target), 이전 = 숫자(a.targetPrev);
+  const 목표 = 숫자(a.target);
+  let 이전 = 숫자(a.targetPrev), 이전출처 = 이전 != null ? '리포트' : null;
+  const epsYear = 숫자(a.epsYear), epsNow = 숫자(a.epsNow);
+  let epsPrev = 숫자(a.epsPrev), eps출처 = epsPrev != null ? '리포트' : null;
+
+  // 리포트에 이전 값이 없으면 — 같은 증권사의 그 종목 직전 리포트(봇이 전에 받은 것)와 견줍니다
+  const 같은증권사 = (x, y) => String(x || '').replace(/증권|투자|\s/g, '') === String(y || '').replace(/증권|투자|\s/g, '');
+  const 전것들 = (읽기().items || []).filter(x =>
+    x.id !== `${chat.id}_${메시지.message_id}` && 같은증권사(x.broker, a.broker) &&
+    ((code && x.code === code) || (!code && x.name && a.name && x.name.replace(/\s/g, '') === String(a.name).replace(/\s/g, ''))));
+  const 직전 = 전것들.sort((x, y) => (x.date + x.postedAt < y.date + y.postedAt ? 1 : -1))[0];
+  if (이전 == null && 목표 != null && 직전 && 직전.target != null && 직전.target !== 목표) { 이전 = 직전.target; 이전출처 = '직전 리포트 ' + 직전.date; }
+  if (epsPrev == null && epsNow != null && 직전 && 직전.epsNow != null && 직전.epsYear === epsYear && 직전.epsNow !== epsNow) {
+    epsPrev = 직전.epsNow; eps출처 = '직전 리포트 ' + 직전.date;
+  }
+  const 비율 = (지금, 전) => 지금 != null && 전 ? Math.round((지금 / 전 - 1) * 1000) / 10 : null;
+
   const 항목 = {
     id: `${chat.id}_${메시지.message_id}`,
     date: /^\d{8}$/.test(String(a.date || '')) ? String(a.date) : 한국날(메시지.date),
@@ -148,8 +185,11 @@ async function 처리(메시지, 채널) {
     fileName: 이름, type: a.type || null,
     name: a.name || null, code, market,
     broker: a.broker || null, author: a.author || null, title: a.title || null,
-    opinion: a.opinion || null, target: 목표, tpPrev: 이전,
-    tpPct: 목표 && 이전 ? Math.round((목표 / 이전 - 1) * 1000) / 10 : null,
+    opinion: a.opinion || null, target: 목표, tpPrev: 이전, tpPrevFrom: 이전출처,
+    tpPct: 비율(목표, 이전),
+    epsYear, epsPrev, epsNow, epsFrom: eps출처,
+    epsPct: epsPrev > 0 ? 비율(epsNow, epsPrev) : null,
+    pages: a._pages, cutPages: a._cut,
     summary: Array.isArray(a.summary) ? a.summary.slice(0, 3).map(String) : [],
     body: a.body ? String(a.body) : '',
     source: '텔레그램 · AI 요약', model: a._model,
@@ -162,7 +202,13 @@ async function 처리(메시지, 채널) {
     const 목표글 = 목표 ? ` · 목표가 ${목표.toLocaleString('ko-KR')}원${항목.tpPct != null ? ` (${항목.tpPct > 0 ? '▲' : '▼'}${Math.abs(항목.tpPct)}%)` : ''}` : '';
     await 답장(chat.id, 메시지.message_id,
       `✅ ${항목.name || ''} · ${항목.broker || ''}${항목.opinion ? ' · ' + 항목.opinion : ''}${목표글}\n` +
-      `「${항목.title || 이름}」\n\n` + 항목.summary.map(s => '• ' + s).join('\n') +
+      `「${항목.title || 이름}」\n` +
+      (항목.epsPrev != null && 항목.epsNow != null && 항목.epsPrev !== 항목.epsNow
+        ? `EPS(${항목.epsYear || ''}) ${항목.epsPrev.toLocaleString('ko-KR')} → ${항목.epsNow.toLocaleString('ko-KR')}` +
+          `${항목.epsPct != null ? ` (${항목.epsPct > 0 ? '▲' : '▼'}${Math.abs(항목.epsPct)}%)` : ` (${항목.epsNow > 항목.epsPrev ? '▲' : '▼'})`}` +
+          `${항목.epsFrom && 항목.epsFrom !== '리포트' ? ' · ' + 항목.epsFrom + ' 대비' : ''}\n` : '') +
+      (항목.tpPrevFrom && 항목.tpPrevFrom !== '리포트' ? `(목표가 이전 값은 ${항목.tpPrevFrom} 기준)\n` : '') +
+      `\n` + 항목.summary.map(s => '• ' + s).join('\n') +
       `\n\n${항목.body}\n\n— 리포트 요약 페이지에 올렸습니다 (${항목.date})`);
   }
 }
