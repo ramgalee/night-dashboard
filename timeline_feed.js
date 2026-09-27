@@ -194,7 +194,7 @@ async function 글쓰기(본문, 직전, 시각, 옵션 = {}) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': 키, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
-        model, max_tokens: 500,
+        model, max_tokens: 2000,   // 넉넉히 — 모자라면 새 모델이 빈 답을 줄 수 있습니다
         system: 규칙 + (옵션.미국 ? 미국덧붙임 : ''),
         messages: [{ role: 'user', content: 머리 }],
       }),
@@ -202,16 +202,20 @@ async function 글쓰기(본문, 직전, 시각, 옵션 = {}) {
     return { r, j: await r.json() };
   }
 
-  let r, j;
-  for (const m of (쓰는모델 ? [쓰는모델] : 모델후보)) {
+  const 글뽑기 = j => (j.content || []).filter(x => x.type === 'text').map(x => x.text).join('\n').trim();
+  let r, j, 빈이유 = null;
+  const 차례 = 쓰는모델 ? [쓰는모델, ...모델후보.filter(x => x !== 쓰는모델)] : 모델후보;
+  for (const m of 차례) {
     ({ r, j } = await 부르기(m));
-    if (r.ok) { 쓰는모델 = m; break; }
+    if (r.ok && 글뽑기(j)) { 쓰는모델 = m; break; }
+    if (r.ok) { 빈이유 = `${m}: stop=${j.stop_reason}`; continue; }   // 글 없는 답 → 다음 모델
     const 말 = String((j.error && j.error.message) || '');
     if (!/model/i.test(말) && r.status !== 404) break;
   }
   if (!r.ok) throw new Error((j.error && j.error.message) || '요약 실패');
 
-  const 글 = (j.content || []).filter(x => x.type === 'text').map(x => x.text).join('\n').trim();
+  const 글 = 글뽑기(j);
+  if (!글) throw new Error('빈 응답' + (빈이유 ? ` (${빈이유})` : ''));
   const 조각 = 글.split(/\n\s*\n/);
   return {
     title: (조각[0] || '').replace(/^#+\s*/, '').trim().slice(0, 60),
