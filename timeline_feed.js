@@ -13,7 +13,8 @@ const path = require('path');
 const 안 = 'http://127.0.0.1:3000';
 const 폴더 = '/root/app/timeline';
 const 미국폴더 = '/root/app/timeline_us';
-const 모델후보 = ['claude-opus-5-5', 'claude-sonnet-5', 'claude-sonnet-4-5', 'claude-haiku-4-5-20251001'];
+// Sonnet 5 를 먼저 씁니다(2026-09-27). temperature 는 Sonnet 5 부터 받지 않아 뺐습니다 — 넣으면 400 으로 거절됩니다.
+const 모델후보 = ['claude-sonnet-5', 'claude-sonnet-4-5', 'claude-haiku-4-5-20251001'];
 let 쓰는모델 = null;
 
 const 규칙 = `당신은 한국 경제지 증권부 기자입니다. 장중 시황을 짧게 적습니다.
@@ -193,7 +194,7 @@ async function 글쓰기(본문, 직전, 시각, 옵션 = {}) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': 키, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
-        model, max_tokens: 500, temperature: 0.3,
+        model, max_tokens: 500,
         system: 규칙 + (옵션.미국 ? 미국덧붙임 : ''),
         messages: [{ role: 'user', content: 머리 }],
       }),
