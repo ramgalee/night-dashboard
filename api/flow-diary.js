@@ -26,6 +26,11 @@ async function 받기(주소, 초) {
     return await r.json();
   } finally { clearTimeout(시계); }
 }
+// 느린 창구(stock-flow 27초)는 서버가 미리 받아 둔 것(warm_cache)을 먼저 씁니다. 안 되면 원래 창구를.
+async function 빠른받기(경로, 초) {
+  try { return await 받기(`${서버}/cached?path=${encodeURIComponent(경로)}`, 초 || 20); }
+  catch (e) { return 받기(서버 + 경로, 초); }
+}
 const 둘째 = v => Math.round(v * 100) / 100;
 const 주말 = d => { const w = new Date(Date.UTC(+d.slice(0, 4), +d.slice(4, 6) - 1, +d.slice(6, 8))).getUTCDay(); return w === 0 || w === 6; };
 
@@ -35,7 +40,7 @@ export default async function handler(req, res) {
     const [씨앗, 흐름, 종목, 대금피, 대금닥, 선물] = await Promise.all([
       받기(씨앗주소, 15).catch(() => null),
       받기(`${서버}/flow-history?from=${시작}`).catch(() => null),
-      받기(`${서버}/stock-flow?codes=${코드}&from=${시작}`).catch(() => null),
+      빠른받기(`/stock-flow?codes=${코드}&from=${시작}`).catch(() => null),
       받기(`${서버}/index-daily?code=001&from=${시작}`, 20).catch(() => null),
       받기(`${서버}/index-daily?code=101&from=${시작}`, 20).catch(() => null),
       받기(`${서버}/fut-flow?from=${시작}`, 15).catch(() => null),
