@@ -123,7 +123,7 @@ async function AI읽기(원본pdf) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': 키, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
-        model, max_tokens: 1500,          // temperature 는 넣지 않습니다 — Sonnet 5 부터 받지 않음(400)
+        model, max_tokens: 4000,          // temperature 는 넣지 않습니다 — Sonnet 5 부터 받지 않음(400). 토큰은 넉넉히(모자라면 빈 답)
         messages: [{ role: 'user', content: [
           { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdf.toString('base64') } },
           { type: 'text', text: 지시 },
@@ -216,6 +216,16 @@ async function 처리(메시지, 채널, 재시도) {
 
 // ── 받기 순서 (한 번에 하나씩) ───────────────────────
 const 줄 = [];
+// 받은 PDF 는 파일에도 적어 둡니다 — 요약 도중 서버가 재시작돼도 잃어버리지 않게(다시 켜지면 이어서 처리)
+function 대기적기(m, 채널) {
+  const d = 읽기(); d.pending = d.pending || [];
+  const id = `${m.chat.id}_${m.message_id}`;
+  if (!d.pending.some(x => x.id === id)) { d.pending.push({ id, m, 채널 }); 쓰기(d); }
+}
+function 대기지우기(m) {
+  const d = 읽기(); const id = `${m.chat.id}_${m.message_id}`;
+  if ((d.pending || []).some(x => x.id === id)) { d.pending = d.pending.filter(x => x.id !== id); 쓰기(d); }
+}
 let 처리중 = false;
 // 크레딧 부족·한도 초과·AI 혼잡처럼 '기다리면 풀리는' 실패는 따로 적어 두었다가
 // 30분마다 다시 시도합니다. 충전하면 밀린 PDF 가 저절로 요약됩니다(최대 3일, 20번).
@@ -255,6 +265,7 @@ async function 돌리기() {
         await 답장(m.chat.id, m.message_id, `⚠ 요약하지 못했습니다: ${오류.slice(0, 200)}`);
       }
     }
+    if (!재시도) 대기지우기(m);             // 끝난 뒤에 지웁니다 (도중에 꺼지면 다시 켜질 때 이어서)
     await 쉬기(1500);
   }
   처리중 = false;
@@ -273,6 +284,8 @@ async function 듣기() {
   상태.running = true;
   const d = 읽기();
   let offset = d.offset || 0;
+  for (const x of d.pending || []) if (x.m) 줄.push([x.m, x.채널]);     // 재시작 전에 못 끝낸 것
+  if ((d.pending || []).length) 돌리기();
   for (;;) {
     try {
       const 받은 = await tg('getUpdates', { offset, timeout: 50, allowed_updates: ['message', 'channel_post'] });
@@ -285,9 +298,17 @@ async function 듣기() {
         상태.seenChats[m.chat.id] = { type: m.chat.type, title: m.chat.title || m.chat.username || m.chat.first_name || '', at: new Date().toISOString() };
         const 허락 = 허용.includes(String(m.chat.id));
         const 문서 = m.document;
-        if (문서 && /pdf$/i.test(문서.mime_type || 문서.file_name || '')) {
-          if (허락) 줄.push([m, 채널]);
+        // 휴대폰·PC 에 따라 PDF 가 'application/octet-stream' 으로 오기도 해서, 형식과 파일 이름을 둘 다 봅니다
+        const PDF다 = 문서 && (/pdf/i.test(문서.mime_type || '') || /\.pdf$/i.test(문서.file_name || ''));
+        if (PDF다) {
+          if (허락) {
+            줄.push([m, 채널]); 대기적기(m, 채널);
+            const 앞 = 줄.length - 1 + (처리중 ? 1 : 0);
+            if (!채널 && 앞 > 0) await 답장(m.chat.id, m.message_id, `📥 접수했습니다 — 앞에 ${앞}건이 있어 차례로 읽습니다.`);
+          }
           else if (!채널) await 답장(m.chat.id, m.message_id, `이 대화방(${m.chat.id})은 아직 허락되지 않았습니다. 서버 .env 의 REPORT_CHAT_IDS 에 이 번호를 넣어 주세요.`);
+        } else if (문서 && 허락 && !채널) {
+          await 답장(m.chat.id, m.message_id, `PDF 만 읽을 수 있습니다 (받은 파일: ${문서.file_name || '이름 없음'} · ${문서.mime_type || '형식 모름'}).`);
         } else if (!채널 && 허락 && m.text && /^\/retry/.test(m.text)) {
           const n = 밀린것다시();
           await 답장(m.chat.id, m.message_id, n ? `↻ 밀린 리포트 ${n}건을 다시 시도합니다.` : '밀린 리포트가 없습니다.');
@@ -314,7 +335,7 @@ module.exports = (app) => {
   });
   app.get('/report-bot/status', (req, res) => {
     const d = 읽기();
-    res.json({ ...상태, retry: (d.retry || []).map(x => ({ id: x.id, file: x.m.document && x.m.document.file_name, tries: x.tries, error: x.error })),
+    res.json({ ...상태, pending: (d.pending || []).length, retry: (d.retry || []).map(x => ({ id: x.id, file: x.m.document && x.m.document.file_name, tries: x.tries, error: x.error })),
                token: !!환경('TELEGRAM_BOT_TOKEN'), allowed: 환경('REPORT_CHAT_IDS') || '',
                anthropic: !!환경('ANTHROPIC_API_KEY'), stored: (d.items || []).length,
                last: (d.items || []).slice(-1)[0] || null });
