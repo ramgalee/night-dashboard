@@ -123,7 +123,7 @@ async function AI읽기(원본pdf) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': 키, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
-        model, max_tokens: 1500, temperature: 0,
+        model, max_tokens: 1500,          // temperature 는 넣지 않습니다 — Sonnet 5 부터 받지 않음(400)
         messages: [{ role: 'user', content: [
           { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdf.toString('base64') } },
           { type: 'text', text: 지시 },
