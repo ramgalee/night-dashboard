@@ -118,6 +118,14 @@
            max-height:55vh; overflow:auto; outline:none; }
   #bBody p { margin:0 0 12px; }
   .blog-msg { font-size:12px; color:var(--signature); min-height:16px; }
+  .blog-modes { display:flex; gap:0; border-bottom:1px solid var(--hair); margin-top:12px; }
+  .blog-modes button { background:transparent; border:none; border-bottom:2px solid transparent; border-radius:0; padding:8px 14px;
+                       font-size:13px; font-weight:600; color:var(--textTer); }
+  .blog-modes button.on { color:var(--textPri); border-bottom-color:var(--signature); }
+  #bBody table { border-collapse:collapse; width:100%; margin:4px 0 14px; font-size:13px; }
+  #bBody th, #bBody td { border:1px solid #D9DDE8; padding:7px 10px; text-align:left; vertical-align:top; }
+  #bBody th { background:#F4F5F9; font-weight:600; }
+  #bBody hr { border:none; border-top:1px solid var(--hair); margin:16px 0; }
   .blog-btn { background:var(--signature); border-color:var(--signature); color:#fff; font-weight:600; font-size:12.5px; padding:7px 12px; }
 
   @media (max-width:1000px) { .grid4 { grid-template-columns:1fr 1fr; } }
@@ -201,6 +209,10 @@
         <div class="meta" id="bMeta"></div></div>
       <button class="modal-x" id="bClose">✕</button>
     </div>
+    <div class="blog-modes" id="bModes">
+      <button data-m="ai" class="on">AI 해설 글</button>
+      <button data-m="plain">기본 정리</button>
+    </div>
     <div style="margin-top:12px" class="meta">제목</div>
     <div class="blog-title" id="bTitle"></div>
     <div class="blog-alt" id="bAlt"></div>
@@ -208,7 +220,7 @@
       <button id="bCopyT">제목 복사</button>
       <button class="main" id="bCopyH">본문 복사 (굵게·줄바꿈 그대로)</button>
       <button id="bCopyP">본문 글자만 복사</button>
-      <label class="meta" style="display:flex;align-items:center;gap:5px"><input type="checkbox" id="bAll"> 종목 리포트 전부 넣기</label>
+      <label class="meta" id="bAllBox" style="display:none;align-items:center;gap:5px"><input type="checkbox" id="bAll"> 종목 리포트 전부 넣기</label>
     </div>
     <div class="blog-msg" id="bMsg"></div>
     <div id="bBody" contenteditable="true"></div>
@@ -421,6 +433,25 @@ function 블로그글(전부) {
   const D = DATA.days[날] || {}, 리포트 = D.reports || [];
   const 종목 = 리포트.filter(x => 종류of(x) === "종목"), 산업 = 리포트.filter(x => 종류of(x) === "산업");
   const 첫줄 = x => (x.summary && x.summary[0]) || (x.body ? String(x.body).split(/(?<=[.다])\s/)[0] : "") || x.title || "";
+  // 요약 3줄 — 요약이 모자라면 본문 문장으로 채웁니다
+  const 세줄 = x => {
+    const a = (x.summary || []).map(String).filter(Boolean).slice(0, 3);
+    if (a.length < 3 && x.body) for (const t of String(x.body).split(/(?<=[.다])\s+/)) { if (a.length >= 3) break; if (t && !a.includes(t)) a.push(t); }
+    return a.length ? a : [x.title || ""];
+  };
+  // 리포트 한 건 — 머리 한 줄 + 제목 + 요약 3줄
+  const 한건 = (x, 번호) => {
+    const 목표 = x.target ? `목표가 ${원(x.target)}${x.tpPct ? ` (${부호(x.tpPct)})` : ""}` : "";
+    const 머리 = [x.broker, x.opinion, 목표].filter(Boolean).join(" · ");
+    const 이름 = (번호 ? 번호 + ". " : "■ ") + (x.name || "");
+    const 줄들 = 세줄(x);
+    return [
+      `<p><b>${esc(이름)}</b>${머리 ? " | " + esc(머리) : ""}` +
+        (x.title ? `<br>「${esc(x.title)}」` : "") +
+        줄들.map(t => `<br>- ${esc(t)}`).join("") + `</p>`,
+      `${이름}${머리 ? " | " + 머리 : ""}` + (x.title ? `\n「${x.title}」` : "") + 줄들.map(t => `\n- ${t}`).join(""),
+    ];
+  };
 
   // 핵심 3가지 — 목표가를 크게 올린 것 → EPS 를 올린 것 → 요약이 있는 것 순
   const 점수 = x => (x.tpPct > 0 ? 100 + x.tpPct : 0) + (x.epsPct > 0 ? 50 + Math.min(x.epsPct, 50) : 0) + ((x.summary || []).length ? 10 : 0);
@@ -434,12 +465,8 @@ function 블로그글(전부) {
   넣(`<p>${블로그.인사 ? esc(블로그.인사) + "<br>" : ""}${머리말}</p>`, (블로그.인사 ? 블로그.인사 + "\n" : "") + 머리말);
 
   if (핵심.length) {
-    const h = 핵심.map((x, i) => {
-      const 꼬리 = [x.broker, x.target ? `목표가 ${원(x.target)}${x.tpPct ? ` (${부호(x.tpPct)})` : ""}` : ""].filter(Boolean).join(" · ");
-      return [`<b>${i + 1}. ${esc(x.name)}</b> — ${esc(꼬리)}<br>${esc(첫줄(x))}`, `${i + 1}. ${x.name} — ${꼬리}\n${첫줄(x)}`];
-    });
     넣(`<p><b>📌 오늘의 핵심 ${핵심.length}가지</b></p>`, `📌 오늘의 핵심 ${핵심.length}가지`);
-    h.forEach(([a, b]) => 넣(`<p>${a}</p>`, b));
+    핵심.forEach((x, i) => { const [a, b] = 한건(x, i + 1); 넣(a, b); });
   }
 
   const 변화 = (k, 제목, 모양) => {
@@ -467,19 +494,13 @@ function 블로그글(전부) {
     .map(A => A[0]);
   const 보일것 = 전부 ? 나머지 : 나머지.slice(0, 블로그.종목몇개);
   if (보일것.length) {
-    const 줄들 = 보일것.map(x => {
-      const 머리 = [x.broker, x.opinion, x.target ? 원(x.target) : ""].filter(Boolean).join(" · ");
-      return [`<b>· ${esc(x.name)}</b> (${esc(머리)})<br>&nbsp;&nbsp;${esc(첫줄(x))}`, `· ${x.name} (${머리})\n  ${첫줄(x)}`];
-    });
-    넣(`<p><b>📝 종목 리포트 한 줄 요약</b></p>`, `📝 종목 리포트 한 줄 요약`);
-    넣(`<p>${줄들.map(a => a[0]).join("<br>")}</p>`, 줄들.map(a => a[1]).join("\n"));
+    넣(`<p><b>📝 종목 리포트 3줄 요약</b></p>`, `📝 종목 리포트 3줄 요약`);
+    보일것.forEach(x => { const [a, b] = 한건(x); 넣(a, b); });
     if (보일것.length < 나머지.length) 넣(`<p>외 ${나머지.length - 보일것.length}건</p>`);
   }
   if (산업.length) {
-    const 줄들 = 산업.map(x => [`<b>· ${esc(x.name || "")}</b> ${esc(x.title || "")} (${esc(x.broker || "")})<br>&nbsp;&nbsp;${esc(첫줄(x))}`,
-                                `· ${x.name || ""} ${x.title || ""} (${x.broker || ""})\n  ${첫줄(x)}`]);
     넣(`<p><b>🏭 산업·시황 리포트</b></p>`, `🏭 산업·시황 리포트`);
-    넣(`<p>${줄들.map(a => a[0]).join("<br>")}</p>`, 줄들.map(a => a[1]).join("\n"));
+    산업.forEach(x => { const [a, b] = 한건(x); 넣(a, b); });
   }
 
   const 태그 = [...블로그.기본태그, ...핵심.map(x => x.name), ...(D.tpUp || []).map(x => x.name)]
@@ -497,6 +518,66 @@ function 블로그글(전부) {
   };
 }
 
+// ── AI 해설 글 (서버가 하루 한 번 써서 저장해 둔 것) ──
+const 굵게 = t => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+const 민글 = t => String(t ?? "").replace(/\*\*(.+?)\*\*/g, "$1");
+const 표칸 = 'style="border:1px solid #D9DDE8;padding:7px 10px;text-align:left;vertical-align:top"';
+function 표(머리, 줄들) {
+  return `<table style="border-collapse:collapse;width:100%"><tr>${머리.map(h => `<th ${표칸}><b>${esc(h)}</b></th>`).join("")}</tr>` +
+    줄들.map(r => `<tr>${r.map(c => `<td ${표칸}>${굵게(c)}</td>`).join("")}</tr>`).join("") + `</table>`;
+}
+function AI글그리기(p) {
+  const h = [];
+  h.push(`<p><b>3줄 요약</b><br>${(p.summary3 || []).map((t, i) => `${i + 1}. ${굵게(t)}`).join("<br>")}</p><hr>`);
+  (p.sections || []).forEach((x, i) => {
+    h.push(`<p><b>${i + 1}. ${esc(x.heading || "")}</b>${x.lead ? `<br>${굵게(x.lead)}` : ""}</p>`);
+    if ((x.table || []).length) h.push(표(["증권사", "목표주가", x.tableHead || "한 줄"], x.table.map(r => [r.broker, r.target, r.line])));
+    for (const b of x.blocks || []) {
+      if (b.sub) h.push(`<p><b>${esc(b.sub)}</b></p>`);
+      for (const t of b.paragraphs || []) h.push(`<p>${굵게(t)}</p>`);
+    }
+    h.push(`<p><br></p>`);
+  });
+  if ((p.others || []).length) {
+    h.push(`<p><b>나머지는 한 줄씩</b></p>`);
+    h.push(표(["종목", "핵심", "증권사 / 목표주가"], p.others.map(r => [r.name, r.line, [r.broker, r.target].filter(Boolean).join(" / ")])));
+  }
+  for (const t of p.notes || []) if (t) h.push(`<p>${굵게(t)}</p>`);
+  h.push(`<p><br></p><p style="color:#8B94B0">본 글은 증권사 리서치 자료를 요약한 것으로, 투자의견과 목표주가는 해당 증권사의 견해입니다. 매매를 권유하는 글이 아니며 투자 판단의 책임은 본인에게 있습니다.</p>`);
+  if ((p.tags || []).length) h.push(`<p>${p.tags.map(t => "#" + esc(String(t).replace(/^#/, "").replace(/\s/g, ""))).join(" ")}</p>`);
+  return h.join("");
+}
+let 글종류 = "ai", AI기다림 = null;
+async function AI글받기(다시) {
+  clearTimeout(AI기다림);
+  const 이날 = 날, 몸 = document.getElementById("bBody"), 알림 = document.getElementById("bMsg");
+  const 지금건수 = ((DATA.days[날] || {}).reports || []).length;
+  if (!다시) 몸.innerHTML = `<p style="color:#8B94B0">글을 불러오는 중...</p>`;
+  try {
+    const d = await (await fetch(`/api/report-blog?d=${날}`, { cache: "no-store" })).json();
+    if (글종류 !== "ai" || 날 !== 이날 || !document.getElementById("blog").classList.contains("on")) return;
+    if (d.status === "writing") {
+      몸.innerHTML = `<p style="color:#8B94B0">AI 가 오늘 리포트를 읽고 글을 쓰는 중입니다… (1~2분)<br>이 창을 닫았다가 나중에 열어도 됩니다.</p>`;
+      AI기다림 = setTimeout(() => AI글받기(false), 8000);
+      return;
+    }
+    if (d.status === "error" && !d.post) {
+      몸.innerHTML = `<p>AI 글을 만들지 못했습니다: ${esc(d.error || "")}<br>10분 뒤 다시 열어 보시거나, 위의 '기본 정리' 를 쓰세요.</p>`;
+      return;
+    }
+    if (d.error && !d.post) throw new Error(d.error);
+    document.getElementById("bTitle").textContent = d.post.title || 블로그결과.제목;
+    document.getElementById("bAlt").textContent = "";
+    몸.innerHTML = AI글그리기(d.post);
+    const 쓴때 = d.at ? new Date(d.at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }) : "";
+    document.getElementById("bMeta").textContent = `${날보기(날)} · 리포트 ${d.count}건으로 쓴 글 · ${쓴때}` +
+      (지금건수 > d.count ? ` · 그 뒤로 ${지금건수 - d.count}건 더 들어옴` : "");
+    알림.textContent = "";
+  } catch (e) {
+    몸.innerHTML = `<p>AI 글을 불러오지 못했습니다 (${esc(e.message)}). 위의 '기본 정리' 를 쓰세요.</p>`;
+  }
+}
+
 let 블로그결과 = null;
 function 블로그열기() {
   if (!DATA || !날) return;
@@ -507,7 +588,12 @@ function 블로그열기() {
   document.getElementById("bBody").innerHTML = 블로그결과.건수 ? 블로그결과.html : `<p>이 날은 리포트가 없습니다.</p>`;
   document.getElementById("bMsg").textContent = "";
   document.getElementById("blog").classList.add("on");
+  document.querySelectorAll("#bModes button").forEach(b => b.classList.toggle("on", b.dataset.m === 글종류));
+  document.getElementById("bAllBox").style.display = 글종류 === "plain" ? "flex" : "none";
+  if (글종류 === "ai" && 블로그결과.건수) AI글받기(false);
 }
+document.querySelectorAll("#bModes button").forEach(b => b.onclick = () => { 글종류 = b.dataset.m; 블로그열기(); });
+
 async function 복사(html, 글) {
   const 알림 = t => { document.getElementById("bMsg").textContent = t; };
   try {
@@ -528,7 +614,7 @@ const 본문글 = () => { const el = document.getElementById("bBody");
   return el.innerText.replace(/\n{3,}/g, "\n\n").trim(); };
 document.getElementById("blogBtn").onclick = 블로그열기;
 document.getElementById("bAll").onchange = 블로그열기;
-document.getElementById("bClose").onclick = () => document.getElementById("blog").classList.remove("on");
+document.getElementById("bClose").onclick = () => { clearTimeout(AI기다림); document.getElementById("blog").classList.remove("on"); };
 document.getElementById("blog").addEventListener("click", e => { if (e.target.id === "blog") e.currentTarget.classList.remove("on"); });
 document.getElementById("bCopyT").onclick = () => 복사(null, document.getElementById("bTitle").textContent);
 document.getElementById("bCopyH").onclick = () => 복사(document.getElementById("bBody").innerHTML, 본문글());
