@@ -62,6 +62,7 @@
     .cnt small, .cd, .etf { font-size:10.5px !important; }
     .etf { padding:2px 6px; }
   }
+  .opp { font-size:10px; font-weight:500; color:var(--textTer); margin-top:2px; white-space:nowrap; }
 </style>
 </head>
 <body>
@@ -100,19 +101,33 @@
       <b>비중이 아니라 주식수로 봅니다.</b> 비중은 주가가 오르기만 해도 늘어나지만,
       주식수는 운용사가 실제로 사야 늘어납니다. 3% 넘게 움직인 것만 셉니다.<br><br>
       한 곳의 선택은 취향일 수 있지만 <b>여러 곳이 같은 종목을 동시에 편입하거나 편출하면</b>
-      눈여겨볼 만합니다. 종목명을 누르면 수급오실레이터에서 그 종목을 볼 수 있습니다.
+      눈여겨볼 만합니다. <b>산 곳 많은 순</b>은 신규 편입과 주식수 늘림을 합쳐, 사들인 ETF 가 많은 순으로
+      보여 줍니다(같으면 판 곳이 적은 종목이 위). 비중이 큰 ETF 부터 나옵니다. 종목명을 누르면 수급오실레이터에서 그 종목을 볼 수 있습니다.
     </div>
   </div>
 </div>
 
 <script>
-let DATA = null, TAB = "new";
+let DATA = null, TAB = "buy";
 const 탭들 = [
+  ["buy", "산 곳 많은 순", "nBuy", "up"],
+  ["sell", "판 곳 많은 순", "nSell", "down"],
   ["new", "신규 편입", "nNew", "up"],
   ["up", "주식수 늘림", "nUp", "up"],
   ["down", "주식수 줄임", "nDown", "down"],
   ["out", "편출", "nOut", "down"],
 ];
+
+// 신규 편입 + 주식수 늘림 = '산 곳', 편출 + 주식수 줄임 = '판 곳' 으로 합칩니다
+function 합치기() {
+  for (const x of DATA.items || []) {
+    x.buy = [...(x.new || []).map(i => ({ ...i, _k: "new" })), ...(x.up || []).map(i => ({ ...i, _k: "up" }))]
+      .sort((a, b) => (b.w || 0) - (a.w || 0));
+    x.sell = [...(x.out || []).map(i => ({ ...i, _k: "out" })), ...(x.down || []).map(i => ({ ...i, _k: "down" }))]
+      .sort((a, b) => (b.w || 0) - (a.w || 0));
+    x.nBuy = x.buy.length; x.nSell = x.sell.length;
+  }
+}
 
 function 그리기() {
   const 몸 = document.getElementById("body");
@@ -120,6 +135,10 @@ function 그리기() {
   const 목록 = (DATA.items || []).filter(x => (x[탭들.find(t => t[0] === TAB)[2]] || 0) > 0)
     .sort((a, b) => {
       const k = 탭들.find(t => t[0] === TAB)[2];
+      if (TAB === "buy" || TAB === "sell") {           // 곳 수 → 반대쪽이 적은 것 → 가장 크게 담은 비중
+        const 반대 = TAB === "buy" ? "nSell" : "nBuy";
+        return (b[k] - a[k]) || (a[반대] - b[반대]) || ((b.maxW || 0) - (a.maxW || 0));
+      }
       return (b[k] - a[k]) || (b.score - a.score);
     });
 
@@ -136,7 +155,9 @@ function 그리기() {
   몸.innerHTML = 목록.slice(0, 40).map(x => `
     <div class="row">
       <div class="cnt" style="color:${색 === "up" ? "var(--up)" : "var(--down)"}">
-        ${x[탭들.find(t => t[0] === TAB)[2]]}<small>곳</small></div>
+        ${x[탭들.find(t => t[0] === TAB)[2]]}<small>곳</small>
+        ${TAB === "buy" && x.nSell ? `<div class="opp">판 곳 ${x.nSell}</div>` : ""}
+        ${TAB === "sell" && x.nBuy ? `<div class="opp">산 곳 ${x.nBuy}</div>` : ""}</div>
       <div class="main">
         <div><span class="nm" data-stk="${x.code}">${x.name || x.code}</span><span class="cd">${x.code}</span>
           ${x.maxW ? `<span class="big">최대 비중 <b>${x.maxW}%</b></span>` : ""}</div>
@@ -145,12 +166,13 @@ function 그리기() {
           // "몇 주 늘렸고 / 그래서 지금 비중이 몇 %" 순서로 읽히게 둡니다.
           // 주식수는 ETF 1좌(CU) 기준이라 늘어난 양 자체로 봅니다.
           const 늘어난 = (i.q != null && i.q0 != null) ? i.q - i.q0 : null;
-          const 증감 = (TAB === "up" || TAB === "down")
+          const 갈래 = i._k || TAB;
+          const 증감 = (갈래 === "up" || 갈래 === "down")
             ? `<b>${늘어난 > 0 ? "+" : "−"}${수(Math.abs(늘어난))}주</b>`
-            : (TAB === "new" ? `<b>+${수(i.q)}주</b>`
-            : (TAB === "out" ? `<b>−${수(i.q0)}주</b>` : ""));
+            : (갈래 === "new" ? `<b>${i._k ? "신규 " : ""}+${수(i.q)}주</b>`
+            : (갈래 === "out" ? `<b>${i._k ? "편출 " : ""}−${수(i.q0)}주</b>` : ""));
           const 비중 = i.w != null
-            ? `<em>·</em><i>비중 ${i.w}%</i>` + (TAB === "out" ? `<em>였음</em>` : "")
+            ? `<em>·</em><i>비중 ${i.w}%</i>` + (갈래 === "out" ? `<em>였음</em>` : "")
             : "";
           return `<span class="etf ${색 === "up" ? "plus" : "minus"}">${i.etf}${증감}${비중}</span>`;
         }).join("")}
@@ -166,6 +188,7 @@ function 요약() {
   const a = DATA.items || [];
   const 칸 = [
     ["추적 ETF", DATA.etfCount || 0, "개"],
+    ["2곳 이상 산 종목", a.filter(x => x.nBuy >= 2).length, "종목"],
     ["신규 편입", a.filter(x => x.nNew > 0).length, "종목"],
     ["주식수 늘림", a.filter(x => x.nUp > 0).length, "종목"],
     ["주식수 줄임", a.filter(x => x.nDown > 0).length, "종목"],
@@ -181,6 +204,7 @@ async function 받기() {
     const d = await r.json();
     if (d.error || !d.items) throw new Error("no data");
     DATA = d;
+    합치기();
     const 보기 = s => s && s.length === 8 ? `${s.slice(4, 6)}.${s.slice(6, 8)}` : s;
     document.getElementById("meta").textContent =
       `${보기(DATA.prevDate)} → ${보기(DATA.date)} · 움직인 종목 ${DATA.count}개`;
