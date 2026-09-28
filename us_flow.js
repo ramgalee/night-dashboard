@@ -141,7 +141,20 @@ async function 시세(기호) {
   const 종가들 = ((r.indicators && r.indicators.quote && r.indicators.quote[0]) || {}).close || [];
   const 값 = 종가들.filter(v => v != null);
   const 지금 = m.regularMarketPrice ?? 값[값.length - 1];
-  const 전날 = m.chartPreviousClose ?? m.previousClose ?? 값[값.length - 2];
+  // ★ 2026-09-29 고침 — range=5d 에서 chartPreviousClose 는 '어제 종가' 가 아니라 '5일 전 종가' 입니다.
+  //   그래서 등락률이 5일 등락률로 나왔습니다(반도체 SMH 가 하락한 날 +0.67% 로 표시).
+  //   이제 일봉 목록에서 전날 종가를 직접 찾습니다. 마지막 봉이 오늘(마지막 체결일) 봉이면 한 칸 앞이 전날입니다.
+  const 시각들 = r.timestamp || [];
+  const 봉 = 시각들.map((t, i) => [t, 종가들[i]]).filter(([t, c]) => t != null && c != null);
+  let 전날 = null;
+  if (봉.length) {
+    const [끝시각, 끝값] = 봉[봉.length - 1];
+    const 오늘봉 = m.regularMarketTime
+      ? Math.abs(m.regularMarketTime - 끝시각) < 20 * 3600
+      : (지금 != null && Math.abs(끝값 - 지금) < Math.abs(지금) * 1e-6);
+    전날 = 오늘봉 ? (봉.length >= 2 ? 봉[봉.length - 2][1] : null) : 끝값;
+  }
+  if (전날 == null) 전날 = m.previousClose ?? null;
   return {
     price: 지금 == null ? null : Number(지금),
     prev: 전날 == null ? null : Number(전날),
