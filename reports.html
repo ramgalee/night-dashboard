@@ -159,7 +159,7 @@
       </div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end">
         <span class="meta" id="meta">불러오는 중...</span>
-        <button class="blog-btn" id="blogBtn" title="고른 날의 리포트를 네이버 블로그에 붙여 넣기 좋은 글로 만듭니다">📝 블로그 글 만들기</button>
+        <button class="blog-btn" id="blogBtn" title="고른 날의 리포트를 붙여 넣기 좋은 글로 정리해 복사합니다">📝 텍스트 복사</button>
       </div>
     </div>
     <div class="grid4" id="changes"></div>
@@ -197,7 +197,7 @@
 <div id="blog">
   <div class="modal-box">
     <div class="between">
-      <div><div style="font-size:15px;font-weight:600;">블로그용 글</div>
+      <div><div style="font-size:15px;font-weight:600;">텍스트 복사</div>
         <div class="meta" id="bMeta"></div></div>
       <button class="modal-x" id="bClose">✕</button>
     </div>
@@ -213,7 +213,7 @@
     <div class="blog-msg" id="bMsg"></div>
     <div id="bBody" contenteditable="true"></div>
     <div class="note" style="margin-top:10px">본문은 여기서 바로 고칠 수 있습니다. 고친 뒤 복사하면 고친 대로 복사됩니다.
-      네이버 블로그 글쓰기 화면 본문에 Ctrl+V 로 붙여 넣으세요.</div>
+      블로그·카페·메신저 등 원하는 곳에 Ctrl+V 로 붙여 넣으세요.</div>
   </div>
 </div>
 
@@ -405,12 +405,12 @@ document.getElementById("next").onclick = () => 옮기기(1);
 document.getElementById("dateSel").onchange = e => { 날 = e.target.value; 그리기(); };
 ["q", "broker", "krOnly", "allOpen"].forEach(id => document.getElementById(id).addEventListener("input", 목록));
 
-// ── 블로그 글 만들기 (네이버 블로그 '리포트 요약' 글) ──────────
+// ── 텍스트 복사 (고른 날의 리포트를 붙여 넣기 좋은 글로) ──────────
 //  고른 날의 리포트를 간단한 글로 바꿉니다. 인사말·해시태그는 아래에서 바꾸면 됩니다.
 const 블로그 = {
-  인사: "안녕하세요, 주식탐정입니다.",
+  인사: "",                // 첫 줄 인사말 — 비워 두면 넣지 않습니다
   맺음: "※ 증권사 리포트를 짧게 요약한 글입니다. 자세한 내용은 원문을 확인해 주시고, 투자 판단의 책임은 본인에게 있습니다.",
-  기본태그: ["증권사리포트", "리포트요약", "목표주가", "주식탐구생활"],
+  기본태그: ["증권사리포트", "리포트요약", "목표주가"],
   종목몇개: 10,          // '전부 넣기' 를 켜지 않으면 종목 리포트는 이만큼만
 };
 const 원 = v => v == null ? "" : Number(v).toLocaleString("ko-KR") + "원";
@@ -430,8 +430,8 @@ function 블로그글(전부) {
   const 넣 = (h, t) => 줄.push([h, t ?? h.replace(/<[^>]+>/g, "")]);
   const 칸 = () => 넣("", "");
 
-  넣(`<p>${esc(블로그.인사)}<br>${짧은날(날)} 나온 증권사 리포트 ${리포트.length}건 중 핵심만 간단히 정리했습니다.</p>`,
-     `${블로그.인사}\n${짧은날(날)} 나온 증권사 리포트 ${리포트.length}건 중 핵심만 간단히 정리했습니다.`);
+  const 머리말 = `${짧은날(날)} 나온 증권사 리포트 ${리포트.length}건 중 핵심만 간단히 정리했습니다.`;
+  넣(`<p>${블로그.인사 ? esc(블로그.인사) + "<br>" : ""}${머리말}</p>`, (블로그.인사 ? 블로그.인사 + "\n" : "") + 머리말);
 
   if (핵심.length) {
     const h = 핵심.map((x, i) => {
@@ -516,7 +516,7 @@ async function 복사(html, 글) {
         "text/html": new Blob([html], { type: "text/html" }),
         "text/plain": new Blob([글], { type: "text/plain" }) })]);
     } else await navigator.clipboard.writeText(글);
-    알림("✅ 복사했습니다. 블로그 글쓰기 화면에 Ctrl+V 로 붙여 넣으세요.");
+    알림("✅ 복사했습니다. 붙여 넣을 곳에서 Ctrl+V 를 누르세요.");
   } catch (e) {
     // 복사 권한이 막힌 브라우저 — 본문을 골라 두고 직접 Ctrl+C 하게 합니다
     const r = document.createRange(); r.selectNodeContents(document.getElementById("bBody"));
