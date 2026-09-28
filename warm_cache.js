@@ -27,7 +27,7 @@ const 규칙 = [
   ['/infra-theme',  1.5 * 분, 10 * 분, 60 * 분, true,  '국내'],
   ['/supply-ratio', 1 * 분,  10 * 분, 60 * 분, true,  '국내'],
   ['/program-flow', 1 * 분,  10 * 분, 60 * 분, true,  '국내'],
-  ['/fear-greed',   10 * 분, 20 * 분, 60 * 분, true,  '국내'],
+  ['/fear-greed',   10 * 분, 20 * 분, 20 * 분, true,  '국내'],   // 저녁에 fg_extra 를 올리므로 장 밖에도 20분
   ['/us-stocks',    2 * 분,  10 * 분, 60 * 분, true,  '미국'],
   ['/us-flow',      15 * 분, 30 * 분, 60 * 분, true,  '미국'],
 ];
