@@ -106,6 +106,20 @@
   .modal-x { background:transparent; border:none; font-size:20px; line-height:1; color:var(--textTer); cursor:pointer; padding:2px 6px; }
   #mChart { width:100%; height:320px; } #mOsc { width:100%; height:150px; }
 
+  /* 블로그 글 창 */
+  #blog { position:fixed; inset:0; background:rgba(19,26,44,.45); display:none; align-items:center; justify-content:center; padding:24px; z-index:60; }
+  #blog.on { display:flex; }
+  #blog .modal-box { max-width:760px; }
+  .blog-bar { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+  .blog-bar button.main { background:var(--signature); border-color:var(--signature); color:#fff; font-weight:600; }
+  .blog-title { font-size:15px; font-weight:700; padding:10px 12px; border:1px solid var(--hair); border-radius:10px; background:var(--surface2); }
+  .blog-alt { font-size:12px; color:var(--textTer); margin-top:6px; }
+  #bBody { border:1px solid var(--hair); border-radius:10px; padding:14px 16px; font-size:14px; line-height:1.75; color:var(--textPri);
+           max-height:55vh; overflow:auto; outline:none; }
+  #bBody p { margin:0 0 12px; }
+  .blog-msg { font-size:12px; color:var(--signature); min-height:16px; }
+  .blog-btn { background:var(--signature); border-color:var(--signature); color:#fff; font-weight:600; font-size:12.5px; padding:7px 12px; }
+
   @media (max-width:1000px) { .grid4 { grid-template-columns:1fr 1fr; } }
   @media (max-width:760px) {
     .row { grid-template-columns:1fr auto; gap:4px 10px; }
@@ -143,7 +157,10 @@
         <select id="dateSel"></select>
         <button id="next" title="다음 날">▶</button>
       </div>
-      <span class="meta" id="meta">불러오는 중...</span>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end">
+        <span class="meta" id="meta">불러오는 중...</span>
+        <button class="blog-btn" id="blogBtn" title="고른 날의 리포트를 네이버 블로그에 붙여 넣기 좋은 글로 만듭니다">📝 블로그 글 만들기</button>
+      </div>
     </div>
     <div class="grid4" id="changes"></div>
   </div>
@@ -174,6 +191,29 @@
       각 증권사 리포트를 요약·정리한 참고 자료이며, 특정 종목의 매매를 권하는 내용이 아닙니다.
       원문과 세부 내용은 각 증권사 리포트를 확인하세요.
     </div>
+  </div>
+</div>
+
+<div id="blog">
+  <div class="modal-box">
+    <div class="between">
+      <div><div style="font-size:15px;font-weight:600;">블로그용 글</div>
+        <div class="meta" id="bMeta"></div></div>
+      <button class="modal-x" id="bClose">✕</button>
+    </div>
+    <div style="margin-top:12px" class="meta">제목</div>
+    <div class="blog-title" id="bTitle"></div>
+    <div class="blog-alt" id="bAlt"></div>
+    <div class="blog-bar">
+      <button id="bCopyT">제목 복사</button>
+      <button class="main" id="bCopyH">본문 복사 (굵게·줄바꿈 그대로)</button>
+      <button id="bCopyP">본문 글자만 복사</button>
+      <label class="meta" style="display:flex;align-items:center;gap:5px"><input type="checkbox" id="bAll"> 종목 리포트 전부 넣기</label>
+    </div>
+    <div class="blog-msg" id="bMsg"></div>
+    <div id="bBody" contenteditable="true"></div>
+    <div class="note" style="margin-top:10px">본문은 여기서 바로 고칠 수 있습니다. 고친 뒤 복사하면 고친 대로 복사됩니다.
+      네이버 블로그 글쓰기 화면 본문에 Ctrl+V 로 붙여 넣으세요.</div>
   </div>
 </div>
 
@@ -364,6 +404,135 @@ document.getElementById("prev").onclick = () => 옮기기(-1);
 document.getElementById("next").onclick = () => 옮기기(1);
 document.getElementById("dateSel").onchange = e => { 날 = e.target.value; 그리기(); };
 ["q", "broker", "krOnly", "allOpen"].forEach(id => document.getElementById(id).addEventListener("input", 목록));
+
+// ── 블로그 글 만들기 (네이버 블로그 '리포트 요약' 글) ──────────
+//  고른 날의 리포트를 간단한 글로 바꿉니다. 인사말·해시태그는 아래에서 바꾸면 됩니다.
+const 블로그 = {
+  인사: "안녕하세요, 주식탐정입니다.",
+  맺음: "※ 증권사 리포트를 짧게 요약한 글입니다. 자세한 내용은 원문을 확인해 주시고, 투자 판단의 책임은 본인에게 있습니다.",
+  기본태그: ["증권사리포트", "리포트요약", "목표주가", "주식탐구생활"],
+  종목몇개: 10,          // '전부 넣기' 를 켜지 않으면 종목 리포트는 이만큼만
+};
+const 원 = v => v == null ? "" : Number(v).toLocaleString("ko-KR") + "원";
+const 짧은날 = d => `${+d.slice(4, 6)}월 ${+d.slice(6, 8)}일(${"일월화수목금토"[new Date(+d.slice(0,4), +d.slice(4,6)-1, +d.slice(6,8)).getDay()]})`;
+const 부호 = v => v == null ? "" : (v > 0 ? "+" : "") + v.toFixed(1) + "%";
+
+function 블로그글(전부) {
+  const D = DATA.days[날] || {}, 리포트 = D.reports || [];
+  const 종목 = 리포트.filter(x => 종류of(x) === "종목"), 산업 = 리포트.filter(x => 종류of(x) === "산업");
+  const 첫줄 = x => (x.summary && x.summary[0]) || (x.body ? String(x.body).split(/(?<=[.다])\s/)[0] : "") || x.title || "";
+
+  // 핵심 3가지 — 목표가를 크게 올린 것 → EPS 를 올린 것 → 요약이 있는 것 순
+  const 점수 = x => (x.tpPct > 0 ? 100 + x.tpPct : 0) + (x.epsPct > 0 ? 50 + Math.min(x.epsPct, 50) : 0) + ((x.summary || []).length ? 10 : 0);
+  const 핵심 = 종목.slice().sort((a, b) => 점수(b) - 점수(a)).slice(0, 3);
+
+  const 줄 = [];          // [html, 글자] 쌍
+  const 넣 = (h, t) => 줄.push([h, t ?? h.replace(/<[^>]+>/g, "")]);
+  const 칸 = () => 넣("", "");
+
+  넣(`<p>${esc(블로그.인사)}<br>${짧은날(날)} 나온 증권사 리포트 ${리포트.length}건 중 핵심만 간단히 정리했습니다.</p>`,
+     `${블로그.인사}\n${짧은날(날)} 나온 증권사 리포트 ${리포트.length}건 중 핵심만 간단히 정리했습니다.`);
+
+  if (핵심.length) {
+    const h = 핵심.map((x, i) => {
+      const 꼬리 = [x.broker, x.target ? `목표가 ${원(x.target)}${x.tpPct ? ` (${부호(x.tpPct)})` : ""}` : ""].filter(Boolean).join(" · ");
+      return [`<b>${i + 1}. ${esc(x.name)}</b> — ${esc(꼬리)}<br>${esc(첫줄(x))}`, `${i + 1}. ${x.name} — ${꼬리}\n${첫줄(x)}`];
+    });
+    넣(`<p><b>📌 오늘의 핵심 ${핵심.length}가지</b></p>`, `📌 오늘의 핵심 ${핵심.length}가지`);
+    h.forEach(([a, b]) => 넣(`<p>${a}</p>`, b));
+  }
+
+  const 변화 = (k, 제목, 모양) => {
+    const a = (D[k] || []).slice().sort((x, y) => Math.abs(y.pct ?? 0) - Math.abs(x.pct ?? 0));
+    if (!a.length) return;
+    const 줄들 = a.map(모양);
+    넣(`<p><b>${제목} (${a.length}건)</b><br>${줄들.map(esc).join("<br>")}</p>`, `${제목} (${a.length}건)\n${줄들.join("\n")}`);
+  };
+  변화("tpUp", "🎯 목표주가 상향", x => `· ${x.name} ${원(x.prev)} → ${원(x.now)}${x.pct != null ? ` (${부호(x.pct)})` : ""} · ${x.broker || ""}`);
+  변화("tpDown", "🔻 목표주가 하향", x => `· ${x.name} ${원(x.prev)} → ${원(x.now)}${x.pct != null ? ` (${부호(x.pct)})` : ""} · ${x.broker || ""}`);
+  const eps = (k, 제목) => {
+    const a = (D[k] || []).slice().sort((x, y) => Math.abs(y.pct ?? 0) - Math.abs(x.pct ?? 0));
+    if (!a.length) return;
+    const 묶음 = new Map();          // 같은 종목을 여러 증권사가 바꿨으면 한 번만: LG생활건강(-14.0%, -11.4%)
+    for (const x of a) { if (!묶음.has(x.name)) 묶음.set(x.name, []); if (x.pct != null) 묶음.get(x.name).push(부호(x.pct)); }
+    const t = [...묶음].map(([n, ps]) => `${n}${ps.length ? `(${ps.join(", ")})` : ""}`).join(", ");
+    넣(`<p><b>${제목}</b> ${esc(t)}</p>`, `${제목} ${t}`);
+  };
+  eps("epsUp", "📈 EPS 상향:"); eps("epsDown", "📉 EPS 하향:");
+
+  const 핵심들 = new Set(핵심);
+  // 국내 상장 종목 → 목표가 있는 것 → 나머지(해외·비상장) 순
+  const 나머지 = 종목.filter(x => !핵심들.has(x))
+    .map((x, i) => [x, i]).sort((A, B) => ((B[0].code ? 2 : 0) + (B[0].target ? 1 : 0)) - ((A[0].code ? 2 : 0) + (A[0].target ? 1 : 0)) || A[1] - B[1])
+    .map(A => A[0]);
+  const 보일것 = 전부 ? 나머지 : 나머지.slice(0, 블로그.종목몇개);
+  if (보일것.length) {
+    const 줄들 = 보일것.map(x => {
+      const 머리 = [x.broker, x.opinion, x.target ? 원(x.target) : ""].filter(Boolean).join(" · ");
+      return [`<b>· ${esc(x.name)}</b> (${esc(머리)})<br>&nbsp;&nbsp;${esc(첫줄(x))}`, `· ${x.name} (${머리})\n  ${첫줄(x)}`];
+    });
+    넣(`<p><b>📝 종목 리포트 한 줄 요약</b></p>`, `📝 종목 리포트 한 줄 요약`);
+    넣(`<p>${줄들.map(a => a[0]).join("<br>")}</p>`, 줄들.map(a => a[1]).join("\n"));
+    if (보일것.length < 나머지.length) 넣(`<p>외 ${나머지.length - 보일것.length}건</p>`);
+  }
+  if (산업.length) {
+    const 줄들 = 산업.map(x => [`<b>· ${esc(x.name || "")}</b> ${esc(x.title || "")} (${esc(x.broker || "")})<br>&nbsp;&nbsp;${esc(첫줄(x))}`,
+                                `· ${x.name || ""} ${x.title || ""} (${x.broker || ""})\n  ${첫줄(x)}`]);
+    넣(`<p><b>🏭 산업·시황 리포트</b></p>`, `🏭 산업·시황 리포트`);
+    넣(`<p>${줄들.map(a => a[0]).join("<br>")}</p>`, 줄들.map(a => a[1]).join("\n"));
+  }
+
+  const 태그 = [...블로그.기본태그, ...핵심.map(x => x.name), ...(D.tpUp || []).map(x => x.name)]
+    .filter(Boolean).map(n => String(n).replace(/\s/g, "")).filter((n, i, a) => a.indexOf(n) === i).slice(0, 12);
+  넣(`<p style="color:#8B94B0">${esc(블로그.맺음)}</p>`, 블로그.맺음);
+  넣(`<p>${태그.map(t => "#" + esc(t)).join(" ")}</p>`, 태그.map(t => "#" + t).join(" "));
+
+  const 앞3 = 핵심.map(x => x.name).join("·");
+  return {
+    제목: `[리포트 요약] ${짧은날(날)} 오늘 아침 리포트 핵심 3가지`,
+    다른제목: 앞3 ? `${+날.slice(4, 6)}/${+날.slice(6, 8)} 증권사 리포트 요약 — ${앞3}` : "",
+    html: 줄.filter(a => a[0]).map(a => a[0]).join(""),
+    글: 줄.filter(a => a[1] !== "").map(a => a[1]).join("\n\n"),
+    건수: 리포트.length,
+  };
+}
+
+let 블로그결과 = null;
+function 블로그열기() {
+  if (!DATA || !날) return;
+  블로그결과 = 블로그글(document.getElementById("bAll").checked);
+  document.getElementById("bMeta").textContent = `${날보기(날)} · 리포트 ${블로그결과.건수}건`;
+  document.getElementById("bTitle").textContent = 블로그결과.제목;
+  document.getElementById("bAlt").textContent = 블로그결과.다른제목 ? "다른 제목: " + 블로그결과.다른제목 : "";
+  document.getElementById("bBody").innerHTML = 블로그결과.건수 ? 블로그결과.html : `<p>이 날은 리포트가 없습니다.</p>`;
+  document.getElementById("bMsg").textContent = "";
+  document.getElementById("blog").classList.add("on");
+}
+async function 복사(html, 글) {
+  const 알림 = t => { document.getElementById("bMsg").textContent = t; };
+  try {
+    if (html && window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+      await navigator.clipboard.write([new ClipboardItem({
+        "text/html": new Blob([html], { type: "text/html" }),
+        "text/plain": new Blob([글], { type: "text/plain" }) })]);
+    } else await navigator.clipboard.writeText(글);
+    알림("✅ 복사했습니다. 블로그 글쓰기 화면에 Ctrl+V 로 붙여 넣으세요.");
+  } catch (e) {
+    // 복사 권한이 막힌 브라우저 — 본문을 골라 두고 직접 Ctrl+C 하게 합니다
+    const r = document.createRange(); r.selectNodeContents(document.getElementById("bBody"));
+    const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    알림("자동 복사가 막혀 있습니다. 본문을 골라 두었으니 Ctrl+C 를 눌러 주세요.");
+  }
+}
+const 본문글 = () => { const el = document.getElementById("bBody");
+  return el.innerText.replace(/\n{3,}/g, "\n\n").trim(); };
+document.getElementById("blogBtn").onclick = 블로그열기;
+document.getElementById("bAll").onchange = 블로그열기;
+document.getElementById("bClose").onclick = () => document.getElementById("blog").classList.remove("on");
+document.getElementById("blog").addEventListener("click", e => { if (e.target.id === "blog") e.currentTarget.classList.remove("on"); });
+document.getElementById("bCopyT").onclick = () => 복사(null, document.getElementById("bTitle").textContent);
+document.getElementById("bCopyH").onclick = () => 복사(document.getElementById("bBody").innerHTML, 본문글());
+document.getElementById("bCopyP").onclick = () => 복사(null, 본문글());
 
 // ── 종목 차트 창 (순매수 순위 페이지와 같음) ──
 let mChart = null, mOsc = null, mCandle = null, mOscBars = null, mOverlay = null;
