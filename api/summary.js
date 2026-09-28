@@ -16,8 +16,49 @@ let 쓰는모델 = null;
 // Vercel 기본 제한(10초)으로는 모자랄 수 있어 늘려 둡니다.
 export const config = { maxDuration: 60 };
 
-const 캐시 = new Map();          // 열쇠 → { text, at }
+import { createHash } from "crypto";
+
+const 캐시 = new Map();          // 열쇠 → { text, at } (이 함수 안에서만 잠깐)
 const 캐시시간 = 20 * 60 * 1000;
+
+// ── 서버 공용 저장소(ai_cache.js) ─────────────────────────
+//  모든 회원이 같은 글을 보게 하고, AI 는 '한 시간에 한 번 · 마감 뒤 하루 한 번' 만 부릅니다.
+//  서버가 멈추면 예전처럼 여기서 바로 씁니다(화면이 비지 않게).
+const 서버 = "http://141.164.40.229:3000";
+async function 공용받기(k) {
+  const ac = new AbortController(), t = setTimeout(() => ac.abort(), 3000);
+  try { const r = await fetch(`${서버}/ai-cache?k=${encodeURIComponent(k)}`, { signal: ac.signal }); return r.ok ? await r.json() : null; }
+  catch (e) { return null; } finally { clearTimeout(t); }
+}
+async function 공용저장(k, text, model, forced, 키) {
+  const ac = new AbortController(), t = setTimeout(() => ac.abort(), 3000);
+  try {
+    await fetch(`${서버}/ai-cache`, { method: "POST", signal: ac.signal,
+      headers: { "Content-Type": "application/json", "x-ai-cache": createHash("sha256").update(키 + "|ai-cache").digest("hex").slice(0, 32) },
+      body: JSON.stringify({ k, text, model, forced }) });
+  } catch (e) {} finally { clearTimeout(t); }
+}
+const 날꼴 = d => d.toISOString().slice(0, 10).replace(/-/g, "");
+// 글 한 편이 쓰일 '칸' — 장중엔 한 시간마다 새 칸, 장 밖에는 그날 마감 칸 하나
+function 칸열쇠(시장, 자료) {
+  const 한국 = new Date(Date.now() + 9 * 3600e3);
+  const 요일 = 한국.getUTCDay(), 분 = 한국.getUTCHours() * 60 + 한국.getUTCMinutes();
+  const 시 = String(한국.getUTCHours()).padStart(2, "0");
+  if (시장 === "us") {
+    // 한국시간 22:00~다음날 07:00 이 한 세션. 12시간을 빼면 세션 날짜가 됩니다.
+    const 세 = new Date(한국.getTime() - 12 * 3600e3);
+    const 세요일 = 세.getUTCDay();
+    if (세요일 === 6 || 세요일 === 0) {                       // 주말 밤 → 금요일 마감 글
+      세.setUTCDate(세.getUTCDate() - (세요일 === 6 ? 1 : 2));
+      return `us|${날꼴(세)}|마감`;
+    }
+    const 장중 = 분 >= 22 * 60 || 분 < 7 * 60;
+    return `us|${날꼴(세)}|${장중 ? "장중" + 시 : "마감"}`;
+  }
+  const 자료날 = String((자료 && (자료.date || (자료.kospi && 자료.kospi.date))) || "").replace(/\D/g, "").slice(0, 8);
+  const 장중 = 요일 >= 1 && 요일 <= 5 && 분 >= 9 * 60 && 분 < 15 * 60 + 40;
+  return `${시장}|${자료날 || 날꼴(한국)}|${장중 ? "장중" + 시 : "마감"}`;
+}
 
 // 지표 하나만 놓고 짧게 해석할 때 쓰는 규칙
 const 지표규칙 = `당신은 한국 경제지 증권부 기자입니다. 지표 하나를 놓고 지금 상태를 짚어 줍니다.
@@ -201,10 +242,18 @@ export default async function handler(req, res) {
   if (시장뉴스.length) 본문 += "\n\n[시장 뉴스]\n" + 적기(시장뉴스.slice(0, 15));
   if (!본문.trim()) return res.status(400).json({ error: "요약할 자료가 없습니다" });
 
-  const 열쇠 = 시장 + "|" + 본문;
+  const 열쇠 = 칸열쇠(시장, 자료);
   const 있 = 캐시.get(열쇠);
   if (있 && Date.now() - 있.at < 캐시시간 && !body.force) {
     return res.status(200).json({ text: 있.text, at: 있.at, cached: true });
+  }
+  // 서버에 이미 쓴 글이 있으면 그것을 줍니다.
+  // '다시 쓰기' 는 한 칸에 한 번만, 쓴 지 5분이 지났을 때만 받아 줍니다(여러 사람이 눌러도 비용이 불어나지 않게).
+  const 공 = await 공용받기(열쇠);
+  const 다시되나 = body.force && 공 && !공.forced && Date.now() - (공.at || 0) > 5 * 60 * 1000;
+  if (공 && 공.text && !다시되나) {
+    캐시.set(열쇠, { text: 공.text, at: 공.at });
+    return res.status(200).json({ text: 공.text, at: 공.at, cached: true });
   }
 
   const 머리 = 시장 === "us"
@@ -257,6 +306,7 @@ export default async function handler(req, res) {
     const at = Date.now();
     캐시.set(열쇠, { text, at });
     if (캐시.size > 40) 캐시.delete(캐시.keys().next().value);
+    await 공용저장(열쇠, text, 쓰는모델, !!다시되나, 키);
     res.setHeader("Cache-Control", "no-store");
     res.status(200).json({ text, at, cached: false, model: 쓰는모델 });
   } catch (e) {
