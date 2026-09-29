@@ -613,7 +613,7 @@ async function 자금받기() {
 
 module.exports = (app) => {
   setTimeout(스테이트모으기, 60 * 1000);            // 서버가 뜨고 1분 뒤
-  setInterval(스테이트모으기, 6 * 3600 * 1000);     // 그다음 6시간마다
+  setInterval(스테이트모으기, 1 * 3600 * 1000);     // 그다음 1시간마다 (9/29: 6시간 → 1시간 — State Street 가 한국시간 밤에 올리면 바로 받게)
 
   // State Street 자료가 모였는지 확인용
   app.get('/us-flow/ssga', (req, res) => {
