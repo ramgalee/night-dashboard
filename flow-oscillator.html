@@ -262,23 +262,29 @@ function fmtDate(d){
   return d.slice(0,4) + "-" + d.slice(4,6) + "-" + d.slice(6,8);
 }
 
-async function loadData(code){
+// 서버·키움이 잠깐 바쁠 때(다른 수집과 겹칠 때 등) 차트가 비지 않게, 실패하면 두 번까지 다시 받습니다.
+let 보는코드 = null;
+async function loadData(code, 재시도 = 0){
   const statusEl = document.getElementById('statusText');
   const warnEl = document.getElementById('warningBox');
-  statusEl.textContent = code + " 조회 중...";
+  보는코드 = code;
+  statusEl.textContent = code + (재시도 ? ` 다시 조회 중... (${재시도}/2)` : " 조회 중...");
   warnEl.innerHTML = "";
+  const 다시 = (까닭) => {
+    if (보는코드 !== code) return;                       // 그 사이 다른 종목을 골랐으면 그만
+    if (재시도 < 2) {
+      statusEl.textContent = `${까닭} — 잠시 뒤 다시 시도합니다 (${재시도 + 1}/2)`;
+      setTimeout(() => { if (보는코드 === code) loadData(code, 재시도 + 1); }, 4000);
+    } else statusEl.textContent = `${까닭} — 잠시 뒤 종목을 다시 눌러 보세요`;
+  };
   try {
     const r = await fetch("/api/flow-oscillator?code=" + encodeURIComponent(code), { cache: "no-store" });
-    const data = await r.json();
-    if (data.error) {
-      statusEl.textContent = "오류: " + data.message;
-      return;
-    }
+    let data;
+    try { data = await r.json(); } catch (e) { return 다시("서버 응답이 늦습니다"); }
+    if (보는코드 !== code) return;
+    if (data.error) return 다시("오류: " + data.message);
     const series = data.series || [];
-    if (series.length === 0) {
-      statusEl.textContent = "데이터가 없습니다.";
-      return;
-    }
+    if (series.length === 0) return 다시("데이터가 없습니다");
     candleSeries.setData(series.map(s => ({
       time: fmtDate(s.date), open: s.open, high: s.high, low: s.low, close: s.close,
     })));
@@ -311,7 +317,7 @@ async function loadData(code){
       warnEl.innerHTML = `<div class="notice">${data.warmupNotice}</div>`;
     }
   } catch (e) {
-    statusEl.textContent = "불러오지 못했습니다: " + e;
+    다시("불러오지 못했습니다");
   }
 }
 
