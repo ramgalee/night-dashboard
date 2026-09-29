@@ -113,24 +113,53 @@ async function 앞쪽만(pdf) {
   } catch (e) { return { pdf, pages: null, cut: false }; }
 }
 
+// AI 답 속 곧은 따옴표(")가 JSON 을 깨뜨렸을 때 고칩니다 (report_blog.js 와 같은 방법)
+function 따옴표고치기(t) {
+  let 안 = false, 결과 = '', 열림 = false;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (c === '\\' && 안) { 결과 += c + (t[i + 1] || ''); i++; continue; }
+    if (c === '"') {
+      if (!안) { 안 = true; 열림 = false; 결과 += c; continue; }
+      let k = i + 1; while (k < t.length && /\s/.test(t[k])) k++;
+      if (k >= t.length || ',:}]'.includes(t[k])) { 안 = false; 결과 += c; }
+      else { 결과 += 열림 ? '”' : '“'; 열림 = !열림; }
+      continue;
+    }
+    if (안 && (c === '\n' || c === '\r')) { 결과 += '\\n'; continue; }
+    결과 += c;
+  }
+  return 결과;
+}
+
 async function AI읽기(원본pdf) {
   const { pdf, pages, cut } = await 앞쪽만(원본pdf);
   const 키 = 환경('ANTHROPIC_API_KEY');
   if (!키) throw new Error('ANTHROPIC_API_KEY 가 없습니다');
-  let 마지막오류 = null;
-  for (const model of 모델후보) {
+  let 마지막오류 = null, 한번더 = 0, 토큰 = 4000;
+  const 차례 = [...모델후보];
+  while (차례.length) {
+    const model = 차례.shift();
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': 키, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
-        model, max_tokens: 4000,          // temperature 는 넣지 않습니다 — Sonnet 5 부터 받지 않음(400). 토큰은 넉넉히(모자라면 빈 답)
+        model, max_tokens: 토큰,          // temperature 는 넣지 않습니다 — Sonnet 5 부터 받지 않음(400). 토큰은 넉넉히(모자라면 빈 답)
         messages: [{ role: 'user', content: [
           { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdf.toString('base64') } },
           { type: 'text', text: 지시 },
         ] }],
       }),
     });
-    const j = await r.json();
+    // ★ 2026-09-30 — AI 쪽이 붐빌 때 빈 답(본문 없음)이 오면 예전에는 'Unexpected end of JSON input' 으로 끝났습니다.
+    //   이제 글로 먼저 받아 보고, 비었으면 '다시 될 오류' 로 넘겨 30분 뒤 저절로 다시 시도합니다.
+    const 원문 = await r.text();
+    let j;
+    try { j = JSON.parse(원문); }
+    catch (e) {
+      if (한번더 < 1) { 한번더++; await 쉬기(5000); 차례.unshift(model); continue; }   // 5초 쉬고 한 번 더
+      throw new Error(`AI 응답이 비었거나 잘림 (HTTP ${r.status}) — timeout`);
+    }
     if (!r.ok) {
       마지막오류 = (j.error && j.error.message) || String(r.status);
       상태.modelNote = `${new Date().toISOString()} ${model} → ${r.status} ${마지막오류}`.slice(0, 400);   // 왜 다음 모델로 넘어갔나
@@ -138,9 +167,18 @@ async function AI읽기(원본pdf) {
       throw new Error(마지막오류);
     }
     const 글 = (j.content || []).filter(x => x.type === 'text').map(x => x.text).join('');
+    // 글이 길어 도중에 잘렸으면(max_tokens) 토큰을 늘려 한 번 더
+    if (j.stop_reason === 'max_tokens' && 한번더 < 1) { 한번더++; 토큰 = 8000; 차례.unshift(model); continue; }
     const m = 글.match(/\{[\s\S]*\}/);
-    if (!m) throw new Error('AI 답이 JSON 이 아닙니다');
-    const 결과 = JSON.parse(m[0]);
+    let 결과 = null;
+    if (m) {
+      try { 결과 = JSON.parse(m[0]); }
+      catch (e) { try { 결과 = JSON.parse(따옴표고치기(m[0])); } catch (e2) { 결과 = null; } }
+    }
+    if (!결과) {
+      if (한번더 < 1) { 한번더++; 차례.unshift(model); continue; }   // 모양이 깨졌으면 한 번만 다시 쓰게
+      throw new Error('AI 답을 읽지 못했습니다(모양이 깨짐)');
+    }
     결과._model = model; 결과._pages = pages; 결과._cut = cut;
     결과._tokens = j.usage ? (j.usage.input_tokens || 0) + (j.usage.output_tokens || 0) : null;
     return 결과;
@@ -230,7 +268,7 @@ function 대기지우기(m) {
 let 처리중 = false;
 // 크레딧 부족·한도 초과·AI 혼잡처럼 '기다리면 풀리는' 실패는 따로 적어 두었다가
 // 30분마다 다시 시도합니다. 충전하면 밀린 PDF 가 저절로 요약됩니다(최대 3일, 20번).
-const 다시될오류 = /credit|balance|billing|limit|quota|overload|rate|529|503|502|500|timeout|ETIMEDOUT|ECONNRESET|fetch failed/i;
+const 다시될오류 = /credit|balance|billing|limit|quota|overload|rate|529|503|502|500|timeout|ETIMEDOUT|ECONNRESET|fetch failed|Unexpected end of JSON|비었거나 잘림|모양이 깨짐/i;
 function 밀린것저장(m, 채널, 오류) {
   const d = 읽기(); d.retry = d.retry || [];
   const id = `${m.chat.id}_${m.message_id}`, 기존 = d.retry.find(x => x.id === id);
