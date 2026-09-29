@@ -1,20 +1,31 @@
-// 이제 Vercel이 키움 서버에 직접 연결하지 않고,
-// 고정 IP를 가진 중계 서버(Vultr)를 통해서 데이터를 가져옵니다.
-// 중계 서버 주소는 아래 RELAY_URL에서 바꿀 수 있습니다.
-
+// 수급오실레이터 — 중계 서버(Vultr)의 /flow-oscillator 를 그대로 전해 줍니다.
+//   GET /api/flow-oscillator?code=000660
+//
+// ★ 2026-09-29 고침 — 서버·키움이 잠깐 바쁠 때(대형주 수급 수집과 겹칠 때 등) 차트가 안 나오던 문제
+//   · 기다리는 시간을 넉넉히(최대 55초) — 예전에는 Vercel 기본 제한에 걸려 끊길 수 있었습니다.
+//   · 실패하면 2초 쉬고 한 번 더 받아 봅니다.
+export const config = { maxDuration: 60 };
 const RELAY_URL = process.env.KIWOOM_RELAY_URL || "http://141.164.40.229:3000";
+const 쉬기 = ms => new Promise(r => setTimeout(r, ms));
 
-module.exports = async (req, res) => {
+async function 한번(code) {
+  const ac = new AbortController(), t = setTimeout(() => ac.abort(), 25000);
+  try {
+    const r = await fetch(`${RELAY_URL}/flow-oscillator?code=${encodeURIComponent(code)}`, { signal: ac.signal });
+    const data = await r.json();
+    if (data && !data.error && Array.isArray(data.series) && data.series.length) return data;
+    throw new Error((data && (data.message || data.error)) || "빈 결과");
+  } finally { clearTimeout(t); }
+}
+
+export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Cache-Control", "no-store");
-
-  const code = String(req.query?.code || "000660").trim();
-
-  try {
-    const r = await fetch(`${RELAY_URL}/flow-oscillator?code=${encodeURIComponent(code)}`);
-    const data = await r.json();
-    res.status(200).json(data);
-  } catch (e) {
-    res.status(200).json({ error: true, message: "중계 서버 연결 실패: " + String(e && e.message ? e.message : e) });
+  const code = String((req.query && req.query.code) || "000660").trim();
+  let 마지막 = null;
+  for (let k = 0; k < 2; k++) {
+    try { return res.status(200).json(await 한번(code)); }
+    catch (e) { 마지막 = e; if (k === 0) await 쉬기(2000); }
   }
-};
+  res.status(200).json({ error: true, message: "중계 서버 응답 실패: " + String((마지막 && 마지막.message) || 마지막) });
+}
