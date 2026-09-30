@@ -133,6 +133,27 @@
     #tiltOsc   { height:130px; }
     .tilt-val  { margin-left:0; width:100%; }
   }
+  /* 업종 폭 */
+  .br-flag { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600; border-radius:999px;
+             padding:5px 11px; border:1px solid var(--hair); background:var(--surface2); color:var(--textSec); }
+  .br-flag i { width:8px; height:8px; border-radius:50%; background:var(--textTer); }
+  .br-flag.on-red { background:#FDECEC; border-color:#F3B7B9; color:#B4262B; } .br-flag.on-red i { background:#E5484D; }
+  .br-flag.on-blue { background:#EAF1FE; border-color:#B7CDF8; color:#1F4FB8; } .br-flag.on-blue i { background:#2F6FED; }
+  .br-bar { height:6px; background:var(--surface2); border-radius:3px; margin-top:6px; overflow:hidden; }
+  .br-bar b { display:block; height:100%; border-radius:3px; }
+  #brChart svg { display:block; max-width:100%; }
+  .br-wrap { overflow-x:auto; }
+  .br-tbl td, .br-tbl th { white-space:nowrap; }
+  .br-stat { background:var(--surface2); border-radius:12px; padding:12px 14px; font-size:12.5px; line-height:1.75; color:var(--textSec); margin-top:14px; }
+  .br-stat b { color:var(--textPri); }
+  .br-tbl { width:100%; border-collapse:collapse; font-size:12px; margin-top:8px; }
+  .br-tbl th, .br-tbl td { padding:6px 8px; border-bottom:1px solid var(--hair); text-align:right; font-family:var(--mono); }
+  .br-tbl th:first-child, .br-tbl td:first-child { text-align:left; font-family:var(--sans); }
+  .br-tbl th { color:var(--textTer); font-weight:500; font-family:var(--sans); }
+  .br-tbl tr.now td { background:#FFF7E8; font-weight:700; }
+  details.br-ev summary { cursor:pointer; font-size:12px; color:var(--textSec); margin-top:12px; }
+  @media (max-width:480px) { .br-tbl { font-size:11px; } .br-tbl th, .br-tbl td { padding:6px 4px; } }
+
   .note { border:1px dashed var(--hair); border-radius:12px; padding:12px 16px; font-size:11.5px;
           color:var(--textTer); line-height:1.7; background:var(--surface); }
 
@@ -290,6 +311,32 @@
     높으면 업종이 다 같이 움직이는 장, 낮으면 업종끼리 따로 노는 장입니다. 두 지표는 서로 다른 축을 봅니다.
     차트 위에 마우스를 올리면 그날의 주도 업종이 바뀝니다.
     자체 산출 지표이며 투자 판단의 근거로 사용할 수 없습니다.
+  </div>
+<div class="card" id="brCard">
+    <div class="between">
+      <div>
+        <div style="font-size:13px;color:var(--textSec);">업종 폭 <span style="font-size:11px;color:var(--textTer);">· 코스피 26개 업종 중 이동평균선 위에 있는 업종 비율</span></div>
+        <div style="font-size:11px;color:var(--textTer);margin-top:2px;" id="brMeta">불러오는 중...</div>
+      </div>
+      <div class="row" style="gap:8px;" id="brFlags"></div>
+    </div>
+    <div class="parts" id="brParts"></div>
+    <div class="tilt-keys" style="margin-top:16px;">
+      <span><i style="background:#2F6FED;"></i>50일선 위 (5일 평균) · 추세</span>
+      <span><i style="background:#E8833A;"></i>120일선 위 · 역추세</span>
+      <span><i style="background:rgba(229,72,77,.25);"></i>역추세 조건이 켜진 날</span>
+    </div>
+    <div id="brChart"></div>
+    <div class="br-stat" id="brStat"></div>
+    <details class="br-ev"><summary>과거 역추세 조건이 켜진 날 보기</summary><div id="brEvents"></div></details>
+  </div>
+
+  <div class="note">
+    <b>업종 폭</b>은 코스피 WI26 26개 업종 가운데 10·20·50·120일 이동평균선 위에 있는 업종의 비율입니다.
+    <b>추세</b>는 50일선 위 비율(5일 평균)이 50% 이상일 때, <b>역추세</b>는 120일선 위 업종이 20% 이하이면서
+    코스피가 1년 고점 대비 −20% 이하일 때 켜집니다 — 업종이 거의 다 무너진 바닥권이라는 뜻입니다.
+    아래 과거 통계는 2010년 6월부터의 백테스트 결과로, 앞으로도 같다는 보장이 없습니다.
+    자체 산출 지표이며 매수·매도를 권하는 신호가 아니고, 투자 판단의 근거로 사용할 수 없습니다.
   </div>
 </div>
 
@@ -1022,5 +1069,77 @@ document.getElementById("tiltAiGo").onclick = () => 해석쓰기("tilt", 쏠림�
 
 </script>
 
+
+<script>
+// ── 업종 폭 (sector_breadth.json · 칸 40) ─────────────────────
+(async function 업종폭() {
+  const 틀 = id => document.getElementById(id);
+  let J;
+  try { J = await (await fetch('/sector_breadth.json', { cache: 'no-store' })).json(); }
+  catch (e) { 틀('brMeta').textContent = 'sector_breadth.json 이 아직 없습니다 (주피터 칸 40).'; return; }
+  const 날 = d => `${d.slice(0,4)}.${d.slice(4,6)}.${d.slice(6,8)}`;
+  const 부호 = v => v == null ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1) + '%';
+  틀('brMeta').textContent = `${날(J.date)} 기준 · ${J.universe}` + (J.dd != null ? ` · 코스피 1년 고점 대비 ${부호(J.dd)}` : '');
+
+  // 상태 표시
+  틀('brFlags').innerHTML =
+    `<span class="br-flag ${J.contrarian ? 'on-red' : ''}"><i></i>역추세 ${J.contrarian ? '켜짐' : '꺼짐'}</span>` +
+    `<span class="br-flag ${J.trend ? 'on-blue' : ''}"><i></i>추세 ${J.trend ? '켜짐' : '꺼짐'}</span>`;
+
+  // 네 칸
+  const 색 = p => p >= 80 ? '#E5484D' : p >= 50 ? '#E8833A' : p > 20 ? '#8B94B0' : '#2F6FED';
+  const 이름 = { ma10: '10일선 위', ma20: '20일선 위', ma50: '50일선 위', ma120: '120일선 위 · 역추세용' };
+  틀('brParts').innerHTML = Object.keys(이름).map(k => {
+    const x = J.now[k];
+    return `<div class="part"><div class="part-l">${이름[k]}</div>
+      <div class="part-v">${x.pct.toFixed(1)}<span style="font-size:12px;color:var(--textTer);">%</span></div>
+      <div class="part-s">${x.above} / ${x.total} 업종</div>
+      <div class="br-bar"><b style="width:${x.pct}%;background:${색(x.pct)}"></b></div></div>`;
+  }).join('');
+
+  // 차트 (최근 1년)
+  const 차트그리기 = () => {
+  const S = J.series || [], W = Math.max(300, 틀('brChart').clientWidth || 900), H = W < 600 ? 200 : 230, L = 30, R = 6, T = 10, B = 24;
+  const x = i => L + (W - L - R) * (S.length > 1 ? i / (S.length - 1) : 0);
+  const y = v => T + (H - T - B) * (1 - v / 100);
+  const 선 = (k, c, w) => {
+    let d = '', 붓 = false;
+    S.forEach((p, i) => { const v = p[k]; if (v == null) { 붓 = false; return; } d += (붓 ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1); 붓 = true; });
+    return `<path d="${d}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linejoin="round"/>`;
+  };
+  const 칸폭 = S.length > 1 ? (W - L - R) / (S.length - 1) : 0;
+  const 띠 = S.map((p, i) => (p.b120 <= 20 && p.dd != null && p.dd <= -20)
+    ? `<rect x="${(x(i) - 칸폭 / 2).toFixed(1)}" y="${T}" width="${Math.max(칸폭, 1).toFixed(1)}" height="${H - T - B}" fill="rgba(229,72,77,.18)"/>` : '').join('');
+  const 가로 = [0, 20, 50, 80, 100].map(v => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="#E1E5F0" ${v === 20 || v === 50 || v === 80 ? 'stroke-dasharray="4 4" stroke="#B8BFD4"' : ''}/>
+    <text x="${L - 6}" y="${y(v) + 3.5}" font-size="10" fill="#8B94B0" text-anchor="end">${v}</text>`).join('');
+  let 달 = '', 전달 = '';
+  S.forEach((p, i) => { const m = p.d.slice(0, 6); if (m !== 전달) { 전달 = m;
+    if (i > 5 && (W >= 600 || +p.d.slice(4, 6) % 2 === 1)) 달 += `<text x="${x(i)}" y="${H - 6}" font-size="10" fill="#8B94B0" text-anchor="middle">${+p.d.slice(4, 6)}월</text>`; } });
+  틀('brChart').innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="업종 폭 추이">${띠}${가로}${달}
+    ${선('b120', '#E8833A', 1.4)}${선('b50m5', '#2F6FED', 2)}</svg>`;
+  };
+  차트그리기();
+  let 창폭 = window.innerWidth;
+  window.addEventListener('resize', () => { if (window.innerWidth !== 창폭) { 창폭 = window.innerWidth; 차트그리기(); } });
+
+  // 과거 통계
+  const h = J.history || {}, e = h.역추세 || {}, 평 = h.평균 || {};
+  const 지금구간 = (() => { const p = J.now.ma120.pct; return p <= 20 ? '0~20%' : p <= 40 ? '20~40%' : p <= 60 ? '40~60%' : p <= 80 ? '60~80%' : '80~100%'; })();
+  틀('brStat').innerHTML =
+    `<b>과거에는 어땠나</b> <span style="color:var(--textTer);font-size:11px;">(${h.기간 || ''} · 코스피 기준)</span><br>` +
+    `역추세 조건이 켜진 <b>${e.횟수}번</b> 중 결과가 나온 ${e.n20}번 — <b>20거래일 뒤 오른 비율 ${e.up20}%</b> · 평균 ${부호(e.f20)} · 가장 나빴던 때 ${부호(e.worst20)}` +
+    ` / 60거래일 뒤(${e.n60}번) 오른 비율 ${e.up60}% · 평균 ${부호(e.f60)}<br>` +
+    `<span style="color:var(--textTer);">같은 기간 아무 날이나 샀을 때: 20거래일 뒤 평균 ${부호(평.f20)} · 오른 비율 ${평.up20}%. ` +
+    `하락이 길게 이어진 2022년에는 여러 번 틀렸습니다.</span>` +
+    `<div class="br-wrap"><table class="br-tbl"><tr><th>120일선 위</th><th>일수</th><th>20일 뒤</th><th>오른 비율</th><th>60일 뒤</th></tr>` +
+    (h.구간120 || []).map(r => `<tr class="${r.구간 === 지금구간 ? 'now' : ''}"><td>${r.구간}${r.구간 === 지금구간 ? ' ← 지금' : ''}</td><td>${r.일수.toLocaleString()}</td>` +
+      `<td>${부호(r.f20)}</td><td>${r.up20}%</td><td>${부호(r.f60)}</td></tr>`).join('') + `</table></div>` +
+    `<div style="font-size:11px;color:var(--textTer);margin-top:6px;">20일 뒤 · 60일 뒤 = 그 구간에 있던 날부터 20·60거래일 뒤 코스피 평균 등락 · 오른 비율 = 20거래일 뒤 오른 날의 비율</div>`;
+  틀('brEvents').innerHTML = `<div class="br-wrap"><table class="br-tbl"><tr><th>날짜</th><th>120일선 위</th><th>고점 대비</th><th>20일 뒤</th><th>60일 뒤</th></tr>` +
+    (e.사건 || []).slice().reverse().map(r => `<tr><td>${날(r.d)}</td><td>${r.b120.toFixed(1)}%</td><td>${부호(r.dd)}</td>` +
+      `<td style="color:${r.f20 == null ? '' : r.f20 >= 0 ? 'var(--up)' : 'var(--down)'}">${r.f20 == null ? '진행 중' : 부호(r.f20)}</td>` +
+      `<td style="color:${r.f60 == null ? '' : r.f60 >= 0 ? 'var(--up)' : 'var(--down)'}">${r.f60 == null ? '진행 중' : 부호(r.f60)}</td></tr>`).join('') + `</table></div>`;
+})();
+</script>
 </body>
 </html>
