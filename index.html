@@ -965,9 +965,10 @@ function renderIndexCard(label, o) {
 
   let flow = "";
   if (o.flow) {
-    // 원 단위 그대로 쓰면 자릿수가 길어 좁은 화면을 넘칩니다. 억 단위로 줄입니다.
+    // 서버가 주는 순매수는 억원 단위입니다(키움 ka10051). 1조 넘으면 조로 줄입니다.
+    // (2026-09-30 고침 — 예전에는 원 단위로 보고 1억으로 나눠 낮에 ±0.0 으로 보였습니다)
     const 억으로 = v => {
-      const 억 = Math.abs(v) / 1e8;
+      const 억 = Math.abs(v);
       if (억 >= 10000) return (억 / 10000).toFixed(1) + "조";
       if (억 >= 100) return Math.round(억).toLocaleString("ko-KR");
       return 억.toFixed(억 >= 10 ? 0 : 1);
