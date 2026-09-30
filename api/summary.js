@@ -125,7 +125,8 @@ function 국내정리(d) {
   지수("코스피", d.kospi);
   지수("코스닥", d.kosdaq);
   const f = (d.kospi && d.kospi.flow) || {};
-  const 억 = v => v == null ? null : Math.round(v / 1e8);
+  // 순매수는 억원 단위로 옵니다(키움 ka10051). 혹시 원 단위(1e6 이상)면 억으로 바꿉니다.
+  const 억 = v => v == null ? null : Math.round(Math.abs(v) >= 1e6 ? v / 1e8 : v);
   if (f.individual != null || f.foreign != null || f.institution != null) {
     줄.push(`코스피 투자자 순매수(억원): 개인 ${억(f.individual)}, 외국인 ${억(f.foreign)}, 기관 ${억(f.institution)}`);
   }

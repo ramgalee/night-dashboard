@@ -7,6 +7,9 @@
 //   그래서 장 밖(평일 15:30~다음 날 08:00 · 주말)에는 그날 하루 합계(서버 /flow-history,
 //   KRX+NXT 통합 · 억원)로 바꿔 보여 줍니다. 다음 날 08:00 넥스트레이드 프리마켓이 열리면 다시 실시간입니다.
 //   하루 합계를 못 받으면 예전처럼 서버 값을 그대로 씁니다.
+//
+// ★ 2026-09-30 — 단위를 억원으로 통일합니다. 서버(키움 ka10051)는 억원으로 주고,
+//   야간 증시·브리핑도 억원으로 읽습니다. 혹시 원 단위(1e6 이상)가 섞여 오면 억으로 바꿉니다.
 const 서버 = 'http://141.164.40.229:3000';
 
 async function 받기(주소, 초) {
@@ -30,9 +33,18 @@ const 며칠전 = (ymd, n) => {
   return d.toISOString().slice(0, 10).replace(/-/g, '');
 };
 
+const 억으로 = v => (typeof v === 'number' && Math.abs(v) >= 1e6) ? Math.round(v / 1e8) : v;
+function 단위맞춤(f) {
+  if (!f) return f;
+  for (const k of ['individual', 'foreign', 'institution']) f[k] = 억으로(f[k]);
+  if (f.detail) for (const k of Object.keys(f.detail)) f.detail[k] = 억으로(f.detail[k]);
+  return f;
+}
+
 export default async function handler(req, res) {
   try {
     const data = await 받기(`${서버}/index-intraday`, 20);
+    for (const 키 of ['kospi', 'kosdaq']) if (data[키] && data[키].flow) 단위맞춤(data[키].flow);
 
     if (장밖()) {
       try {
@@ -43,9 +55,9 @@ export default async function handler(req, res) {
           for (const [키, 시장] of [['kospi', 'KOSPI'], ['kosdaq', 'KOSDAQ']]) {
             const x = 줄 && 줄[시장];
             if (!x || !data[키] || [x.개인, x.외국인, x.기관계].some(v => v == null)) continue;
-            // flow-history 는 억원, 화면은 원 단위를 받아 억으로 줄여 씁니다
+            // flow-history 도 억원 — 그대로 넣습니다
             data[키].flow = { ...(data[키].flow || {}),
-              individual: x.개인 * 1e8, foreign: x.외국인 * 1e8, institution: x.기관계 * 1e8,
+              individual: x.개인, foreign: x.외국인, institution: x.기관계,
               basis: '하루 합계 (KRX+NXT)' };
           }
           data.flowBasis = 줄 ? 'day-total' : 'live';
