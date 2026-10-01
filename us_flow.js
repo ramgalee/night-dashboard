@@ -18,6 +18,9 @@
 //  1-2) 정확 — State Street 공시 (SPY · 섹터 SPDR 11개)
 //     설정일부터의 NAV · 상장주식수를 엑셀로 받아 같은 방식으로 셉니다. 과거까지 바로 나옵니다.
 //
+//  1-3) 정확 — 운용사 직접 공시 (QQQ 인베스코 · SMH 반에크 · DRAM 라운드힐) — 10/1 추가, 아래 '운용사' 참고
+//     이틀치가 쌓이기 전에는 아래 추정으로 보여 줍니다.
+//
 //  2) 추정  — 야후 순자산 (나머지)
 //     운용사마다 공시 형식이 달라 전부 읽으려면 파서가 다섯 개 필요합니다.
 //     그래서 나머지는 순자산에서 가격 상승분을 빼는 표준 추정식을 씁니다.
@@ -414,6 +417,201 @@ function 스테이트흐름(기호) {
   };
 }
 
+// ── 운용사 직접 공시 (QQQ 인베스코 · SMH 반에크 · DRAM 라운드힐) — 10/1 추가 ─────────────
+//   야후 순자산(며칠씩 안 바뀜)으로 '추정'하던 셋을, 운용사가 공시한 상장주식수로 '정확'하게 셉니다.
+//     QQQ   인베스코 공개 JSON — 그날 순자산(날짜 붙음) ÷ 같은 날 NAV(이력) = 상장주식수
+//     DRAM  라운드힐 홈페이지가 쓰는 CSV — Shares Outstanding · NAV · Rate Date
+//     SMH   반에크 엑셀(쿠키를 받아야 내려줌 → curl 로) — 보유내역 머리말의 Shares Outstanding · NAV 이력
+//   그날 숫자만 주는 곳이 많아 서버가 하루에 한 줄씩 /root/app/issuer_flow.json 에 쌓습니다.
+//   그래서 붙인 뒤 둘째 거래일부터 '정확' 값이 나오고, 그 전에는 예전처럼 추정으로 보여 줍니다.
+//   GET /us-flow/issuers   — 쌓인 날수 · 마지막 날 · 오류 (반에크 엑셀 모양이 다르면 앞줄을 보여 줌)
+const { execFile } = require('child_process');
+const 운용사파일 = '/root/app/issuer_flow.json';
+const 운용사들 = ['QQQ', 'SMH', 'DRAM'];
+let 운용사저장 = (() => { try { return JSON.parse(fs.readFileSync(운용사파일, 'utf8')); } catch (e) { return {}; } })();
+const 운용사상태 = { 마지막: null, 결과: {} };
+const 브라우저 = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+
+function 날로(v) {                                    // 여러 날짜 모양 → "20260930"
+  const s = String(v == null ? '' : v).trim();
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return m[1] + m[2] + m[3];
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (m) return (m[3].length === 2 ? '20' + m[3] : m[3]) + m[1].padStart(2, '0') + m[2].padStart(2, '0');
+  m = s.match(/([A-Za-z]{3})[a-z]*\.? (\d{1,2}),? (\d{4})/); if (m && 영달[m[1]]) return m[3] + 영달[m[1]] + m[2].padStart(2, '0');
+  if (typeof v === 'number') return 날짜풀기(v);
+  return 날짜풀기(s);
+}
+function 한줄넣기(기호, 날, nav, 주식수) {
+  if (!날 || !(nav > 0) || !(주식수 > 0)) throw new Error(`숫자가 이상함 (날 ${날} · NAV ${nav} · 주식수 ${주식수})`);
+  const h = 운용사저장[기호] = 운용사저장[기호] || {};
+  h[날] = [Math.round(nav * 1e6) / 1e6, Math.round(주식수)];
+  const 날들 = Object.keys(h).sort();
+  for (const d of 날들.slice(0, Math.max(0, 날들.length - 스테이트보관))) delete h[d];
+  return `${날} · NAV ${nav} · 주식수 ${Math.round(주식수).toLocaleString('en-US')}`;
+}
+
+// QQQ — 인베스코
+async function 인베스코() {
+  const 머 = { Accept: 'application/json,*/*', Referer: 'https://www.invesco.com/', 'User-Agent': 브라우저 };
+  const base = 'https://dng-api.invesco.com/cache/v1/accounts/en_US/shareclasses/46090E103';
+  const 받 = async u => { const r = await fetch(u, { headers: 머 }); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); };
+  const fd = await 받(`${base}?idType=cusip&productType=ETF&expand=nav&variationType=fundDetails`);
+  const 날 = 날로(fd.shareclassTotalNetAssetsEffectiveDate || fd.effectiveDate);
+  const 순 = Number(fd.shareclassTotalNetAssets);
+  const navs = await 받(`${base}/navs?idType=cusip&productType=ETF`);
+  const 줄 = ((navs.lineChartData || []).find(x => x.type === 'NAV') || {}).data || [];
+  const nav표 = {};
+  for (const p of 줄) { const d = 날로(p.date); if (d && p.value > 0) nav표[d] = Number(p.value); }
+  if (!nav표[날]) throw new Error(`${날} NAV 가 이력에 아직 없음`);
+  // 순자산 ÷ NAV — 설정단위가 5만 주라 100주 단위로 반올림해 계산 잔돈을 없앱니다
+  return 한줄넣기('QQQ', 날, nav표[날], Math.round(순 / nav표[날] / 100) * 100);
+}
+
+// DRAM — 라운드힐 (홈페이지가 읽는 CSV)
+function csv줄(t) {
+  const 줄들 = [];
+  for (const 줄 of t.split(/\r?\n/)) {
+    if (!줄.trim()) continue;
+    const 칸 = []; let 값 = '', 안 = false;
+    for (let i = 0; i < 줄.length; i++) {
+      const c = 줄[i];
+      if (c === '"') { if (안 && 줄[i + 1] === '"') { 값 += '"'; i++; } else 안 = !안; }
+      else if (c === ',' && !안) { 칸.push(값); 값 = ''; }
+      else 값 += c;
+    }
+    칸.push(값); 줄들.push(칸.map(x => x.trim()));
+  }
+  return 줄들;
+}
+async function 라운드힐() {
+  const r = await fetch('https://www.roundhillinvestments.com/assets/data/FilepointRoundhill.40RU.RU_DailyNAV.csv',
+    { headers: { 'User-Agent': 브라우저, Accept: 'text/csv,*/*', Referer: 'https://www.roundhillinvestments.com/etf/dram/' } });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const 줄 = csv줄(await r.text());
+  const 머 = 줄[0] || [], 칸 = n => 머.findIndex(x => x.toLowerCase() === n.toLowerCase());
+  const [iT, iD, iS, iN] = ['Fund Ticker', 'Rate Date', 'Shares Outstanding', 'NAV'].map(칸);
+  if ([iT, iD, iS, iN].some(i => i < 0)) throw new Error('CSV 열 이름이 바뀜: ' + 머.join(' | ').slice(0, 200));
+  const 행들 = 줄.slice(1).filter(x => x[iT] === 'DRAM');
+  if (!행들.length) throw new Error('CSV 에 DRAM 줄이 없음');
+  let 끝 = '';
+  for (const x of 행들) 끝 = 한줄넣기('DRAM', 날로(x[iD]), 숫자로(x[iN]), 숫자로(x[iS]));
+  return 끝 + (행들.length > 1 ? ` (${행들.length}줄)` : '');
+}
+
+// SMH — 반에크 (Cloudflare 쿠키를 받아야 엑셀을 내줘서 curl 로)
+function curl받기(주소) {
+  return new Promise((ok, no) => {
+    const 쿠키 = `/tmp/vaneck_${process.pid}.jar`;
+    execFile('curl', ['-s', '-L', '--max-redirs', '8', '-m', '60', '-A', 브라우저, '-c', 쿠키, '-b', 쿠키, 주소],
+      { encoding: 'buffer', maxBuffer: 30 * 1024 * 1024 }, (e, out) => {
+        try { fs.unlinkSync(쿠키); } catch (x) {}
+        if (e) return no(new Error('curl ' + (e.code || e.message)));
+        ok(out);
+      });
+  });
+}
+// .NET 이 만든 엑셀은 <x:row> 처럼 앞에 이름표가 붙습니다 — 붙어 있어도 읽습니다
+function 엑셀표(buf) {
+  const f = zip풀기(buf);
+  const 공유 = [];
+  const ss = Object.keys(f).find(k => /sharedStrings\.xml$/i.test(k));
+  if (ss) for (const m of f[ss].toString('utf8').matchAll(/<(?:\w+:)?si>([\s\S]*?)<\/(?:\w+:)?si>/g))
+    공유.push([...m[1].matchAll(/<(?:\w+:)?t[^>]*>([\s\S]*?)<\/(?:\w+:)?t>/g)].map(x => 엑셀풀이(x[1])).join(''));
+  const 시트 = Object.keys(f).filter(k => /worksheets\/sheet\d+\.xml$/i.test(k)).sort()[0];
+  if (!시트) throw new Error('시트가 없음');
+  const 표 = [];
+  for (const 줄 of f[시트].toString('utf8').matchAll(/<(?:\w+:)?row\b[^>]*>([\s\S]*?)<\/(?:\w+:)?row>/g)) {
+    const 칸들 = [];
+    for (const c of 줄[1].matchAll(/<(?:\w+:)?c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:\w+:)?c>)/g)) {
+      const t = (c[1].match(/\bt="(\w+)"/) || [])[1], 안 = c[2] || '';
+      const v = (안.match(/<(?:\w+:)?v>([\s\S]*?)<\/(?:\w+:)?v>/) || [])[1];
+      const is = (안.match(/<(?:\w+:)?t[^>]*>([\s\S]*?)<\/(?:\w+:)?t>/) || [])[1];
+      칸들.push(t === 's' ? 공유[+v] : t === 'inlineStr' ? 엑셀풀이(is || '') : v == null ? null : (isNaN(+v) ? 엑셀풀이(v) : +v));
+    }
+    표.push(칸들);
+  }
+  return 표;
+}
+let 반에크앞줄 = null;                                // 읽기 실패 때 /us-flow/issuers 에 보여 줄 앞줄
+async function 반에크() {
+  const 기본 = 'https://www.vaneck.com/us/en/investments/semiconductor-etf-smh/downloads/';
+  // 1) NAV 이력 엑셀 — 날짜 · NAV (· 상장주식수가 있으면 과거까지 한 번에)
+  const 이력 = 엑셀표(await curl받기(기본 + 'fundhistoprices/'));
+  const hi = 이력.findIndex(r => r.some(x => /^date$/i.test(String(x || '').trim())) && r.some(x => /^nav$/i.test(String(x || '').trim())));
+  const nav표 = {};
+  let 채움 = 0;
+  if (hi >= 0) {
+    const 머 = 이력[hi].map(x => String(x || '').trim().toLowerCase());
+    const iD = 머.indexOf('date'), iN = 머.indexOf('nav'), iS = 머.findIndex(x => /shares\s*outstanding/.test(x));
+    for (const r of 이력.slice(hi + 1)) {
+      const d = 날로(r[iD]), nav = 숫자로(r[iN]);
+      if (!d || !(nav > 0)) continue;
+      nav표[d] = nav;
+      if (iS >= 0 && 숫자로(r[iS]) > 0) { 한줄넣기('SMH', d, nav, 숫자로(r[iS])); 채움++; }
+    }
+  }
+  if (채움) return `NAV 이력 엑셀에서 ${채움}일 (상장주식수 열 있음)`;
+  // 2) 보유내역 엑셀 머리말 — "Shares Outstanding" 옆 숫자 · "As of" 날짜
+  const 보유 = 엑셀표(await curl받기(기본 + 'holdings/'));
+  let 주식수 = null, 날 = null, nav = null;
+  for (let i = 0; i < Math.min(보유.length, 40); i++) {
+    const r = 보유[i];
+    for (let j = 0; j < r.length; j++) {
+      const s = String(r[j] == null ? '' : r[j]);
+      const 다음 = () => { for (let k = j + 1; k < r.length; k++) if (숫자로(r[k]) > 0) return 숫자로(r[k]); const 아래 = 보유[i + 1]; return 아래 ? 숫자로(아래[j]) : null; };
+      if (!주식수 && /shares\s*outstanding/i.test(s)) 주식수 = 숫자로(s.split(/outstanding/i)[1]) || 다음();
+      if (!nav && /^nav\b/i.test(s.trim())) nav = 숫자로(s.replace(/^nav/i, '')) || 다음();
+      if (!날 && /as\s*of/i.test(s)) 날 = 날로((s.match(/(\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{2}-\d{2}|[A-Za-z]{3}[a-z]*\.? \d{1,2},? \d{4})/) || [])[1]);
+    }
+  }
+  if (날 && !nav) nav = nav표[날];
+  if (!날 && 주식수) 날 = Object.keys(nav표).sort().pop();
+  if (!nav && 날) nav = nav표[날];
+  if (!주식수 || !날 || !nav) {
+    반에크앞줄 = { 이력머리: hi >= 0 ? 이력[hi] : 이력.slice(0, 6), 보유앞줄: 보유.slice(0, 14) };
+    throw new Error(`보유내역에서 못 찾음 (주식수 ${주식수} · 날 ${날} · NAV ${nav}) — /us-flow/issuers 의 앞줄 참고`);
+  }
+  반에크앞줄 = null;
+  return 한줄넣기('SMH', 날, nav, 주식수);
+}
+
+async function 운용사모으기() {
+  for (const [기호, 함수] of [['QQQ', 인베스코], ['DRAM', 라운드힐], ['SMH', 반에크]]) {
+    try { 운용사상태.결과[기호] = '됨 · ' + await 함수(); }
+    catch (e) { 운용사상태.결과[기호] = '실패 · ' + ((e && e.message) || e); }
+  }
+  try {
+    fs.writeFileSync(운용사파일 + '.tmp', JSON.stringify(운용사저장), 'utf8');
+    fs.renameSync(운용사파일 + '.tmp', 운용사파일);
+  } catch (e) {}
+  운용사상태.마지막 = new Date().toISOString();
+  자금캐시.at = 0;
+  console.log('[us_flow] 운용사 공시', JSON.stringify(운용사상태.결과));
+}
+
+// 스테이트흐름 과 같은 계산 (저장소만 다름) — 이틀치가 모여야 계산됩니다
+function 운용사흐름(기호) {
+  const h = 운용사저장[기호];
+  if (!h) return null;
+  const a = Object.keys(h).sort();
+  if (a.length < 2) return null;
+  const 합 = n => {
+    const 끝 = a.slice(-(n + 1));
+    let t = 0;
+    for (let i = 1; i < 끝.length; i++) t += (h[끝[i]][1] - h[끝[i - 1]][1]) * h[끝[i]][0];
+    return { usd: Math.round(t), days: 끝.length - 1, to: 끝[끝.length - 1] };
+  };
+  const 끝 = h[a[a.length - 1]], 앞 = h[a[a.length - 2]];
+  return {
+    date: a[a.length - 1], prev: a[a.length - 2],
+    shares: 끝[1], sharesChg: 끝[1] - 앞[1], nav: 끝[0],
+    aum: Math.round(끝[0] * 끝[1]),
+    flow: Math.round((끝[1] - 앞[1]) * 끝[0]),
+    flowPct: 앞[1] ? Math.round((끝[1] - 앞[1]) / 앞[1] * 100000) / 1000 : null,
+    sum5: 합(5), sum20: 합(20), 쌓인날: a.length,
+  };
+}
+
 // ── 업종 ────────────────────────────────────────────
 const 업종캐시 = { at: 0, data: null };
 async function 업종받기() {
@@ -498,7 +696,7 @@ async function 자금받기() {
     칸.p = s.price;
 
     // State Street (SPY · XLK) — 공시 상장주식수로 정확하게, 과거까지
-    const 스 = 스테이트.includes(기호) ? 스테이트흐름(기호) : null;
+    const 스 = 스테이트.includes(기호) ? 스테이트흐름(기호) : 운용사들.includes(기호) ? 운용사흐름(기호) : null;
     if (스) {
       정확수 += 1;
       줄들.push({
@@ -614,6 +812,21 @@ async function 자금받기() {
 module.exports = (app) => {
   setTimeout(스테이트모으기, 60 * 1000);            // 서버가 뜨고 1분 뒤
   setInterval(스테이트모으기, 1 * 3600 * 1000);     // 그다음 1시간마다 (9/29: 6시간 → 1시간 — State Street 가 한국시간 밤에 올리면 바로 받게)
+  setTimeout(운용사모으기, 90 * 1000);              // 운용사 공시 (QQQ · SMH · DRAM) — 1분 30초 뒤, 그다음 1시간마다
+  setInterval(운용사모으기, 1 * 3600 * 1000);
+
+  // 운용사 공시가 쌓이는지 확인용
+  app.get('/us-flow/issuers', (req, res) => {
+    const 요약 = {};
+    for (const 기호 of 운용사들) {
+      const h = 운용사저장[기호], a = h ? Object.keys(h).sort() : [];
+      const f = 운용사흐름(기호);
+      요약[기호] = a.length ? `${a.length}일 (${a[0]}~${a[a.length - 1]})`
+        + (f ? ` · 최근 ${(f.flow / 1e8).toFixed(1)}억$ · 5일 ${(f.sum5.usd / 1e8).toFixed(1)}억$` : ' · 이틀치부터 계산') : '없음';
+    }
+    res.json({ ...운용사상태, 요약, 반에크앞줄 });
+  });
+  app.get('/us-flow/issuers/refresh', async (req, res) => { await 운용사모으기(); res.json(운용사상태); });
 
   // State Street 자료가 모였는지 확인용
   app.get('/us-flow/ssga', (req, res) => {
