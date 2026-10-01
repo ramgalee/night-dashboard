@@ -158,14 +158,16 @@
       return n || s === '전체' ? `<button class="chip ${s === 고른상태 ? 'on' : ''}" data-s="${s}">${s}<b>${n}</b></button>` : '';
     }).join('') + `<select id="sort">
         <option value="rank">오실레이터 큰 순</option><option value="sum5">5일 누적 큰 순</option>
-        <option value="today">오늘 순매수 큰 순</option><option value="cap">시총 큰 순</option></select>`;
+        <option value="today">오늘 순매수 큰 순</option><option value="cap">시총 큰 순</option>
+        <option value="name">이름 순 (가나다)</option></select>`;
     $('sort').value = 정렬;
     $('sort').onchange = e => { 정렬 = e.target.value; 그리기(); };
     document.querySelectorAll('#chips .chip').forEach(b => b.onclick = () => { 고른상태 = b.dataset.s; 그리기(); });
 
     let a = 전부.filter(x => 고른상태 === '전체' || x.state === 고른상태);
     const 키 = { rank: x => -x.rank, sum5: x => x.sum5, today: x => x.today, cap: x => x.cap }[정렬];
-    a = a.slice().sort((p, q) => (키(q) ?? -1e18) - (키(p) ?? -1e18));
+    a = 정렬 === 'name' ? a.slice().sort((p, q) => p.name.localeCompare(q.name, 'ko'))
+                       : a.slice().sort((p, q) => (키(q) ?? -1e18) - (키(p) ?? -1e18));
     if (!a.length) { $('body').innerHTML = '<div class="empty">해당하는 업종이 없습니다.</div>'; return; }
     const 최대 = Math.max(...전부.map(x => Math.abs((x.osc || 0) * 1e4)), 1e-9);
     $('body').innerHTML = `<div style="overflow-x:auto"><table><thead><tr>
