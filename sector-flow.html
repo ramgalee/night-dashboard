@@ -200,8 +200,9 @@
   }
 
   // ── 업종 창 ─────────────────────────────────────
-  function 차트(el, 값들, 막대, 축) {
-    const W = Math.max(300, el.clientWidth), H = 막대 ? 150 : 190, L = 44, R = 8, T = 8, B = 20, n = 값들.length;
+  // 겹침 = 업종 지수 위에 수급오실레이터 선을 오른쪽 눈금으로 겹쳐 그림 (수급오실레이터 페이지의 캔들 + 빨간 선과 같은 모양)
+  function 차트(el, 값들, 막대, 축, 겹침) {
+    const W = Math.max(300, el.clientWidth), H = 막대 ? 150 : 210, L = 44, R = 40, T = 8, B = 20, n = 값들.length;
     const vs = 값들.filter(v => v != null);
     let lo = Math.min(...vs), hi = Math.max(...vs);
     if (막대) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); } else { const p = (hi - lo) * .08 || 1; lo -= p; hi += p; }
@@ -216,6 +217,14 @@
     } else {
       let d = ''; 값들.forEach((v, i) => { if (v != null) d += (d ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1); });
       그림 = `<path d="${d}" fill="none" stroke="#131A2C" stroke-width="2" stroke-linejoin="round"/>`;
+      if (겹침) {
+        const ov = 겹침.filter(v => v != null), 크기 = Math.max(...ov.map(Math.abs), 1e-9) * 1.1;
+        const y2 = v => T + (H - T - B) * (1 - (v + 크기) / (2 * 크기));     // 0 이 가운데
+        let d2 = ''; 겹침.forEach((v, i) => { if (v != null) d2 += (d2 ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y2(v).toFixed(1); });
+        그림 = `<line x1="${L}" x2="${W - R}" y1="${y2(0)}" y2="${y2(0)}" stroke="#E5484D" stroke-opacity=".45" stroke-dasharray="4 4"/>` + 그림 +
+          `<path d="${d2}" fill="none" stroke="#E5484D" stroke-width="1.6" stroke-linejoin="round"/>` +
+          [크기 / 1.1, 0, -크기 / 1.1].map(v => `<text x="${W - R + 6}" y="${y2(v) + 3.5}" font-size="10" fill="#E5484D" text-anchor="start">${v === 0 ? '0' : (v > 0 ? '+' : '−') + Math.abs(v).toFixed(1)}</text>`).join('');
+      }
     }
     let 달 = '', 전 = '';
     J.dates.forEach((d, i) => { const m = d.slice(4, 6); if (m !== 전) { 전 = m; if (i > 3 && i < n - 6) 달 += `<text x="${x(i)}" y="${H - 5}" font-size="10" fill="#8B94B0" text-anchor="middle">${+m}월</text>`; } });
@@ -240,12 +249,12 @@
         <div class="tile"><div class="tile-l">5일 누적</div><div class="tile-v ${색(p.sum5)}">${억(p.sum5)}<span class="dd">억</span></div></div>
         <div class="tile"><div class="tile-l">업종 지수 120일</div><div class="tile-v ${색(끝 - 첫)}">${첫 && 끝 ? ((끝 / 첫 - 1) * 100 >= 0 ? '+' : '−') + Math.abs((끝 / 첫 - 1) * 100).toFixed(1) + '%' : '—'}</div></div>
       </div>
-      <div class="ch-t">업종 지수<span>시총가중 · 120일 전 = 100</span></div><div class="chart" id="c1"></div>
+      <div class="ch-t">업종 지수 + 수급오실레이터<span>검정 = 업종 지수(왼쪽 · 120일 전 = 100) · 빨간 선 = 오실레이터(오른쪽 · ×1만 · 점선 = 0)</span></div><div class="chart" id="c1"></div>
       <div class="ch-t">수급 오실레이터<span>×1만 · 빨강 = 0 위 · 파랑 = 0 아래</span></div><div class="chart" id="c2"></div>
       <div id="mStk"></div>`;
     $('modal').classList.add('on');
     $('mX').onclick = () => $('modal').classList.remove('on');
-    const g1 = 차트($('c1'), 지수, false, v => v.toFixed(0)), g2 = 차트($('c2'), 오실, true, v => v.toFixed(1));
+    const g1 = 차트($('c1'), 지수, false, v => v.toFixed(0), 오실), g2 = 차트($('c2'), 오실, true, v => v.toFixed(1));
     // 두 차트 같은 날짜에 십자선 + 숫자
     [[$('c1'), g1], [$('c2'), g2]].forEach(([el]) => {
       const hit = el.querySelector('.hit');
