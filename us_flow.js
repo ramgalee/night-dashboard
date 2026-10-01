@@ -421,7 +421,7 @@ function 스테이트흐름(기호) {
 //   야후 순자산(며칠씩 안 바뀜)으로 '추정'하던 셋을, 운용사가 공시한 상장주식수로 '정확'하게 셉니다.
 //     QQQ   인베스코 공개 JSON — 그날 순자산(날짜 붙음) ÷ 같은 날 NAV(이력) = 상장주식수
 //     DRAM  라운드힐 홈페이지가 쓰는 CSV — Shares Outstanding · NAV · Rate Date
-//     SMH   반에크 엑셀(쿠키를 받아야 내려줌 → curl 로) — 보유내역 머리말의 Shares Outstanding · NAV 이력
+//     SMH   반에크 NAV 이력 엑셀(쿠키를 받아야 내려줌 → curl 로) — AUM ÷ NAV = 상장주식수, 과거까지 한 번에
 //   그날 숫자만 주는 곳이 많아 서버가 하루에 한 줄씩 /root/app/issuer_flow.json 에 쌓습니다.
 //   그래서 붙인 뒤 둘째 거래일부터 '정확' 값이 나오고, 그 전에는 예전처럼 추정으로 보여 줍니다.
 //   GET /us-flow/issuers   — 쌓인 날수 · 마지막 날 · 오류 (반에크 엑셀 모양이 다르면 앞줄을 보여 줌)
@@ -452,9 +452,17 @@ function 한줄넣기(기호, 날, nav, 주식수) {
 
 // QQQ — 인베스코
 async function 인베스코() {
-  const 머 = { Accept: 'application/json,*/*', Referer: 'https://www.invesco.com/', 'User-Agent': 브라우저 };
   const base = 'https://dng-api.invesco.com/cache/v1/accounts/en_US/shareclasses/46090E103';
-  const 받 = async u => { const r = await fetch(u, { headers: 머 }); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); };
+  // 인베스코 방화벽이 주소마다 받아 주는 Accept 머리말이 달라(406) 세 가지를 차례로 써 봅니다
+  const 받 = async u => {
+    let 마지막 = '';
+    for (const accept of ['application/json', 'application/json,*/*', '*/*']) {
+      const r = await fetch(u, { headers: { Accept: accept, Referer: 'https://www.invesco.com/', 'User-Agent': 브라우저 } });
+      if (r.ok) return r.json();
+      마지막 = 'HTTP ' + r.status;
+    }
+    throw new Error(마지막 + ' · ' + u.split('?')[0].split('/').pop());
+  };
   const fd = await 받(`${base}?idType=cusip&productType=ETF&expand=nav&variationType=fundDetails`);
   const 날 = 날로(fd.shareclassTotalNetAssetsEffectiveDate || fd.effectiveDate);
   const 순 = Number(fd.shareclassTotalNetAssets);
@@ -498,7 +506,7 @@ async function 라운드힐() {
   return 끝 + (행들.length > 1 ? ` (${행들.length}줄)` : '');
 }
 
-// SMH — 반에크 (Cloudflare 쿠키를 받아야 엑셀을 내줘서 curl 로)
+// SMH — 반에크 (Cloudflare 쿠키를 받아야 엑셀을 내줘서 curl 로) · 10/2 보유내역 엑셀엔 주식수가 없어 NAV 이력의 AUM 으로
 function curl받기(주소) {
   return new Promise((ok, no) => {
     const 쿠키 = `/tmp/vaneck_${process.pid}.jar`;
@@ -533,46 +541,30 @@ function 엑셀표(buf) {
   return 표;
 }
 let 반에크앞줄 = null;                                // 읽기 실패 때 /us-flow/issuers 에 보여 줄 앞줄
+function 큰수(v) {                                    // "$74,820,045,123.45" · "74.82B" 둘 다
+  const t = String(v == null ? '' : v).trim(), n = 숫자로(t);
+  if (n == null) return null;
+  return /\d\s*B$/i.test(t) ? n * 1e9 : /\d\s*M$/i.test(t) ? n * 1e6 : n;
+}
 async function 반에크() {
-  const 기본 = 'https://www.vaneck.com/us/en/investments/semiconductor-etf-smh/downloads/';
-  // 1) NAV 이력 엑셀 — 날짜 · NAV (· 상장주식수가 있으면 과거까지 한 번에)
-  const 이력 = 엑셀표(await curl받기(기본 + 'fundhistoprices/'));
+  // NAV 이력 엑셀 — Date · NAV · … · AUM. AUM ÷ NAV = 상장주식수 (과거까지 한 번에 채워짐)
+  const 이력 = 엑셀표(await curl받기('https://www.vaneck.com/us/en/investments/semiconductor-etf-smh/downloads/fundhistoprices/'));
   const hi = 이력.findIndex(r => r.some(x => /^date$/i.test(String(x || '').trim())) && r.some(x => /^nav$/i.test(String(x || '').trim())));
-  const nav표 = {};
-  let 채움 = 0;
-  if (hi >= 0) {
-    const 머 = 이력[hi].map(x => String(x || '').trim().toLowerCase());
-    const iD = 머.indexOf('date'), iN = 머.indexOf('nav'), iS = 머.findIndex(x => /shares\s*outstanding/.test(x));
-    for (const r of 이력.slice(hi + 1)) {
-      const d = 날로(r[iD]), nav = 숫자로(r[iN]);
-      if (!d || !(nav > 0)) continue;
-      nav표[d] = nav;
-      if (iS >= 0 && 숫자로(r[iS]) > 0) { 한줄넣기('SMH', d, nav, 숫자로(r[iS])); 채움++; }
-    }
+  if (hi < 0) { 반에크앞줄 = { 이력앞줄: 이력.slice(0, 8) }; throw new Error('NAV 이력 엑셀 머리글을 못 찾음'); }
+  const 머 = 이력[hi].map(x => String(x || '').trim().toLowerCase());
+  const iD = 머.indexOf('date'), iN = 머.indexOf('nav'), iA = 머.findIndex(x => /^aum$|net assets/.test(x));
+  if (iA < 0) { 반에크앞줄 = { 이력머리: 이력[hi] }; throw new Error('NAV 이력 엑셀에 AUM 열이 없음'); }
+  let 채움 = 0, 끝 = '', 거친값 = 0;
+  const 줄들 = 이력.slice(hi + 1).map(r => ({ d: 날로(r[iD]), nav: 숫자로(r[iN]), a: 큰수(r[iA]), 원: String(r[iA] || '') }))
+    .filter(x => x.d && x.nav > 0 && x.a > 0).sort((p, q) => p.d < q.d ? -1 : 1).slice(-스테이트보관);
+  for (const x of 줄들) {
+    if (/[BM]\s*$/i.test(x.원)) 거친값++;                // "74.82B" 처럼 반올림된 값이면 주식수가 거칠어짐
+    // 설정단위가 5만 주라 1,000주 단위로 반올림해 계산 잔돈을 없앱니다
+    끝 = 한줄넣기('SMH', x.d, x.nav, Math.round(x.a / x.nav / 1000) * 1000); 채움++;
   }
-  if (채움) return `NAV 이력 엑셀에서 ${채움}일 (상장주식수 열 있음)`;
-  // 2) 보유내역 엑셀 머리말 — "Shares Outstanding" 옆 숫자 · "As of" 날짜
-  const 보유 = 엑셀표(await curl받기(기본 + 'holdings/'));
-  let 주식수 = null, 날 = null, nav = null;
-  for (let i = 0; i < Math.min(보유.length, 40); i++) {
-    const r = 보유[i];
-    for (let j = 0; j < r.length; j++) {
-      const s = String(r[j] == null ? '' : r[j]);
-      const 다음 = () => { for (let k = j + 1; k < r.length; k++) if (숫자로(r[k]) > 0) return 숫자로(r[k]); const 아래 = 보유[i + 1]; return 아래 ? 숫자로(아래[j]) : null; };
-      if (!주식수 && /shares\s*outstanding/i.test(s)) 주식수 = 숫자로(s.split(/outstanding/i)[1]) || 다음();
-      if (!nav && /^nav\b/i.test(s.trim())) nav = 숫자로(s.replace(/^nav/i, '')) || 다음();
-      if (!날 && /as\s*of/i.test(s)) 날 = 날로((s.match(/(\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{2}-\d{2}|[A-Za-z]{3}[a-z]*\.? \d{1,2},? \d{4})/) || [])[1]);
-    }
-  }
-  if (날 && !nav) nav = nav표[날];
-  if (!날 && 주식수) 날 = Object.keys(nav표).sort().pop();
-  if (!nav && 날) nav = nav표[날];
-  if (!주식수 || !날 || !nav) {
-    반에크앞줄 = { 이력머리: hi >= 0 ? 이력[hi] : 이력.slice(0, 6), 보유앞줄: 보유.slice(0, 14) };
-    throw new Error(`보유내역에서 못 찾음 (주식수 ${주식수} · 날 ${날} · NAV ${nav}) — /us-flow/issuers 의 앞줄 참고`);
-  }
-  반에크앞줄 = null;
-  return 한줄넣기('SMH', 날, nav, 주식수);
+  if (!채움) { 반에크앞줄 = { 이력머리: 이력[hi], 이력앞줄: 이력.slice(hi + 1, hi + 6) }; throw new Error('NAV 이력에서 읽은 날이 없음'); }
+  반에크앞줄 = 거친값 ? { 주의: `AUM 이 반올림된 값(B·M)이 ${거친값}일 — 주식수가 거칠 수 있음`, 예: 줄들.slice(-2).map(x => x.원) } : null;
+  return `${끝} · NAV 이력 ${채움}일`;
 }
 
 async function 운용사모으기() {
