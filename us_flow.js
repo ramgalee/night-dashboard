@@ -453,13 +453,28 @@ function 한줄넣기(기호, 날, nav, 주식수) {
 // QQQ — 인베스코
 async function 인베스코() {
   const base = 'https://dng-api.invesco.com/cache/v1/accounts/en_US/shareclasses/46090E103';
-  // 인베스코 방화벽이 주소마다 받아 주는 Accept 머리말이 달라(406) 세 가지를 차례로 써 봅니다
+  // 인베스코 방화벽이 때때로 406 으로 거절합니다(같은 주소도 됐다 안 됐다).
+  //   curl 과 node fetch 를 번갈아, Accept 머리말을 바꿔 가며, 4초씩 쉬고 최대 6번 해 봅니다.
   const 받 = async u => {
     let 마지막 = '';
-    for (const accept of ['application/json', 'application/json,*/*', '*/*']) {
-      const r = await fetch(u, { headers: { Accept: accept, Referer: 'https://www.invesco.com/', 'User-Agent': 브라우저 } });
-      if (r.ok) return r.json();
-      마지막 = 'HTTP ' + r.status;
+    const 방법들 = [['curl', 'application/json'], ['fetch', 'application/json'], ['curl', '*/*'],
+                    ['fetch', 'application/json,*/*'], ['curl', 'application/json,text/plain,*/*'], ['fetch', '*/*']];
+    for (const [어떻게, accept] of 방법들) {
+      try {
+        if (어떻게 === 'curl') {
+          const out = (await new Promise((ok, no) => execFile('curl', ['-s', '-m', '30', '--compressed', '-A', 브라우저,
+            '-H', 'Accept: ' + accept, '-H', 'Referer: https://www.invesco.com/', '-H', 'Origin: https://www.invesco.com',
+            '-w', '\n%{http_code}', u], { maxBuffer: 30 * 1024 * 1024 }, (e, o) => e ? no(e) : ok(o)))).toString();
+          const i = out.lastIndexOf('\n'), 코드 = out.slice(i + 1).trim();
+          if (코드 === '200') return JSON.parse(out.slice(0, i));
+          마지막 = 'HTTP ' + 코드 + '(curl)';
+        } else {
+          const r = await fetch(u, { headers: { Accept: accept, Referer: 'https://www.invesco.com/', 'User-Agent': 브라우저 } });
+          if (r.ok) return r.json();
+          마지막 = 'HTTP ' + r.status + '(fetch)';
+        }
+      } catch (e) { 마지막 = (e && e.message) || String(e); }
+      await new Promise(r => setTimeout(r, 4000));
     }
     throw new Error(마지막 + ' · ' + u.split('?')[0].split('/').pop());
   };
