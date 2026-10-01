@@ -493,21 +493,34 @@ const TV표 = {
   "NG=F": "NYMEX:NG1!", "ES=F": "CME_MINI:ES1!", "NQ=F": "CME_MINI:NQ1!",
   "YM=F": "CBOT_MINI:YM1!", "RTY=F": "CME_MINI:RTY1!",
   "DX-Y.NYB": "TVC:DXY", "KRW=X": "FX_IDC:USDKRW", "JPY=X": "FX:USDJPY",
+  "DX=F": "ICEUS:DX1!", "6E=F": "CME:6E1!", "6J=F": "CME:6J1!",
   "BTC-USD": "BITSTAMP:BTCUSD", "ETH-USD": "BITSTAMP:ETHUSD",
 };
 // ★ 10/1 — 붙여 넣는 차트(위젯)에서는 거래소 지수·선물(DJ · SP · CME · NYMEX · COMEX · CBOT 등)이
 //   "TradingView 에서만 제공되는 심볼입니다" 로 막힙니다. 위젯에서는 같은 움직임을 따라가는 CFD(OANDA)로 그리고,
 //   창 오른쪽 위 'TradingView에서 열기' 로 원래 기호를 새 탭에서 볼 수 있게 했습니다.
+//   [위젯에서 그릴 기호, 창 제목 옆에 붙일 설명]
 const 위젯표 = {
-  "^DJI": "OANDA:US30USD", "^GSPC": "OANDA:SPX500USD", "^NDX": "OANDA:NAS100USD", "^RUT": "OANDA:US2000USD",
-  "ES=F": "OANDA:SPX500USD", "NQ=F": "OANDA:NAS100USD", "YM=F": "OANDA:US30USD", "RTY=F": "OANDA:US2000USD",
-  "CL=F": "OANDA:WTICOUSD", "GC=F": "OANDA:XAUUSD", "SI=F": "OANDA:XAGUSD", "HG=F": "OANDA:XCUUSD",
-  "NG=F": "OANDA:NATGASUSD",
+  "^DJI": ["OANDA:US30USD", "다우 CFD"], "^GSPC": ["OANDA:SPX500USD", "S&P500 CFD"],
+  "^NDX": ["OANDA:NAS100USD", "나스닥100 CFD"], "^RUT": ["OANDA:US2000USD", "러셀2000 CFD"],
+  "ES=F": ["OANDA:SPX500USD", "S&P500 CFD"], "NQ=F": ["OANDA:NAS100USD", "나스닥100 CFD"],
+  "YM=F": ["OANDA:US30USD", "다우 CFD"], "RTY=F": ["OANDA:US2000USD", "러셀2000 CFD"],
+  "CL=F": ["OANDA:WTICOUSD", "WTI CFD"], "GC=F": ["OANDA:XAUUSD", "금 CFD"], "SI=F": ["OANDA:XAGUSD", "은 CFD"],
+  "HG=F": ["OANDA:XCUUSD", "구리 CFD"], "NG=F": ["OANDA:NATGASUSD", "천연가스 CFD"],
+  // 10/1 추가 — 나스닥 종합 · 필라델피아 반도체 · 달러인덱스 · 미국채 금리
+  "^IXIC": ["NASDAQ:ONEQ", "나스닥 종합지수를 따르는 ETF ONEQ"],
+  "^SOX": ["NASDAQ:SOXX", "반도체 ETF SOXX (비슷한 움직임)"],
+  "DX-Y.NYB": ["CAPITALCOM:DXY", "달러인덱스 CFD"],
+  "DX=F": ["CAPITALCOM:DXY", "달러인덱스 CFD"], "6E=F": ["FX:EURUSD", "유로/달러 환율"], "6J=F": ["FX:USDJPY", "달러/엔 환율"],
+  "^TNX": ["FRED:DGS10", "미 재무부 10년물 금리 · 하루 1번"], "^TYX": ["FRED:DGS30", "미 재무부 30년물 금리 · 하루 1번"],
+  "^FVX": ["FRED:DGS5", "미 재무부 5년물 금리 · 하루 1번"], "^IRX": ["FRED:DTB3", "미 3개월물 금리 · 하루 1번"],
 };
 const 주식꼴 = s => /^[A-Z]{1,5}([.-][A-Z])?$/.test(s);
 function tv기호(s) {
   if (!s) return null;
   if (TV표[s]) return TV표[s];
+  let m = /^([A-Z]{6})=X$/.exec(s); if (m) return "FX:" + m[1];          // EURUSD=X → FX:EURUSD (유로달러 등)
+  m = /^([A-Z]{3})=X$/.exec(s); if (m) return "FX_IDC:USD" + m[1];       // CNY=X → FX_IDC:USDCNY
   return 주식꼴(s) ? s.replace("-", ".") : null;
 }
 const fv기호 = s => 주식꼴(s) ? s.replace(".", "-") : null;
@@ -516,9 +529,9 @@ const fv기호 = s => 주식꼴(s) ? s.replace(".", "-") : null;
 function 큰차트(sym, name) {
   const tv = tv기호(sym);
   if (!tv) return;
-  const 위젯 = 위젯표[sym] || tv;
+  const [위젯, 설명] = 위젯표[sym] || [tv, ""];
   document.getElementById("popT").textContent = name || sym;
-  document.getElementById("popS").textContent = 위젯 === tv ? sym : `${sym} · 차트는 같은 움직임의 CFD(${위젯.split(":")[1]})`;
+  document.getElementById("popS").textContent = 설명 ? `${sym} · 차트는 ${설명}` : sym;
   document.getElementById("popL").href = "https://www.tradingview.com/chart/?symbol=" + encodeURIComponent(tv);
   const b = document.getElementById("popB");
   b.innerHTML = '<div class="tradingview-widget-container" style="height:100%;width:100%">'
