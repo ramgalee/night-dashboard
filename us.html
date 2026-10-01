@@ -107,6 +107,9 @@
   .pop-h { display:flex; align-items:center; justify-content:space-between; gap:10px;
            padding:10px 14px; border-bottom:1px solid var(--hair); }
   .pop-h b { font-size:14px; } .pop-h small { color:var(--textTer); font-size:11px; margin-left:6px; }
+  .pop-l { font-size:11.5px; color:var(--textSec); text-decoration:none; border:1px solid var(--hair); border-radius:8px;
+           padding:4px 9px; white-space:nowrap; margin-left:auto; }
+  .pop-l:hover { color:#fff; background:#6D4FE0; border-color:#6D4FE0; }
   .pop-x { border:none; background:none; font-size:20px; color:var(--textSec); padding:2px 8px; }
   .pop-b { flex:1; min-height:0; }
   @media (max-width: 560px) { .ct-grid { grid-template-columns:1fr; } .pop { height:86vh; } }
@@ -391,6 +394,7 @@
 
 <div class="veil" id="veil"><div class="pop">
   <div class="pop-h"><div><b id="popT"></b><small id="popS"></small></div>
+    <a class="pop-l" id="popL" target="_blank" rel="noopener">TradingView에서 열기 ↗</a>
     <button class="pop-x" id="popX" aria-label="닫기">✕</button></div>
   <div class="pop-b" id="popB"></div>
 </div></div>
@@ -491,6 +495,15 @@ const TV표 = {
   "DX-Y.NYB": "TVC:DXY", "KRW=X": "FX_IDC:USDKRW", "JPY=X": "FX:USDJPY",
   "BTC-USD": "BITSTAMP:BTCUSD", "ETH-USD": "BITSTAMP:ETHUSD",
 };
+// ★ 10/1 — 붙여 넣는 차트(위젯)에서는 거래소 지수·선물(DJ · SP · CME · NYMEX · COMEX · CBOT 등)이
+//   "TradingView 에서만 제공되는 심볼입니다" 로 막힙니다. 위젯에서는 같은 움직임을 따라가는 CFD(OANDA)로 그리고,
+//   창 오른쪽 위 'TradingView에서 열기' 로 원래 기호를 새 탭에서 볼 수 있게 했습니다.
+const 위젯표 = {
+  "^DJI": "OANDA:US30USD", "^GSPC": "OANDA:SPX500USD", "^NDX": "OANDA:NAS100USD", "^RUT": "OANDA:US2000USD",
+  "ES=F": "OANDA:SPX500USD", "NQ=F": "OANDA:NAS100USD", "YM=F": "OANDA:US30USD", "RTY=F": "OANDA:US2000USD",
+  "CL=F": "OANDA:WTICOUSD", "GC=F": "OANDA:XAUUSD", "SI=F": "OANDA:XAGUSD", "HG=F": "OANDA:XCUUSD",
+  "NG=F": "OANDA:NATGASUSD",
+};
 const 주식꼴 = s => /^[A-Z]{1,5}([.-][A-Z])?$/.test(s);
 function tv기호(s) {
   if (!s) return null;
@@ -503,8 +516,10 @@ const fv기호 = s => 주식꼴(s) ? s.replace(".", "-") : null;
 function 큰차트(sym, name) {
   const tv = tv기호(sym);
   if (!tv) return;
+  const 위젯 = 위젯표[sym] || tv;
   document.getElementById("popT").textContent = name || sym;
-  document.getElementById("popS").textContent = sym;
+  document.getElementById("popS").textContent = 위젯 === tv ? sym : `${sym} · 차트는 같은 움직임의 CFD(${위젯.split(":")[1]})`;
+  document.getElementById("popL").href = "https://www.tradingview.com/chart/?symbol=" + encodeURIComponent(tv);
   const b = document.getElementById("popB");
   b.innerHTML = '<div class="tradingview-widget-container" style="height:100%;width:100%">'
               + '<div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div></div>';
@@ -512,7 +527,7 @@ function 큰차트(sym, name) {
   sc.type = "text/javascript"; sc.async = true;
   sc.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
   sc.text = JSON.stringify({
-    autosize: true, symbol: tv, interval: "D", timezone: "Asia/Seoul", theme: "light",
+    autosize: true, symbol: 위젯, interval: "D", timezone: "Asia/Seoul", theme: "light",
     style: "1", locale: "kr", allow_symbol_change: true, studies: ["STD;SMA"],
     support_host: "https://www.tradingview.com",
   });
