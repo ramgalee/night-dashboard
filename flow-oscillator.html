@@ -539,6 +539,9 @@ document.getElementById('codeInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') document.getElementById('loadBtn').click();
 });
 
+// 다른 페이지에서 ?code=000660 으로 들어오면 그 종목부터 보여 줍니다 (업종 수급 페이지의 종목 칩 · 10/1)
+{ const q = new URLSearchParams(location.search).get('code');
+  if (q && /^[0-9A-Z]{6}$/.test(q)) document.getElementById('codeInput').value = q; }
 loadData(document.getElementById('codeInput').value.trim());
 
 // RS 거르기 버튼

@@ -17,6 +17,7 @@
     ["/calendar.html",        "증시 일정"],
     ["/supply-rank.html",     "순매수 순위"],
     ["/flow-oscillator.html", "수급오실레이터"],
+    ["/sector-flow.html",     "업종 수급"],
     ["/leader.html",          "대형주 수급"],
     ["/etf-flow.html",        "액티브 ETF"],
     ["/reports.html",         "리포트 요약"],
