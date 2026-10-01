@@ -20,6 +20,7 @@
     ["/leader.html",          "대형주 수급"],
     ["/etf-flow.html",        "액티브 ETF"],
     ["/reports.html",         "리포트 요약"],
+    ["/export.html",          "수출 데이터"],
     ["/map.html",             "히트맵"],
     ["/fg.html",              "F&amp;G 지수"],
     ["/night.html",           "야간 증시"],

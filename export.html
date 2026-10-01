@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>수출 데이터</title>
+<style>
+  :root {
+    --void:#F2F4F9; --surface:#FFFFFF; --surface2:#F0F2F8; --hair:#E1E5F0;
+    --textPri:#131A2C; --textSec:#5B6483; --textTer:#8B94B0;
+    --up:#E5484D; --down:#2F6FED; --signature:#6D4FE0; --barMuted:#C9CEE0;
+    --mono: ui-monospace,'SF Mono','Roboto Mono',Menlo,Consolas,monospace;
+    --sans: -apple-system,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--void); color:var(--textPri); font-family:var(--sans); margin:0; padding:24px 16px; }
+  .wrap { max-width:1180px; margin:0 auto; }
+  .between { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .card { background:var(--surface); border:1px solid var(--hair); border-radius:16px; padding:18px;
+          margin-bottom:16px; box-shadow:0 1px 3px rgba(19,26,44,.06); }
+  .eyebrow { font-size:11px; letter-spacing:2px; color:var(--textTer); font-family:var(--mono); }
+  h1 { font-size:22px; margin:2px 0 0; }
+  button { background:var(--surface2); border:1px solid var(--hair); color:var(--textSec);
+           padding:8px 14px; border-radius:10px; font-size:12px; cursor:pointer; font-family:var(--sans); white-space:nowrap; }
+  .between > div:last-child button { font-size:13px; font-weight:600; }
+  .sub { font-size:13px; color:var(--textSec); }
+  .meta { font-size:10.5px; color:var(--textTer); font-family:var(--mono); }
+
+  /* 묶음 칸 */
+  .groups { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px; margin-top:12px; }
+  .g { background:var(--surface2); border:1px solid transparent; border-radius:12px; padding:10px 12px; cursor:pointer; text-align:left; }
+  .g:hover { border-color:var(--hair); }
+  .g.on { background:#F1EDFD; border-color:var(--signature); }
+  .g-n { font-size:12.5px; font-weight:700; color:var(--textPri); }
+  .g-c { font-size:10.5px; color:var(--textTer); margin-left:4px; font-weight:400; }
+  .g-v { font-family:var(--mono); font-size:15px; font-weight:700; margin-top:4px; }
+  .g-s { font-size:10.5px; color:var(--textTer); margin-top:2px; font-family:var(--mono); }
+  .g-s .u { color:var(--up); } .g-s .d { color:var(--down); }
+
+  .tabs { display:flex; gap:5px; flex-wrap:wrap; margin-bottom:8px; }
+  .tabs button.on { background:var(--signature); border-color:var(--signature); color:#fff; font-weight:600; }
+  .ctrl { display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:12px; color:var(--textSec); margin:4px 0 8px; }
+  .ctrl select, .ctrl input[type=search] { font-family:var(--sans); font-size:12px; padding:6px 8px; border:1px solid var(--hair);
+           border-radius:8px; background:var(--surface); color:var(--textPri); }
+  .ctrl label { display:flex; gap:5px; align-items:center; cursor:pointer; user-select:none; }
+  .ctrl input[type=checkbox] { width:15px; height:15px; accent-color:var(--signature); }
+
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { text-align:right; font-size:11px; font-weight:500; color:var(--textTer);
+       padding:7px 8px; border-bottom:1px solid var(--hair); white-space:nowrap; }
+  td { text-align:right; padding:9px 8px; border-bottom:1px solid var(--surface2); white-space:nowrap; }
+  th.l, td.l { text-align:left; }
+  tbody tr { cursor:pointer; }
+  tbody tr:hover { background:var(--surface2); }
+  .no { font-family:var(--mono); color:var(--textTer); font-size:12px; width:30px; }
+  .nm { font-weight:600; }
+  .tag { display:inline-block; font-size:10px; color:var(--textSec); background:var(--surface2); border-radius:5px;
+         padding:1px 6px; margin-left:5px; font-weight:500; vertical-align:1px; }
+  tbody tr:hover .tag { background:#fff; }
+  .co { font-size:11.5px; color:var(--textSec); max-width:230px; overflow:hidden; text-overflow:ellipsis; }
+  .sk { display:inline-block; font-size:11.5px; font-weight:600; color:var(--textPri); background:#F1EDFD; border-radius:6px;
+        padding:2px 7px; margin:1px 3px 1px 0; text-decoration:none; }
+  a.sk:hover { background:var(--signature); color:#fff; }
+  .sk-more { font-size:11px; color:var(--textTer); }
+  .none { font-size:11px; color:var(--textTer); }
+  .num { font-family:var(--mono); }
+  .u { color:var(--up); } .d { color:var(--down); }
+  .acc { display:inline-block; font-family:var(--mono); font-size:11px; font-weight:700; border-radius:6px; padding:2px 7px; }
+  .acc.up { background:#FDEBEC; color:#C0303A; } .acc.dn { background:#EAF1FE; color:#1F4FB8; }
+  .arrow { color:var(--textTer); }
+  .small { font-size:10px; color:var(--textTer); font-family:var(--sans); margin-left:3px; }
+  .show-m { display:none; }
+  .more { margin-top:10px; width:100%; }
+  .empty { font-size:12.5px; color:var(--textTer); padding:14px 0; }
+  .note { font-size:11.5px; color:var(--textTer); line-height:1.75; }
+  .note b { color:var(--textSec); }
+
+  /* 품목 창 */
+  #modal { position:fixed; inset:0; background:rgba(19,26,44,.45); display:none;
+           align-items:center; justify-content:center; padding:24px; z-index:50; }
+  #modal.on { display:flex; }
+  .modal-box { background:var(--surface); border-radius:16px; width:100%; max-width:920px;
+               max-height:92vh; overflow:auto; padding:18px 20px; box-shadow:0 12px 40px rgba(19,26,44,.25); }
+  .modal-x { background:transparent; border:none; font-size:20px; line-height:1; color:var(--textTer); cursor:pointer; padding:2px 6px; }
+  .tiles { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:14px 0 6px; }
+  .tile { background:var(--surface2); border-radius:12px; padding:10px 12px; }
+  .tile-l { font-size:11px; color:var(--textTer); }
+  .tile-v { font-family:var(--mono); font-size:18px; font-weight:700; margin-top:3px; }
+  .ch-t { font-size:12.5px; font-weight:700; margin:16px 0 4px; }
+  .ch-t span { font-weight:400; color:var(--textTer); font-size:11px; margin-left:6px; }
+  .chart { position:relative; }
+  .chart svg { display:block; width:100%; }
+  .tip { position:absolute; pointer-events:none; background:var(--textPri); color:#fff; font-size:11.5px; line-height:1.5;
+         border-radius:8px; padding:6px 9px; white-space:nowrap; transform:translate(-50%,-100%); display:none; font-family:var(--mono); }
+
+  @media (max-width:640px) {
+    #modal { padding:10px; }
+    .modal-box { padding:14px; max-height:94vh; }
+    .card { padding:14px; }
+    button { min-height:34px; }
+    .groups { grid-template-columns:repeat(3,1fr); gap:6px; }
+    .g { padding:8px 9px; } .g-n { font-size:11.5px; } .g-c { display:none; } .g-v { font-size:13px; } .g-s { font-size:9.5px; }
+    .tiles { grid-template-columns:repeat(2,1fr); }
+    .tblwrap { overflow-x:auto; }
+    .co { max-width:120px; }
+    .hide-m { display:none; }
+    .show-m { display:block !important; font-size:10.5px; margin-top:2px; max-width:130px; }
+    td, th { padding-left:5px; padding-right:5px; }
+    .tag { display:none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="between" style="margin-bottom:16px;">
+    <div>
+      <div class="eyebrow">EXPORT</div>
+      <h1>수출 데이터</h1>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <span id="hgMenu" style="display:contents"></span><script src="/menu.js"></script>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="between">
+      <div class="sub">품목별 수출 — 하루 평균으로 견줌 <span style="font-size:11px;color:var(--textTer);">관세청 잠정치 · 매월 1일 · 11일 · 21일</span></div>
+      <span id="meta" class="meta"></span>
+    </div>
+    <div class="groups" id="groups"></div>
+  </div>
+
+  <div class="card">
+    <div class="tabs" id="tabs"></div>
+    <div class="ctrl">
+      <select id="minSize">
+        <option value="1e6">월 100만 달러 이상</option>
+        <option value="5e6" selected>월 500만 달러 이상</option>
+        <option value="2e7">월 2,000만 달러 이상</option>
+        <option value="0">전체</option>
+      </select>
+      <input type="search" id="q" placeholder="품목·종목 찾기" />
+      <label><input type="checkbox" id="showImp"> 수입 품목도</label>
+      <label><input type="checkbox" id="showStale"> 갱신 멈춘 품목도</label>
+    </div>
+    <div class="tblwrap" id="body"><div class="empty">불러오는 중...</div></div>
+  </div>
+
+  <div class="card">
+    <div class="note">
+      <b>일평균 수출</b> = 그 달 수출 금액 ÷ 조업일수. 달마다 일수가 달라도, 11일·21일에 나오는 열흘·스무날 잠정치도
+      지난달·작년과 바로 견줄 수 있습니다.<br>
+      <b>가속</b> = 이번 달 YoY − 직전 3달 YoY 평균. 숫자가 크면 늘어나는 속도가 빨라진 품목, 마이너스면 식는 품목입니다.<br>
+      <b>3달 합 YoY</b> = 최근 3달 일평균 합을 작년 같은 3달과 견준 것. 한 달 선적이 몰려 튀는 것을 눌러 줍니다.<br>
+      <b>판가 YoY</b> = 금액 ÷ 중량의 작년 대비. 물량이 아니라 값이 올라서 늘었는지 봅니다.<br><br>
+      작년 금액이 아주 작았던 품목은 YoY 가 수백~수천 %로 튑니다. 위 <b>규모 거르기</b>를 같이 보세요.
+      HS 코드 하나를 여러 회사가 함께 쓰므로 <b>회사 매출과 같지 않습니다</b>. 수출 숫자는 주력 지표가 아니라,
+      이미 강한 업종에서 한 번 더 확인하는 용도로 씁니다.
+    </div>
+  </div>
+</div>
+
+<div id="modal"><div class="modal-box" id="mBox"></div></div>
+
+<script>
+(async function () {
+  const $ = id => document.getElementById(id);
+  let J;
+  try { J = await (await fetch('/export.json', { cache: 'no-store' })).json(); }
+  catch (e) { $('body').innerHTML = '<div class="empty">export.json 이 아직 없습니다 (주피터 칸 42).</div>'; return; }
+
+  const 월글 = m => `${m.slice(0, 4)}년 ${+m.slice(4)}월`;
+  const 짧은월 = m => `${m.slice(2, 4)}.${m.slice(4)}`;
+  const 퍼 = v => v == null ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toLocaleString(undefined, { maximumFractionDigits: Math.abs(v) >= 100 ? 0 : 1 }) + '%';
+  const 색 = v => v == null ? '' : v > 0 ? 'u' : v < 0 ? 'd' : '';
+  const 백만 = v => v == null ? '—' : (v / 1e6).toLocaleString(undefined, { maximumFractionDigits: v >= 1e8 ? 0 : 1 });
+  $('meta').textContent = `${월글(J.month)} · ${J.stage} · 엑셀 갱신 ${J.updated || ''}`;
+
+  let 묶음 = '전체', 정렬 = 'accel', 더보기 = 40;
+  const 정렬들 = [['accel', '가속 큰 순'], ['yoy', 'YoY 높은 순'], ['decel', '감속 큰 순'], ['yoy3sum', '3달 합 YoY'], ['pyoy', '판가 오른 순'], ['usd', '규모 큰 순']];
+
+  const 고르기 = (무시묶음) => {
+    const 최소 = +$('minSize').value, q = $('q').value.trim().toLowerCase();
+    return J.items.filter(p =>
+      (무시묶음 || 묶음 === '전체' || p.group === 묶음) &&
+      ($('showImp').checked || p.kind === '수출') &&
+      ($('showStale').checked || !p.stale) &&
+      (p.usd || 0) >= 최소 &&
+      (!q || (p.name + ' ' + p.co + ' ' + p.stocks.map(x => x[1]).join(' ')).toLowerCase().includes(q)));
+  };
+
+  function 묶음칸() {
+    const 모두 = 고르기(true), 이름들 = ['전체', ...new Set(J.items.map(p => p.group))];
+    const 순서 = ['전체', '반도체', '2차전지·태양광', '전력·인프라', '조선·방산·기계', '자동차', 'IT부품·디스플레이', '화장품·미용', '의료·바이오', '음식료', '소재', '기타'];
+    이름들.sort((a, b) => (순서.indexOf(a) + 1 || 99) - (순서.indexOf(b) + 1 || 99));
+    $('groups').innerHTML = 이름들.map(g => {
+      const a = 모두.filter(p => g === '전체' || p.group === g);
+      if (!a.length && g !== '전체') return '';
+      const ys = a.map(p => p.yoy3sum).filter(v => v != null).sort((x, y) => x - y);
+      const 중 = ys.length ? ys[Math.floor(ys.length / 2)] : null;
+      const 가 = a.filter(p => p.accel > 0).length, 감 = a.filter(p => p.accel < 0).length;
+      return `<div class="g ${g === 묶음 ? 'on' : ''}" data-g="${g}">
+        <div class="g-n">${g}<span class="g-c">${a.length}개</span></div>
+        <div class="g-v ${색(중)}" title="최근 3달 합 YoY 의 가운데 값">${퍼(중)}</div>
+        <div class="g-s">가속 <span class="u">${가}</span> · 감속 <span class="d">${감}</span></div></div>`;
+    }).join('');
+    document.querySelectorAll('.g').forEach(el => el.onclick = () => { 묶음 = el.dataset.g; 더보기 = 40; 그리기(); });
+  }
+
+  function 종목칩(p, 몇, 링크) {
+    if (!p.stocks.length) return '<span class="none">업황 지표</span>';
+    const 칩 = x => 링크 && x[0] ? `<a class="sk" href="https://finance.naver.com/item/main.naver?code=${x[0]}" target="_blank" rel="noopener">${x[1]}</a>` : `<span class="sk">${x[1]}</span>`;
+    return p.stocks.slice(0, 몇).map(칩).join('') + (p.stocks.length > 몇 ? `<span class="sk-more">+${p.stocks.length - 몇}</span>` : '');
+  }
+
+  function 막대줄(p) {        // 최근 12개월 일평균 — 작은 막대
+    const s = p.m.slice(-12), mx = Math.max(...s.map(x => x[1]), 1), W = 84, H = 22, w = W / s.length;
+    return `<svg width="${W}" height="${H}" aria-hidden="true">` + s.map((x, i) => {
+      const h = Math.max(1, x[1] / mx * (H - 1));
+      return `<rect x="${(i * w + 0.5).toFixed(1)}" y="${(H - h).toFixed(1)}" width="${(w - 1.5).toFixed(1)}" height="${h.toFixed(1)}" rx="1" fill="${i === s.length - 1 ? 'var(--signature)' : 'var(--barMuted)'}"/>`;
+    }).join('') + '</svg>';
+  }
+
+  function 그리기() {
+    $('tabs').innerHTML = 정렬들.map(([k, t]) => `<button class="${k === 정렬 ? 'on' : ''}" data-k="${k}">${t}</button>`).join('');
+    document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => { 정렬 = b.dataset.k; 더보기 = 40; 그리기(); });
+    묶음칸();
+    const 키 = { accel: p => p.accel, yoy: p => p.yoy, decel: p => p.accel == null ? null : -p.accel, yoy3sum: p => p.yoy3sum, pyoy: p => p.pyoy, usd: p => p.usd }[정렬];
+    const a = 고르기(false).filter(p => 키(p) != null).sort((x, y) => 키(y) - 키(x));
+    if (!a.length) { $('body').innerHTML = '<div class="empty">조건에 맞는 품목이 없습니다.</div>'; return; }
+    const 이달 = +J.month.slice(4);
+    $('body').innerHTML = `<table><thead><tr><th class="l">#</th><th class="l">품목</th><th class="l hide-m">관련 종목</th>
+      <th class="hide-m">${이달}월 수출<span class="small">백만$</span></th><th>일평균 YoY</th><th class="hide-m">직전 3달</th><th>가속</th>
+      <th>3달 합 YoY</th><th class="hide-m">판가 YoY</th><th class="hide-m">최근 12개월</th></tr></thead><tbody>` +
+      a.slice(0, 더보기).map((p, i) => `<tr data-i="${J.items.indexOf(p)}">
+        <td class="l no">${i + 1}</td>
+        <td class="l"><span class="nm">${p.name}</span><div class="co show-m">${p.stocks.length ? p.stocks.map(x => x[1]).join(', ') : '업황 지표'}</div><span class="tag">${p.kind === '수입' ? '수입 · ' : ''}${p.group}</span>${p.stale ? `<span class="tag">${짧은월(p.m[p.m.length - 1][0])} 멈춤</span>` : ''}</td>
+        <td class="l hide-m" title="${p.stocks.map(x => x[1]).join(', ')}">${종목칩(p, 3)}</td>
+        <td class="num hide-m">${백만(p.usd)}</td>
+        <td class="num ${색(p.yoy)}" style="font-weight:700">${퍼(p.yoy)}</td>
+        <td class="num hide-m ${색(p.yoy3prev)}">${퍼(p.yoy3prev)}</td>
+        <td>${p.accel == null ? '—' : `<span class="acc ${p.accel >= 0 ? 'up' : 'dn'}">${p.accel >= 0 ? '▲' : '▼'} ${Math.abs(Math.round(p.accel)).toLocaleString()}%p</span>`}</td>
+        <td class="num ${색(p.yoy3sum)}">${퍼(p.yoy3sum)}</td>
+        <td class="num hide-m ${색(p.pyoy)}">${퍼(p.pyoy)}</td>
+        <td class="hide-m">${막대줄(p)}</td></tr>`).join('') + '</tbody></table>' +
+      (a.length > 더보기 ? `<button class="more" id="moreBtn">더 보기 (${a.length - 더보기}개 남음)</button>` : '');
+    document.querySelectorAll('#body tbody tr').forEach(tr => tr.onclick = () => 창(J.items[+tr.dataset.i]));
+    if ($('moreBtn')) $('moreBtn').onclick = () => { 더보기 += 40; 그리기(); };
+  }
+
+  // ── 품목 창 ─────────────────────────────────────
+  function 막대차트(el, s, 값, 색칠, 축글, 팁, 위아래) {
+    const W = Math.max(300, el.clientWidth), H = 190, L = 44, R = 6, T = 8, B = 22;
+    const vs = s.map(값).filter(v => v != null);
+    let lo = 위아래 ? Math.min(0, ...vs) : 0, hi = Math.max(0, ...vs);
+    if (hi === lo) hi = lo + 1;
+    const y = v => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
+    const w = (W - L - R) / s.length;
+    const 눈 = (위아래 ? [lo, 0, hi] : [0, hi / 2, hi]).filter((v, i, a) => a.indexOf(v) === i && (v === 0 || Math.abs(y(v) - y(0)) >= 14)).map(v => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="#E1E5F0"/>
+      <text x="${L - 6}" y="${y(v) + 3.5}" font-size="10" fill="#8B94B0" text-anchor="end">${축글(v)}</text>`).join('');
+    const 영 = 위아래 ? `<line x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}" stroke="#8B94B0"/>` : '';
+    const 막 = s.map((x, i) => {
+      const v = 값(x); if (v == null) return '';
+      const y0 = y(Math.max(0, v)), h = Math.max(1, Math.abs(y(v) - y(0)));
+      return `<rect x="${(L + i * w + 1).toFixed(1)}" y="${y0.toFixed(1)}" width="${Math.max(1, w - 2).toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="${색칠(x, i)}"/>`;
+    }).join('');
+    let 달 = '';
+    s.forEach((x, i) => { if (x[0].slice(4) === '01' || i === s.length - 1)
+      달 += `<text x="${i === s.length - 1 ? W - R : L + i * w + w / 2}" y="${H - 6}" font-size="10" fill="#8B94B0" text-anchor="${i === s.length - 1 ? 'end' : 'middle'}">${i === s.length - 1 ? 짧은월(x[0]) : x[0].slice(0, 4)}</text>`; });
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${눈}${막}${영}${달}
+      <rect x="${L}" y="0" width="${W - L - R}" height="${H}" fill="transparent" class="hit"/></svg><div class="tip"></div>`;
+    const tip = el.querySelector('.tip'), hit = el.querySelector('.hit');
+    hit.onmousemove = e => {
+      const r = el.getBoundingClientRect(), i = Math.min(s.length - 1, Math.max(0, Math.floor((e.clientX - r.left - L) / w)));
+      tip.innerHTML = 팁(s[i]); tip.style.display = 'block';
+      tip.style.left = (L + i * w + w / 2) + 'px'; tip.style.top = (y(Math.max(0, 값(s[i]) || 0)) - 6) + 'px';
+    };
+    hit.onmouseleave = () => tip.style.display = 'none';
+  }
+
+  function 창(p) {
+    const s = p.m.slice(-36), 끝 = p.m[p.m.length - 1];
+    $('mBox').innerHTML = `
+      <div class="between" style="flex-wrap:nowrap;align-items:flex-start;"><div>
+        <div style="font-size:17px;font-weight:700;">${p.name}<span class="tag">${p.kind === '수입' ? '수입 · ' : ''}${p.group}</span></div>
+        <div style="margin-top:6px;">${종목칩(p, 20, true)}</div>
+        <div class="meta" style="margin-top:6px;">${p.hs ? 'HS ' + p.hs + ' · ' : ''}${월글(끝[0])} ${p.stale ? '(갱신 멈춤)' : J.stage}</div>
+      </div><button class="modal-x" id="mX">✕</button></div>
+      <div class="tiles">
+        <div class="tile"><div class="tile-l">${+끝[0].slice(4)}월 ${p.kind}</div><div class="tile-v">${백만(p.usd)}<span class="small">백만$</span></div></div>
+        <div class="tile"><div class="tile-l">일평균 YoY</div><div class="tile-v ${색(p.yoy)}">${퍼(p.yoy)}</div></div>
+        <div class="tile"><div class="tile-l">3달 합 YoY</div><div class="tile-v ${색(p.yoy3sum)}">${퍼(p.yoy3sum)}</div></div>
+        <div class="tile"><div class="tile-l">판가 YoY</div><div class="tile-v ${색(p.pyoy)}">${퍼(p.pyoy)}</div></div>
+      </div>
+      <div class="ch-t">일평균 ${p.kind}<span>달러 · 최근 3년 · 보라 = 이번 달 · 연보라 = 작년 같은 달</span></div>
+      <div class="chart" id="c1"></div>
+      <div class="ch-t">일평균 YoY<span>빨강 = 늘어남 · 파랑 = 줄어듦 · 옅은 빨강 = 300% 넘어 잘라 그린 달</span></div>
+      <div class="chart" id="c2"></div>`;
+    $('modal').classList.add('on');
+    $('mX').onclick = () => $('modal').classList.remove('on');
+    const 작년 = String(+끝[0].slice(0, 4) - 1) + 끝[0].slice(4);
+    막대차트($('c1'), s, x => x[1],
+      (x, i) => i === s.length - 1 ? '#6D4FE0' : x[0] === 작년 ? '#B9A9F2' : '#C9CEE0',
+      v => v === 0 ? '0' : v >= 1e6 ? (v / 1e6).toFixed(1) + 'B' : v >= 1e3 ? (v / 1e3).toFixed(v >= 1e4 ? 0 : 1) + 'M' : Math.round(v) + 'K',
+      x => `${월글(x[0])}<br>일평균 ${(x[1] / 1e3).toLocaleString(undefined, { maximumFractionDigits: 2 })}백만$ · YoY ${퍼(x[2])}`);
+    막대차트($('c2'), s, x => x[2] == null ? null : Math.max(-300, Math.min(300, x[2])),
+      x => x[2] > 300 ? '#F3A7AA' : x[2] >= 0 ? '#E5484D' : '#2F6FED',
+      v => Math.round(v) + '%',
+      x => `${월글(x[0])}<br>일평균 YoY ${퍼(x[2])} · 판가 YoY ${퍼(x[3])}`, true);
+  }
+  $('modal').onclick = e => { if (e.target.id === 'modal') $('modal').classList.remove('on'); };
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') $('modal').classList.remove('on'); });
+
+  ['minSize', 'showImp', 'showStale'].forEach(id => $(id).onchange = () => { 더보기 = 40; 그리기(); });
+  $('q').oninput = () => { 더보기 = 40; 그리기(); };
+  그리기();
+})();
+</script>
+</body>
+</html>
