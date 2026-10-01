@@ -27,7 +27,7 @@ async function 내부(경로, 시도 = 2) {
   for (let i = 0; i < 시도; i++) {
     try {
       const ac = new AbortController();
-      const 시계 = setTimeout(() => ac.abort(), 15000);
+      const 시계 = setTimeout(() => ac.abort(), 60000);   // osc_cache 줄에서 회원 요청을 먼저 보내므로 넉넉히
       const r = await fetch(안 + 경로, { signal: ac.signal });
       clearTimeout(시계);
       if (!r.ok) throw new Error(경로 + ' → ' + r.status);
@@ -134,7 +134,7 @@ async function 훑기() {
       캐시.진행 += 1;
       let s = null;
       try {
-        const d = await 내부('/flow-oscillator?code=' + encodeURIComponent(x.code), 2);
+        const d = await 내부('/flow-oscillator-cached?bg=1&code=' + encodeURIComponent(x.code), 2);   // 10/1 osc_cache 거쳐서 (회원 요청이 먼저)
         s = 상태보기(d.series);
       } catch (e) { s = null; }
       {
