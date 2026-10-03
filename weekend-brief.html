@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>주말 브리프</title>
+<style>
+  :root {
+    --void:#F2F4F9; --surface:#FFFFFF; --surface2:#F0F2F8; --hair:#E1E5F0;
+    --textPri:#131A2C; --textSec:#5B6483; --textTer:#8B94B0;
+    --up:#E5484D; --down:#2F6FED; --signature:#6D4FE0; --amber:#B8790A;
+    --mono: ui-monospace,'SF Mono','Roboto Mono',Menlo,Consolas,monospace;
+    --sans: -apple-system,'Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  body { background:var(--void); color:var(--textPri); font-family:var(--sans); margin:0; padding:24px 16px; }
+  .wrap { max-width:1180px; margin:0 auto; }
+  .between { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .card { background:var(--surface); border:1px solid var(--hair); border-radius:16px; padding:18px;
+          margin-bottom:16px; box-shadow:0 1px 3px rgba(19,26,44,.06); }
+  .eyebrow { font-size:11px; letter-spacing:2px; color:var(--textTer); font-family:var(--mono); }
+  h1 { font-size:22px; margin:2px 0 0; }
+  h2 { font-size:15px; margin:0 0 12px; }
+  .sub { font-size:13px; color:var(--textSec); margin-top:4px; }
+  button { background:var(--surface2); border:1px solid var(--hair); color:var(--textSec);
+           padding:8px 14px; border-radius:10px; font-size:12px; cursor:pointer; font-family:var(--sans); }
+  button, .between a button { white-space:nowrap; }
+  .between > div:last-child button { font-size:13px; font-weight:600; }
+
+  .lede { font-size:13.5px; line-height:1.85; color:var(--textSec); }
+  .lede b { color:var(--textPri); }
+  .key { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:1px;
+         background:var(--hair); border:1px solid var(--hair); border-radius:12px; overflow:hidden; margin:14px 0 0; }
+  .key div { background:var(--surface); padding:12px 14px; }
+  .key .k { font-size:10.5px; color:var(--textTer); margin-bottom:4px; }
+  .key .v { font-family:var(--mono); font-size:16px; font-weight:700; }
+  .key .s { font-size:11px; color:var(--textTer); margin-top:3px; line-height:1.5; }
+
+  .tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; }
+  .tabs button.on { background:var(--signature); border-color:var(--signature); color:#fff; font-weight:600; }
+  .tabs button small { display:block; font-size:10px; opacity:.8; font-weight:400; margin-top:1px; }
+
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
+  .grid2 > div, .grid3 > div { min-width:0; }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  th { text-align:right; font-size:11px; font-weight:500; color:var(--textTer);
+       padding:6px 8px; border-bottom:1px solid var(--hair); white-space:nowrap; }
+  td { text-align:right; padding:7px 8px; border-bottom:1px solid var(--surface2);
+       font-family:var(--mono); white-space:nowrap; }
+  th:first-child, td:first-child { text-align:left; font-family:var(--sans); }
+  tbody tr:last-child td { border-bottom:none; }
+  .up { color:var(--up); } .down { color:var(--down); }
+  .grp td { font-family:var(--sans); font-size:11px; color:var(--textTer); padding-top:12px; border-bottom:1px solid var(--hair); }
+
+  .bar-row { display:grid; grid-template-columns:96px 1fr 62px; align-items:center; gap:8px; padding:4px 0; font-size:12.5px; }
+  .bar-t { height:10px; background:var(--surface2); border-radius:5px; position:relative; overflow:hidden; }
+  .bar-f { position:absolute; top:0; bottom:0; left:0; border-radius:5px; }
+  .bar-v { font-family:var(--mono); text-align:right; }
+
+  .why { margin-top:6px; }
+  .why-item { padding:11px 0; border-bottom:1px solid var(--surface2); }
+  .why-item:last-child { border-bottom:none; }
+  .why-t { font-size:13px; font-weight:700; margin-bottom:4px; }
+  .why-t .no { font-family:var(--mono); color:var(--signature); margin-right:6px; }
+  .why-b { font-size:12.5px; color:var(--textSec); line-height:1.75; }
+  .why-b b { color:var(--textPri); }
+
+  .stk { display:flex; flex-wrap:wrap; gap:5px 7px; margin-top:8px; }
+  .stk span { font-size:11.5px; background:var(--surface2); border-radius:6px; padding:3px 8px; color:var(--textSec); }
+  .stk b { font-family:var(--mono); margin-left:4px; }
+  .gname { font-size:12px; font-weight:700; margin:12px 0 2px; }
+  .gname small { font-weight:400; color:var(--textTer); margin-left:4px; }
+
+  .cal-day { border-left:3px solid var(--hair); padding:2px 0 14px 14px; margin-left:4px; }
+  .cal-day:last-child { padding-bottom:0; }
+  .cal-day.big { border-left-color:var(--up); }
+  .cal-d { font-size:13px; font-weight:700; margin-bottom:6px; }
+  .cal-d span { font-size:11px; font-weight:400; color:var(--textTer); margin-left:6px; }
+  .cal-l { font-size:12.5px; color:var(--textSec); line-height:1.85; }
+  .cal-l b { color:var(--textPri); }
+  .tag { font-size:10px; font-family:var(--mono); border-radius:5px; padding:1px 6px; margin-right:5px; }
+  .t-kr { background:#EDE9FB; color:var(--signature); }
+  .t-us { background:#EEF3FE; color:var(--down); }
+  .t-cn { background:#FDEBEC; color:#C0303A; }
+  .t-ev { background:#FEF3E6; color:#9A6210; }
+  .note { font-size:11.5px; color:var(--textTer); line-height:1.8; }
+  .callout { background:#F6F3FE; border:1px solid #E2DAFB; border-radius:12px; padding:12px 14px;
+             font-size:12.5px; color:var(--textSec); line-height:1.75; margin-top:12px; }
+  .callout b { color:var(--textPri); }
+
+  @media (max-width:960px) { .grid3 { grid-template-columns:1fr 1fr; } }
+  @media (max-width:860px) { .grid2, .grid3 { grid-template-columns:1fr; } }
+  @media (max-width:640px) {
+    .between > div:last-child { gap:6px; flex-wrap:wrap; }
+    .between > div:last-child button { font-size:12.5px; padding:8px 11px; }
+    .card { padding:14px; }
+    button { min-height:34px; }
+    table { display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    table.fit { display:table; }
+    .key { grid-template-columns:1fr 1fr; }
+    .key .v { font-size:14px; }
+    .cal-day { padding-left:11px; }
+    .stk span { font-size:11px; }
+    .bar-row { grid-template-columns:84px 1fr 58px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="between" style="margin-bottom:16px;">
+    <div>
+      <div class="eyebrow">WEEKEND BRIEF · 10/02 (금) 미국 마감</div>
+      <h1>고용 둔화에 상승 출발, 장기금리 재반등에 상승폭 축소</h1>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <span id="hgMenu" style="display:contents"></span><script src="/menu.js"></script>
+    </div>
+  </div>
+
+  <!-- 한눈에 -->
+  <div class="card">
+    <h2>한눈에</h2>
+    <div class="lede">
+      9월 고용보고서가 예상보다 크게 부진하게 나오면서 국채금리가 내렸고,
+      <b>나스닥이 사상 최고치를 새로 쓰며</b> 강세로 출발했습니다.
+      G7의 비축유 방출 계획에 국제유가도 내려 금리와 에너지 부담이 함께 줄었습니다.<br><br>
+      그러나 장중 <b>브로드컴의 600억 달러 회사채 발행 추진</b>과 다음 주 국채 발행 증가가 부각되며
+      장기금리가 다시 오르자 상승폭이 줄었습니다.
+      대형주 중심의 펀드 자금 유입이 아래를 받쳤고, 옵션 수급이 위를 막은 하루였습니다.
+    </div>
+    <div class="key">
+      <div><div class="k">나스닥</div><div class="v up">+1.19%</div>
+           <div class="s">사상 최고치 경신 · S&amp;P500 +0.73%</div></div>
+      <div><div class="k">필라델피아 반도체</div><div class="v up">+2.40%</div>
+           <div class="s">VanEck 반도체 +2.07%</div></div>
+      <div><div class="k">미 10년물 금리</div><div class="v up">5.273%</div>
+           <div class="s">+3.9bp · 장중 5.16% 찍고 되돌림</div></div>
+      <div><div class="k">WTI</div><div class="v down">$91.26</div>
+           <div class="s">−1.73% · 장중 −4% 넘게 밀렸다 축소</div></div>
+      <div><div class="k">MSCI 한국 ETF</div><div class="v up">+3.10%</div>
+           <div class="s">KOSPI 야간선물 +1.25%</div></div>
+      <div><div class="k">달러/원 NDF</div><div class="v">1,344원대</div>
+           <div class="s">달러인덱스 101.93 (−0.17%)</div></div>
+    </div>
+  </div>
+
+  <!-- 지수 · 업종 -->
+  <div class="card">
+    <div class="grid2">
+      <div>
+        <h2>지수 · ETF</h2>
+        <table class="fit">
+          <thead><tr><th>이름</th><th>등락</th></tr></thead>
+          <tbody id="idx"></tbody>
+        </table>
+      </div>
+      <div>
+        <h2>업종 (S&amp;P500 섹터)</h2>
+        <div id="sec"></div>
+        <div class="note" style="margin-top:10px;">11개 업종 중 10개가 올랐습니다. 경기소비재·기술이 앞장섰고 헬스케어만 보합권에서 밀렸습니다.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 변화요인 -->
+  <div class="card">
+    <h2>오늘 시장을 움직인 여섯 가지</h2>
+    <div class="grid2">
+      <div class="why" id="why1"></div>
+      <div class="why" id="why2"></div>
+    </div>
+  </div>
+
+  <!-- 금리 · 환율 · 원자재 -->
+  <div class="card">
+    <h2>금리 · 환율 · 원자재</h2>
+    <div class="grid3">
+      <div>
+        <table class="fit">
+          <thead><tr><th>미국 국채</th><th>금리</th><th>변화</th></tr></thead>
+          <tbody id="bond"></tbody>
+        </table>
+        <table class="fit" style="margin-top:14px;">
+          <thead><tr><th>외환</th><th>값</th><th>등락</th></tr></thead>
+          <tbody id="fx"></tbody>
+        </table>
+      </div>
+      <div>
+        <table class="fit">
+          <thead><tr><th>원자재</th><th>값</th><th>등락</th></tr></thead>
+          <tbody id="cmd"></tbody>
+        </table>
+      </div>
+      <div class="why" id="mkt"></div>
+    </div>
+  </div>
+
+  <!-- 업종별 이야기 -->
+  <div class="card">
+    <div class="between" style="margin-bottom:12px;">
+      <h2 style="margin:0;">업종별로 무슨 일이 있었나</h2>
+      <span class="note">눌러서 넘겨 보세요</span>
+    </div>
+    <div class="tabs" id="tabs"></div>
+    <div id="body"></div>
+  </div>
+
+  <!-- 종목 등락 -->
+  <div class="card">
+    <div class="between" style="margin-bottom:4px;">
+      <h2 style="margin:0;">관심 종목 등락</h2>
+      <span class="note">미국 증시 화면과 같은 묶음</span>
+    </div>
+    <div class="grid2">
+      <div id="grpL"></div>
+      <div id="grpR"></div>
+    </div>
+  </div>
+
+  <!-- 한국 관점 -->
+  <div class="card">
+    <h2>한국 증시 관점</h2>
+    <div class="grid2">
+      <div>
+        <div class="why-item">
+          <div class="why-t">우호적 — 반도체 투자심리 개선</div>
+          <div class="why-b">
+            MSCI 한국 ETF <b>+3.10%</b>, 필라델피아 반도체 +2.40%, SK하이닉스 ADR +0.84%에
+            엔비디아 +1.34%, 브로드컴 +3.35%, AMD +2.95%까지 AI 반도체가 고르게 올랐습니다.
+            MSCI 이머징 ETF +1.29%, KOSPI 야간선물 +1.25%로 한국 시장에는 상당히 우호적인 조합입니다.
+          </div>
+        </div>
+        <div class="why-item">
+          <div class="why-t">확산 — 서버에서 광통신, 장비까지</div>
+          <div class="why-b">
+            HPE +7.36%, 델 +3.84%, 슈퍼마이크로 +4.22% → 루멘텀 +3.79%, 코히런트 +5.59% →
+            어플라이드 +2.03%, 램리서치 +2.17%로 <b>AI 서버 → 광통신 → 장비</b>까지 매수가 번졌습니다.
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="why-item">
+          <div class="why-t">환율 — 원화 강세 방향</div>
+          <div class="why-b">
+            NDF 기준 달러/원이 1,344원대로 내려와 국내 외국인 수급에는 긍정적인 환경입니다.
+          </div>
+        </div>
+        <div class="why-item">
+          <div class="why-t">주의 — 메모리·스토리지 안에서도 갈린다</div>
+          <div class="why-b">
+            씨게이트·웨스턴디지털이 −10% 넘게 빠졌습니다. 메모리·스토리지 안에서도
+            <b>공급 확대 우려가 있는 영역</b>과 <b>AI 설비투자의 직접 수혜 영역</b>을 나눠 봐야 합니다.
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="callout">
+      <b>이번 주 국내 장은 10/6(화) ~ 10/8(목) 사흘입니다.</b> 10/5(월)과 10/9(금)는 휴장입니다.
+      화요일 장은 미국 금요일과 월요일(ISM 서비스업) <b>두 밤의 흐름을 함께</b> 반영하게 됩니다.
+      삼성전자 3분기 잠정실적(7~8일 예정)이 짧은 한 주의 중심입니다.
+    </div>
+  </div>
+
+  <!-- 주간전략 -->
+  <div class="card">
+    <h2>10/05 ~ 10/09 주간 전략 — 핵심은 여전히 '장기금리'</h2>
+    <div class="lede" style="margin-bottom:6px;">
+      가장 중요한 변화는 <b>고용이 둔화됐는데도 미국 장기금리가 다시 오르고 있다</b>는 점입니다.
+      고용보고서 직후 급락했던 10년물·30년물이 빠르게 상승으로 돌아섰습니다.
+      시장이 단기 정책금리보다 높은 유가·기대인플레이션, 미국 재정적자와 국채 공급,
+      AI 기업의 회사채 발행, 일본·유럽 장기금리 상승을 더 크게 반영하고 있다는 뜻입니다.
+      증시를 누르는 핵심이 연준의 추가 인상보다 <b>기간 프리미엄과 글로벌 채권 수급</b>으로 옮겨 가고 있습니다.
+    </div>
+    <div class="grid2">
+      <div class="why" id="wk1"></div>
+      <div class="why" id="wk2"></div>
+    </div>
+    <div class="callout">
+      <b>이번 주 결론</b> — "고용이 약한데도 왜 장기금리가 안 내려가는가"를 검증하는 주간입니다.
+      장기금리가 안정되면 AI·반도체 행사와 삼성전자 실적이 기술주 상승의 촉매가 될 수 있습니다.
+      반대로 10년물 5%대가 이어지거나 더 오르면, 좋은 실적과 AI 뉴스에도 밸류에이션 부담이 커지며
+      변동성이 커질 수 있습니다. <b>실적보다 먼저 금리, 특히 장기채 수요와 입찰 결과</b>를 확인해야 하는 시장입니다.
+    </div>
+  </div>
+
+  <!-- 일정 -->
+  <div class="card">
+    <h2>요일별 일정 <span class="note">10/04 ~ 10/09</span></h2>
+    <div id="cal"></div>
+  </div>
+
+  <div class="card">
+    <div class="note">
+      이 화면은 주말 동안 해외 시장 흐름을 한 번에 훑기 위해 정리한 것입니다.
+      지수·종목 등락률은 미국 증시 화면(야후 기준)의 10/2 종가 등락률이며, 특정 종목의 매매를 권하는 내용이 아닙니다.
+    </div>
+  </div>
+</div>
+
+<script>
+const 부호 = v => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2) + "%";
+const bp = v => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(1) + "bp";
+const 색 = v => v > 0 ? "up" : v < 0 ? "down" : "";
+const 칩 = 목록 => `<div class="stk">${목록.map(([이름, v]) =>
+  `<span>${이름}<b class="${색(v)}">${부호(v)}</b></span>`).join("")}</div>`;
+
+// ── 지수 · ETF ────────────────────────────
+const 지수 = [
+  ["지수", null],
+  ["나스닥", 1.19], ["러셀2000", 0.94], ["S&P500", 0.73], ["다우존스", 0.49], ["다우 운송", 2.07], ["VIX 변동성", -6.59],
+  ["반도체", null],
+  ["필라델피아 반도체", 2.40], ["VanEck Semiconductor", 2.07], ["DRAM ETF", -0.40],
+  ["한국 · 신흥국", null],
+  ["MSCI 한국지수 ETF", 3.10], ["MSCI 이머징지수 ETF", 1.29], ["KOSPI 야간선물", 1.25],
+];
+document.getElementById("idx").innerHTML = 지수.map(([n, v]) => v == null
+  ? `<tr class="grp"><td colspan="2">${n}</td></tr>`
+  : `<tr><td>${n}</td><td class="${색(v)}">${부호(v)}</td></tr>`).join("");
+
+// ── 업종 ─────────────────────────────────
+const 업종 = [["경기소비재", 1.13], ["기술", 1.01], ["산업재", 0.78], ["소재", 0.66], ["유틸리티", 0.38],
+  ["커뮤니케이션", 0.35], ["리츠·부동산", 0.32], ["필수소비재", 0.25], ["에너지", 0.19], ["금융", 0.06], ["헬스케어", -0.01]];
+const 업종최대 = Math.max(...업종.map(x => Math.abs(x[1])));
+document.getElementById("sec").innerHTML = 업종.map(([n, v]) => `
+  <div class="bar-row"><div>${n}</div>
+    <div class="bar-t"><div class="bar-f" style="width:${Math.max(2, Math.abs(v) / 업종최대 * 100)}%;background:${v >= 0 ? "var(--up)" : "var(--down)"};opacity:.75"></div></div>
+    <div class="bar-v ${색(v)}">${부호(v)}</div></div>`).join("");
+
+// ── 변화요인 ──────────────────────────────
+const 요인 = [
+  ["9월 고용 +2.9만 명, 예상 크게 하회",
+   "비농업고용이 <b>+2.9만 명</b>으로 예상 +9만 명을 크게 밑돌았고, 7~8월도 합계 6만 명 하향 수정됐습니다. 시간당 임금은 전월 +0.1%, 전년 +3.0%에 그쳐 임금 압력도 둔화했습니다. 실업률은 4.1% → 4.2%.<br>다만 고용참가율이 61.8%로 높아졌고 가계조사 취업자는 +40.6만 명 늘었습니다. <b>신규 채용은 둔화되지만 기업이 적극적으로 해고하는 상황은 아니라는 점</b>이 핵심입니다."],
+  ["데이터센터 건설은 여전히 강함",
+   "데이터센터 건설과 관련된 비주거 전문건설 고용이 <b>+1만 2,300명</b>으로 강했던 반면, 백화점 등 소매업은 −4,800명이었습니다. AI·데이터센터 투자는 강하고 전통 소비 업종은 약한 <b>K자형 흐름</b>이 고용에서도 나타났습니다."],
+  ["고용 둔화는 분명하지만 침체 신호는 아님",
+   "올해 노동절이 늦어 계절조정 과정에서 9월 고용이 실제보다 약하게 잡혔을 수 있다는 지적이 나왔습니다. 다만 근로시간과 임금 증가율이 둔화되고, 27주 이상 장기 실업자가 194.4만 명으로 높으며, 3개월 평균 고용도 둔화돼 <b>냉각 방향 자체는 분명</b>합니다. 급격한 침체로 보기는 어려운 수준입니다."],
+  ["G7 비축유 1억 배럴 방출 → WTI 장중 −4%",
+   "G7이 향후 4개월 동안 IEA를 통해 디젤·원유 등 총 <b>1억 배럴</b> 방출에 합의했고, 러시아도 디젤 수출금지 일부 해제 가능성을 언급했습니다. WTI는 장중 −4% 넘게 밀렸지만 사우디 리야드 폭발음 소식, 후티 반군 공격 검토 보도에 낙폭을 줄여 <b>−1.73%</b>로 마쳤습니다."],
+  ["10년물 5.16%까지 내렸다가 5.27%로 재상승",
+   "부진한 고용과 유가 급락에 10년물이 장중 <b>5.16%</b>까지 내렸습니다. 그러나 브로드컴의 600억 달러 회사채 발행 추진으로 AI·하이퍼스케일러의 회사채 공급 부담이 다시 부각됐고, 고용지표가 계절조정 탓에 과도하게 낮게 나왔을 수 있다는 분석, 유가 낙폭 축소에 따른 물가 불안이 겹쳐 <b>5.273%</b>로 마쳤습니다. 주식도 상승폭을 일부 반납했습니다."],
+  ["펀드 자금은 아래를 받치고, 옵션은 위를 막았다",
+   "AI 투자 기대와 연준 부담 완화로 글로벌 주식형 펀드에 1주간 <b>347.6억 달러</b>, 미국 주식형 펀드에 206억 달러가 들어왔습니다(2주 연속 유입). 반면 기술주 섹터 펀드에서는 빠져, AI 종목 추격보다 <b>시장 전체·대형주 중심</b>으로 움직였습니다.<br>옵션은 S&amp;P500 7,750선, QQQ 750달러 부근에 거래가 몰려 지수가 그 가격대를 크게 벗어나기 어려운 구조였습니다."],
+];
+const 요인그리기 = (목록, 시작) => 목록.map(([t, b], i) =>
+  `<div class="why-item"><div class="why-t"><span class="no">${시작 + i}</span>${t}</div><div class="why-b">${b}</div></div>`).join("");
+document.getElementById("why1").innerHTML = 요인그리기(요인.slice(0, 3), 1);
+document.getElementById("why2").innerHTML = 요인그리기(요인.slice(3), 4);
+
+// ── 금리 · 환율 · 원자재 ──────────────────────
+document.getElementById("bond").innerHTML = [["2년물", "4.827%", 0.4], ["10년물", "5.273%", 3.9], ["30년물", "5.623%", 0.2]]
+  .map(([n, v, c]) => `<tr><td>${n}</td><td>${v}</td><td class="${색(c)}">${bp(c)}</td></tr>`).join("");
+document.getElementById("fx").innerHTML = [["유로/달러", "1.12518", 0.09], ["달러/엔", "157.828", -0.15], ["달러인덱스", "101.928", -0.17]]
+  .map(([n, v, c]) => `<tr><td>${n}</td><td>${v}</td><td class="${색(c)}">${부호(c)}</td></tr>`).join("");
+document.getElementById("cmd").innerHTML = [["WTI", "$91.26", -1.73], ["브렌트", "$102.72", 0.46], ["천연가스", "3.040", 2.43],
+  ["금", "$4,172.10", -0.72], ["은", "60.710", -0.76], ["구리", "6.5800", 0.63]]
+  .map(([n, v, c]) => `<tr><td>${n}</td><td>${v}</td><td class="${색(c)}">${부호(c)}</td></tr>`).join("");
+document.getElementById("mkt").innerHTML = [
+  ["국제유가 — 급락 후 낙폭 축소", "비축유 방출과 러시아 디젤 수출 재개 가능성에 장중 −4% 넘게 밀렸지만, 중국 석유제품 수출 중단, 러시아 정유시설 피격, 사우디의 후티 공격 검토, 미·이란 전쟁 지속 등 공급 불안이 남아 −1%대로 줄었습니다."],
+  ["천연가스 — 상승", "미국은 9월 LNG 수출 증가 소식에, 유럽은 겨울철 재고 부족 우려에 +2%대 올랐습니다."],
+  ["달러 — 고용 부진에 약세", "국채금리가 반등하며 약세폭은 줄었습니다. 유로는 프랑스 재정불안이 발목을 잡았습니다(프랑스-독일 금리차 150bp 넘게 확대, 2011년 이후 최고 수준 근접). 파운드·엔은 강세, 전날 급락한 멕시코 페소는 반등."],
+  ["국채 — 고용만으로는 장기금리가 안 잡힌다", "고용 충격과 유가 급락에 내렸던 금리가 계절조정 논란, 브로드컴 회사채, 다음 주 국채 발행 증가, 유가 낙폭 축소가 겹치며 빠르게 되돌아왔습니다."],
+].map(([t, b]) => `<div class="why-item"><div class="why-t">${t}</div><div class="why-b">${b}</div></div>`).join("");
+
+// ── 업종별 이야기 (탭) ──────────────────────
+const 이야기 = [
+  { 키: "mem", 라벨: "메모리·스토리지", 부제: "HDD 급락",
+    글: "도시바가 AI 데이터센터용 HDD 생산능력을 내년까지 <b>2배로 늘리고</b> 필리핀 공장에 3.8억 달러를 투자한다고 발표하자 씨게이트·웨스턴디지털이 −10% 넘게 급락했습니다. 지금의 HDD 공급부족과 높은 가격결정력이 약해질 수 있다는 우려입니다. 마이크론·샌디스크도 차익실현이 나왔고, SK하이닉스 ADR만 수급 영향 속에 올랐습니다.",
+    목록: [["씨게이트", -10.21], ["웨스턴 디지털", -10.22], ["샌디스크", -3.79], ["마이크론", -2.05], ["SK하이닉스 ADR", 0.84]] },
+  { 키: "ai", 라벨: "AI 반도체", 부제: "엔비디아·브로드컴·AMD",
+    글: "엔비디아는 장 초반 금리 하락과 AI 반도체 매수세에 올랐습니다. 모건스탠리가 반도체 최선호주로 다시 꼽았고, 아마존이 약 80억 달러어치 블랙웰 칩을 SPV에 넘긴 뒤 재임차하는 금융구조를 검토한다는 보도도 긍정적이었습니다.<br>브로드컴은 앤트로픽 등 고객의 AI칩 구매를 지원하려 약 <b>600억 달러</b>(선순위 부채 420억 달러 포함)를 조달한다는 소식에 AI 가속기·네트워크 수요 기대가 커졌습니다. 인텔은 장중 금리 재상승에 하락 전환했습니다.",
+    목록: [["엔비디아", 1.34], ["브로드컴", 3.35], ["AMD", 2.95], ["마벨", 1.57], ["인텔", -0.56]] },
+  { 키: "srv", 라벨: "AI 서버", 부제: "HPE·델·슈퍼마이크로",
+    글: "HPE는 Vultr로부터 받은 <b>12억 달러</b> 규모 AMD 기반 AI 서버랙 주문과 장기 성장 전망 상향 효과가 이어졌고, 다이와의 투자의견·목표주가 상향도 더해졌습니다. 델은 약 950억 달러 규모 AI 서버 수주잔고와 기업 고객의 AI 인프라 투자 확대 기대에 강세였습니다.",
+    목록: [["HPE", 7.36], ["델", 3.84], ["슈퍼마이크로", 4.22]] },
+  { 키: "opt", 라벨: "광통신·장비", 부제: "공급부족 · 마이크론 설비투자",
+    글: "루멘텀은 고성능 200G 레이저 물량이 사실상 매진됐고 판매가격도 이전 세대의 약 2배라는 점이 다시 부각됐습니다. 코히런트 등 광통신주가 함께 올랐고, 어플라이드·램리서치 등 장비주는 마이크론의 설비투자 증액 효과가 이어졌습니다.",
+    목록: [["코히런트", 5.59], ["루멘텀", 3.79], ["램리서치", 2.17], ["어플라이드", 2.03]] },
+  { 키: "car", 라벨: "자동차", 부제: "테슬라 +4.65%",
+    글: "테슬라는 3분기 인도량이 <b>48만 6,532대</b>로 예상 45만 7천 대를 크게 웃돌았습니다. 전년 대비로는 −2%였지만 유럽 판매 회복과 미국 수요가 예상보다 강했습니다. 포드는 3분기 미국 판매 −6.6%(50만 9,764대)와 F-150 생산중단이, GM은 전날 발표한 3분기 판매 −5.5%가 부담이었습니다. 알버말은 중국 탄산리튬 가격이 3분기 −20.8% 내렸다는 소식에 약세.",
+    목록: [["테슬라", 4.65], ["포드", -1.39], ["GM", -1.31], ["퀀텀스케이프", -0.44], ["알버말", -0.42]] },
+  { 키: "big", 라벨: "대형기술주", 부제: "알파벳·애플·아마존",
+    글: "알파벳은 Gemini 4 Argon의 출력 한도가 6.4만 → 100만 토큰으로 약 15.6배 늘었다는 소식과, TPU를 스페이스X 로켓으로 발사해 우주 데이터센터 가능성을 시험한다는 소식에 올랐습니다. 애플은 중국 아이폰 18 Pro 첫 주 판매가 전년 대비 +12%, 중국 점유율이 33%까지 올랐다는 소식에, 아마존은 AWS의 엔비디아 GPU 임대가격 약 15% 인상과 블랙웰 칩 재임차 구조 기대에 강세였습니다.",
+    목록: [["알파벳", 1.62], ["아마존", 1.33], ["애플", 1.02], ["마이크로소프트", 0.92], ["메타", 0.30]] },
+  { 키: "sw", 라벨: "소프트웨어·보안", 부제: "오라클 +3.06%",
+    글: "오라클은 Lighthouse 프로젝트의 전력 확보를 위해 Point Beach 원전 전력을 일부 사고 약 3억 달러의 추가 에너지 비용을 직접 부담하기로 했습니다. 전력비용을 지역 주민에게 넘기지 않는다는 점이 건설 지연 우려를 덜었습니다. 팔로알토는 TD코웬의 목표주가 상향 효과, 세일즈포스·서비스나우는 장중 금리 재상승에 밀렸습니다.",
+    목록: [["오라클", 3.06], ["팔로알토", 1.76], ["팔란티어", -0.68], ["세일즈포스", -0.84], ["서비스나우", -2.45]] },
+  { 키: "spc", 라벨: "우주", 부제: "스페이스X +7.35%",
+    글: "스페이스X는 약 13시간 동안 Crew-13, Transporter-18, NROL-97 세 임무를 연속 수행하며 발사능력을 재확인했습니다. Transporter-18에는 소형위성·탑재체 130개와 구글 TPU 시제품이 실려 우주환경에서 AI칩의 방사선 내성·열관리를 시험합니다. NASA의 달 남극 Moon Base 과제 선정과 민간 활용 확대도 긍정적이었고, 로켓랩은 일본 기업과 <b>20회 발사계약</b>(단일 상업고객 최대)을 맺었습니다.",
+    목록: [["스페이스X", 7.35], ["로켓랩", 4.91], ["인튜이티브 머신스", 4.70], ["AST SpaceMobile", 2.47]] },
+  { 키: "btc", 라벨: "비트코인", 부제: "금리 따라 올랐다 반락",
+    글: "약한 고용에 금리가 급락하자 비트코인은 장 초반 8만 6,800달러까지 올랐지만, 10년물이 5.2% 후반으로 반등하면서 상승분을 모두 반납하고 8만 4,180달러 수준으로 내렸습니다. 로빈후드는 플랫폼에서 이미 15만 명 이상이 AI 에이전트를 쓰고 2억 달러 이상의 자산이 그 방식으로 운용된다는 점이 부각돼 올랐습니다.",
+    목록: [["로빈후드", 1.43], ["스트래티지", -0.31], ["서클", -2.00], ["코인베이스", -3.32]] },
+];
+let 탭 = 이야기[0].키;
+function 이야기그리기() {
+  document.getElementById("tabs").innerHTML = 이야기.map(n =>
+    `<button data-t="${n.키}" class="${n.키 === 탭 ? "on" : ""}">${n.라벨}<small>${n.부제}</small></button>`).join("");
+  document.querySelectorAll("[data-t]").forEach(b => b.onclick = () => { 탭 = b.dataset.t; 이야기그리기(); });
+  const n = 이야기.find(x => x.키 === 탭);
+  document.getElementById("body").innerHTML = `<div class="why-b" style="font-size:13px">${n.글}</div>${칩(n.목록)}`;
+}
+
+// ── 관심 종목 등락 (미국 증시 화면 묶음) ──────────
+const 묶음 = [
+  ["M7", "", [["테슬라", 4.65], ["알파벳", 1.62], ["엔비디아", 1.34], ["아마존닷컴", 1.33], ["애플", 1.02], ["마이크로소프트", 0.92], ["메타", 0.30]]],
+  ["소프트웨어", "", [["오라클", 3.06], ["팔란티어", -0.68], ["세일즈포스", -0.84], ["어도비 시스템즈", -1.49], ["서비스나우", -2.45]]],
+  ["반도체", "설계 및 파운드리", [["Arm", 5.18], ["브로드컴", 3.35], ["TSMC", 2.96], ["AMD", 2.95], ["인텔", -0.56]]],
+  ["반도체", "장비", [["KLA", 3.27], ["ASML", 3.25], ["램리서치", 2.17], ["어플라이드 머티어리얼즈", 2.03]]],
+  ["반도체", "테스트 및 패키징", [["ASE ADR", 6.08], ["Amkor", 5.90]]],
+  ["반도체", "메모리 및 저장장치", [["SK하이닉스", 0.84], ["마이크론", -2.05], ["샌디스크", -3.79], ["씨게이트", -10.21], ["웨스턴 디지털", -10.22]]],
+  ["반도체", "전력반도체", [["온 세미컨덕터", 6.01], ["모놀리틱 파워", 5.79], ["마이크로칩", 3.59], ["Navitas", 2.31]]],
+  ["반도체", "AI 반도체·연결", [["Credo", 4.03], ["Celestica", 3.81], ["마벨", 1.57], ["Astera Labs", -1.71]]],
+  ["네트워크 및 AI 인프라", "", [["Coherent", 5.59], ["TTM Tech", 4.25], ["Super Micro", 4.22], ["델", 3.84], ["Lumentum", 3.79], ["Vertiv", 2.46], ["코닝", 2.35], ["아리스타", 1.40]]],
+  ["NEO CLOUD", "", [["Nebius", 4.53], ["IREN", 2.73], ["Cipher Mining", 1.62], ["CoreWeave", 1.19]]],
+  ["에너지 및 전력", "원전", [["X Energy", 3.08], ["Centrus", 0.12], ["Fermi America", -0.49], ["Nuscale", -0.51], ["Oklo", -0.75]]],
+  ["에너지 및 전력", "우라늄", [["우라늄 ETF", 0.51], ["카메코", -0.60]]],
+  ["에너지 및 전력", "태양광", [["솔라엣지", 7.19], ["인페이즈", 1.98], ["퍼스트 솔라", 1.45], ["징코솔라 ADR", -1.51]]],
+  ["에너지 및 전력", "전력기기 및 인프라", [["Bloom Energy", 4.17], ["Fluence", 0.53], ["Vistra", 0.19], ["GE Vernova", 0.13], ["이튼", -0.27], ["콘스텔레이션", -0.55]]],
+  ["에너지 및 전력", "송배전 인프라", [["Powell", 2.89], ["Quanta", 2.11], ["Hubbell", 1.83]]],
+  ["에너지 및 전력", "리튬/소재", [["알버말", -0.42]]],
+  ["헬스케어 및 바이오", "지수·ETF", [["SPDR S&P Biotech", -0.05], ["NASDAQ Biotechnology", -0.26]]],
+  ["헬스케어 및 바이오", "비만치료제", [["노보 노디스크", -0.21], ["일라이릴리", -0.61], ["Viking", -1.87], ["Structure ADR", -4.52]]],
+  ["헬스케어 및 바이오", "제약", [["모더나", 0.57], ["머크", 0.34], ["존슨앤존슨", -1.02], ["화이자", -1.14]]],
+  ["헬스케어 및 바이오", "RNA · MASH · 기타", [["Madrigal", -0.06], ["Immunovant", -0.09], ["Arrowhead", -0.93], ["Ionis", -1.05], ["Wave Life Sciences", -2.58], ["Evommune", -4.02], ["Compass", -4.92]]],
+  ["가상화폐 및 블록체인", "", [["Strategy", -0.31], ["Circle", -2.00], ["코인베이스", -3.32]]],
+  ["우주항공", "", [["스페이스X", 7.35], ["Rocket Lab", 4.91], ["Intuitive Machines", 4.70], ["AST SpaceMobile", 2.47]]],
+  ["양자 컴퓨팅", "", [["IONQ", -0.50], ["Rigetti", -2.37], ["D-Wave", -4.77]]],
+  ["방위산업", "", [["록히드 마틴", -0.02], ["RTX", -0.18], ["L3해리스", -0.76], ["노스롭 그루먼", -0.83], ["헌팅턴 잉걸스", -2.11]]],
+  ["자동차 · 이차전지", "", [["제너럴 모터스", -1.31], ["포드", -1.39], ["리비안", -3.12], ["퀀텀스케이프", -0.44]]],
+  ["중국 기술주", "", [["중국 인터넷 ETF", -1.93]]],
+  ["금융", "", [["모건 스탠리", 1.22], ["씨티그룹", 1.18], ["골드만삭스", 0.66], ["웰스 파고", 0.25], ["뱅크오브아메리카", 0.04], ["JP모건", -0.24]]],
+];
+const 묶음글 = 목록 => 목록.map(([g, s, l]) =>
+  `<div class="gname">${g}${s ? `<small>· ${s}</small>` : ""}</div>${칩(l)}`).join("");
+// 칸 수(묶음 제목 + 종목 수)가 비슷하게 둘로 나눕니다
+const 무게 = 묶음.map(x => 2 + x[2].length), 전체무게 = 무게.reduce((a, b) => a + b, 0);
+let 반 = 0; for (let 누 = 0; 반 < 묶음.length && 누 + 무게[반] / 2 < 전체무게 / 2; 반++) 누 += 무게[반];
+document.getElementById("grpL").innerHTML = 묶음글(묶음.slice(0, 반));
+document.getElementById("grpR").innerHTML = 묶음글(묶음.slice(반));
+
+// ── 주간 전략 ─────────────────────────────
+const 주간 = [
+  ["경제지표보다 '금리가 실제로 내려가느냐'",
+   "5일 ISM 서비스업, 7일 FOMC 의사록이 있지만, 지표가 다소 약하게 나오더라도 <b>장기금리가 실제로 내려가는지</b>가 더 중요합니다. 약한 고용에도 장기금리가 다시 오르는 흐름이 이어지면 기술주 밸류에이션 부담은 계속될 수 있습니다."],
+  ["미국 3·10·30년물 입찰",
+   "6일 3년물, <b>7일 10년물, 8일 30년물</b> 입찰이 이어지고 재무부는 6일 2~3년물, 8일 20~30년물 바이백도 합니다. 응찰률과 간접낙찰 비중이 부진하거나 테일이 생기면 '재정·공급 부담 → 기간 프리미엄 상승 → 장기금리 상승' 논리가 강해집니다. 반대로 수요가 강하고 바이백 효과가 확인되면 장기금리가 안정되며 기술주에도 긍정적입니다. 핵심 질문은 <b>\"10년물 5%대 금리를 투자자들이 얼마나 소화할 수 있느냐\"</b>입니다."],
+  ["일본 · 유럽 금리도 중요",
+   "일본은 재정지출 확대 우려와 BOJ 추가 긴축 기대가 겹쳐 장기금리가 높고, 유럽은 프랑스·영국 재정부담이 장기금리를 끌어올리고 있습니다. 프랑스는 2027년 재정적자를 GDP 대비 5%로 낮추는 긴축안을 두고 정치적 충돌이 이어지며 프랑스-독일 금리차가 2011년 이후 최고 수준입니다. 8일 유로존 재무장관회의, 9일 EU 재무장관회의와 프랑스 예산안 수정, 일본 5일 총리 정책연설·6일 10년물·8일 30년물 입찰을 봐야 합니다."],
+  ["AI · 반도체 이벤트 집중",
+   "6일 마벨 투자자의 날, 7일 MS·엔비디아 AI PC 행사, 8일 TSMC 9월 매출, 그리고 <b>삼성전자 3분기 잠정실적</b>(7~8일)이 몰려 있습니다. 마벨은 자체칩·광통신 성장과 하이퍼스케일러 매출 전환 시점, MS·엔비디아 행사는 AI가 PC·엣지로 얼마나 번지는지, TSMC와 삼성전자는 AI·메모리 업황의 강도를 직접 보여줍니다."],
+  ["좋은 AI 뉴스도 금리를 봐야 한다",
+   "AI 투자 확대가 단순 호재로만 읽히지 않습니다. 'AI 설비투자 증가 → 데이터센터 투자 확대 → 하이퍼스케일러 회사채 발행 증가 → 장기채 공급 경쟁 → 국채금리 상승'이라는 연결고리도 함께 부각되고 있습니다. 기업들이 설비투자 확대를 강조해도 금리가 같이 오르면 주가 반응은 제한될 수 있고, 금리가 안정되면 AI 실적·수요 모멘텀이 다시 기술주 강세를 이끌 수 있습니다."],
+];
+document.getElementById("wk1").innerHTML = 요인그리기(주간.slice(0, 3), 1);
+document.getElementById("wk2").innerHTML = 요인그리기(주간.slice(3), 4);
+
+// ── 일정 ─────────────────────────────────
+const 일정 = [
+  { 날: "10/04 (일)", 큼: false, 줄: [["t-ev", "원유", "OPEC+ 회담"]] },
+  { 날: "10/05 (월)", 큼: false, 줄: [
+      ["t-us", "미국", "<b>ISM 서비스업 (9월)</b> · 고용동향지수"],
+      ["t-ev", "유로존", "생산자물가 (8월)"],
+      ["t-ev", "정치", "일본 총리 임시국회 정책연설 · 영국 보수당 전당대회 시작"],
+      ["t-kr", "휴장", "한국 · 호주 · 중국"]] },
+  { 날: "10/06 (화)", 큼: false, 줄: [
+      ["t-ev", "유럽", "독일 공장주문 (8월) · 유로존 소매판매 (8월)"],
+      ["t-us", "미국", "수출입통계 (8월) · <b>3년물 입찰</b> · 재무부 2~3년물 바이백 · EIA 단기에너지전망"],
+      ["t-ev", "일본", "10년물 입찰 · 우에다 BOJ 총재 발언"],
+      ["t-us", "발언", "보우먼 연준 부의장"],
+      ["t-us", "행사", "마벨 투자자의 날"],
+      ["t-cn", "휴장", "중국"]] },
+  { 날: "10/07 (수)", 큼: true, 줄: [
+      ["t-us", "미국", "<b>10년물 입찰 · FOMC 의사록 공개</b> · 뉴욕 연은 소비자 기대조사"],
+      ["t-ev", "유럽", "독일 산업생산 (8월)"],
+      ["t-us", "행사", "<b>MS Windows·Surface AI 행사</b> (나델라·젠슨 황 참석) · BofA 기술 서밋 · 밀컨 아시아 서밋"],
+      ["t-us", "발언", "윌리엄스 · 로건 총재"],
+      ["t-kr", "한국", "삼성전자 3분기 잠정실적 발표 가능일 (7~8일)"],
+      ["t-cn", "휴장", "중국"]] },
+  { 날: "10/08 (목)", 큼: true, 줄: [
+      ["t-us", "미국", "<b>30년물 입찰</b> · 재무부 20~30년물 바이백 · 월러 연준 이사 경제전망"],
+      ["t-ev", "일본", "30년물 입찰"],
+      ["t-ev", "유럽", "독일 수출입통계 · 유로존 재무장관회의"],
+      ["t-us", "행사", "NeoCloud Summit (AMD·슈퍼마이크로 등)"],
+      ["t-ev", "대만", "<b>TSMC 9월 매출</b>"],
+      ["t-kr", "한국", "삼성전자 3분기 잠정실적 발표 가능일"]] },
+  { 날: "10/09 (금)", 큼: false, 줄: [
+      ["t-us", "미국", "소비자심리지수 (10월) · 콜린스 총재 발언 · WASDE 곡물 수급보고서"],
+      ["t-ev", "유럽", "EU 재무장관회의 · 프랑스 2027년 예산안 1부 수정안 제출 마감"],
+      ["t-us", "실적", "장전 — 델타항공"],
+      ["t-kr", "휴장", "한국"]] },
+];
+document.getElementById("cal").innerHTML = 일정.map(d => `
+  <div class="cal-day ${d.큼 ? "big" : ""}">
+    <div class="cal-d">${d.날}${d.큼 ? `<span>중요</span>` : ""}</div>
+    <div class="cal-l">${d.줄.map(([c, 종류, 글]) =>
+      `<div><span class="tag ${c}">${종류}</span>${글}</div>`).join("")}</div>
+  </div>`).join("");
+
+이야기그리기();
+</script>
+</body>
+</html>
